@@ -9,6 +9,25 @@ Add an admin-only debug snapshot for relay requests so local operators can compa
 
 This is intended for diagnosing request failures caused by parameter mapping, disabled-field removal, pass-through behavior, model mapping, or parameter override issues.
 
+The implementation must also remain easy to carry on top of upstream new-api updates. This is a personal/local customization, so the patch should minimize long-term merge friction.
+
+## Upstream Sync Constraints
+
+The first implementation should be shaped as a small, easy-to-reapply local patch:
+
+- avoid database schema migrations in the first version
+- avoid frontend changes in the first version
+- keep the feature disabled by default
+- keep configuration in one backend setting/env area rather than scattering channel-specific switches
+- keep redaction, truncation, and snapshot assembly in one helper package or relay-common helper
+- touch the smallest practical number of relay entry points
+- do not modify provider-specific adaptors unless a path cannot be captured from the common relay flow
+- prefer appending `Other.admin_info.request_debug` over changing log model fields
+
+When upstream changes are pulled in, this design should let the local patch be replayed by resolving conflicts in a few predictable files rather than across dozens of channel adaptors.
+
+The implementation should be kept as one or a small number of focused commits. That makes it easier to maintain a personal branch, rebase onto upstream, or cherry-pick the local customization after upgrading.
+
 ## Scope
 
 The first version covers JSON-based relay paths where the code already produces a final upstream JSON payload before dispatch:
@@ -118,3 +137,10 @@ Tests should use deterministic table cases and `testify/require` plus `testify/a
 Prefer a small service or relay-common helper for building sanitized snapshots. Avoid scattering redaction and truncation logic across individual channel adaptors.
 
 Do not add a new database column or table in the first version. The existing `logs.other` JSON field is sufficient for a personal debug workflow and avoids cross-database migration risk.
+
+For local maintenance, document the touched files after implementation and keep a short manual verification command list. After pulling upstream changes, the expected recovery flow is:
+
+1. rebase or merge upstream
+2. resolve conflicts in the small set of touched files
+3. run the focused request-debug tests
+4. run the existing relay/log tests affected by the touched files
