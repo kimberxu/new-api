@@ -84,6 +84,7 @@ func InitEnv() {
 	// Initialize variables from constants.go that were using environment variables
 	DebugEnabled = os.Getenv("DEBUG") == "true"
 	MemoryCacheEnabled = os.Getenv("MEMORY_CACHE_ENABLED") == "true"
+	initRequestDebugConfigFromEnv()
 	IsMasterNode = os.Getenv("NODE_TYPE") != "slave"
 	initNodeNameIdentity()
 	TLSInsecureSkipVerify = GetEnvOrDefaultBool("TLS_INSECURE_SKIP_VERIFY", false)
@@ -132,6 +133,22 @@ func InitEnv() {
 	SearchRateLimitNum = GetEnvOrDefault("SEARCH_RATE_LIMIT", 10)
 	SearchRateLimitDuration = int64(GetEnvOrDefault("SEARCH_RATE_LIMIT_DURATION", 60))
 	initConstantEnv()
+}
+
+func initRequestDebugConfigFromEnv() {
+	mode := strings.ToLower(strings.TrimSpace(GetEnvOrDefaultString("REQUEST_DEBUG_LOGGING", "off")))
+	switch mode {
+	case "always", "error_only":
+		RequestDebugLogging = mode
+	default:
+		RequestDebugLogging = "off"
+	}
+
+	maxBytes := GetEnvOrDefault("REQUEST_DEBUG_MAX_BODY_BYTES", 32*1024)
+	if maxBytes <= 0 {
+		maxBytes = 32 * 1024
+	}
+	RequestDebugMaxBodyBytes = maxBytes
 }
 
 func initConstantEnv() {
