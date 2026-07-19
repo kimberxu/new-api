@@ -114,17 +114,17 @@ services:
 
 那么容器运行的是上游公开镜像。即使服务器上的 Git 仓库已经切换到 `deploy` 分支，执行普通的 `docker compose up -d` 仍不会包含本地请求调试改造。
 
-本地定制版本必须通过本仓库的 `Dockerfile` 构建。推荐在部署机器上从个人 Gitea 的 `deploy` 分支构建，并给本地镜像使用独立名称，避免覆盖上游镜像。
+本地定制版本必须使用个人 GitHub fork 的 `deploy` 分支构建镜像，并给镜像使用独立名称，避免覆盖上游公开镜像。推荐使用 GitHub Actions 构建并发布到 GHCR，部署机器只拉取镜像。
 
-本地 Gitea 仓库使用以下分支：
+个人 GitHub fork 使用以下分支：
 
 - `local/request-debug`：请求调试功能分支；
 - `deploy`：部署分支；
 - `main`：个人主分支。
 
-完整 Git 工作流见 [local-gitea-workflow.md](local-gitea-workflow.md)。
+完整 Git 工作流见 [local-github-workflow.md](local-github-workflow.md)。
 
-### 5.2 合并并更新 Gitea 部署分支
+### 5.2 合并并更新 GitHub 部署分支
 
 在开发机完成验证后执行：
 
@@ -135,7 +135,7 @@ git merge --no-ff local/request-debug
 git push origin deploy
 ```
 
-### 5.3 首次将原上游克隆切换到个人 Gitea
+### 5.3 首次将原上游克隆切换到个人 GitHub fork
 
 以下命令只需执行一次。先进入原来运行 Compose 的仓库目录：
 
@@ -144,11 +144,11 @@ cd /实际路径/new-api
 git remote -v
 ```
 
-如果当前只有名为 `origin` 的 GitHub 上游地址，将它保留为 `upstream`，再添加个人 Gitea 为新的 `origin`：
+如果当前只有名为 `origin` 的官方上游地址，将它保留为 `upstream`，再把个人 GitHub fork 设为新的 `origin`：
 
 ```bash
 git remote rename origin upstream
-git remote add origin ssh://git@gitea.228778.xyz:23022/kim/new-api.git
+git remote add origin https://github.com/kimberxu/new-api.git
 git fetch origin
 git fetch upstream
 ```
@@ -157,7 +157,7 @@ git fetch upstream
 
 ```bash
 git remote set-url upstream https://github.com/QuantumNous/new-api.git
-git remote set-url origin ssh://git@gitea.228778.xyz:23022/kim/new-api.git
+git remote set-url origin https://github.com/kimberxu/new-api.git
 git fetch --all --prune
 ```
 
@@ -304,10 +304,11 @@ env_file:
 https://github.com/kimberxu/new-api.git
 ```
 
-当前仓库已添加 GitHub 远程：
+当前仓库使用以下远程：
 
 ```bash
-git remote add github https://github.com/kimberxu/new-api.git
+origin   https://github.com/kimberxu/new-api.git
+upstream https://github.com/QuantumNous/new-api.git
 ```
 
 `workflow_dispatch` 工作流必须存在于 GitHub 仓库默认分支，否则 Actions 页面不会显示手动触发入口。因此需要同时保证：
@@ -318,16 +319,16 @@ git remote add github https://github.com/kimberxu/new-api.git
 如果 workflow 已经存在于 GitHub `main`，后续只需要推送 `deploy`：
 
 ```bash
-git push -u github deploy
+git push -u origin deploy
 ```
 
 如果 Actions 页面看不到 `Build deploy image (GHCR)`，说明 workflow 还没有进入默认分支。此时在开发机执行：
 
 ```bash
-git fetch github main
-git switch -C github-main github/main
+git fetch origin main
+git switch -C origin-main origin/main
 git cherry-pick <新增 workflow 的提交>
-git push github github-main:main
+git push origin origin-main:main
 git switch deploy
 ```
 
@@ -412,10 +413,10 @@ curl -fsS http://127.0.0.1:23002/api/status
 以后更新个人部署分支时，在开发机完成代码合并和验证后推送 `deploy`：
 
 ```bash
-git fetch github
+git fetch origin
 git checkout deploy
-git pull --ff-only github deploy
-git push github deploy
+git pull --ff-only origin deploy
+git push origin deploy
 ```
 
 然后到 GitHub 手动运行：
