@@ -198,66 +198,82 @@ git pull --ff-only origin deploy
 
 ### 5.6 创建机器专用 Compose 文件
 
-推荐保留仓库的 `docker-compose.yml`，把原生产配置复制成机器专用文件：
+推荐保留仓库跟踪的 `docker-compose.yml`，把原生产配置复制成机器专用的 `compose.yml`：
 
 ```bash
-cp docker-compose.yml.before-request-debug docker-compose.production.yml
+cp docker-compose.yml.before-request-debug compose.yml
 ```
 
-编辑 `docker-compose.production.yml`，仅将 `new-api` 服务的公开镜像配置：
+Docker Compose 会自动识别同目录的 `compose.yml`，后续命令无需再使用 `-f` 指定文件。
 
-```yaml
-image: calciumion/new-api:latest
-```
-
-替换为：
-
-```yaml
-build:
-  context: .
-  dockerfile: Dockerfile
-image: new-api-local:request-debug
-```
-
-根据用户现有配置，`new-api` 服务应类似：
+将 `compose.yml` 简化为：
 
 ```yaml
 services:
   new-api:
-    mem_limit: 2048m
     build:
       context: .
       dockerfile: Dockerfile
     image: new-api-local:request-debug
     container_name: new-api
     restart: unless-stopped
+    mem_limit: 2048m
     command: --log-dir /app/logs
+
     ports:
       - "23002:3000"
+
     volumes:
       - ./data:/data
       - ./logs:/app/logs
+
     env_file:
       - .env
+
     depends_on:
       - redis
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O - http://localhost:3000/api/status | grep -o '\"success\":\\s*true' || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: unless-stopped
 ```
 
-原有 Redis、数据库、healthcheck、端口、数据卷和其他环境配置保持不变。不要把现有 `.env` 内容复制到镜像或提交到 Git。
+不要把现有 `.env` 内容复制到镜像或提交到 Git。此配置继续使用原来的端口、数据目录、日志目录和 Redis 容器。
+
+当前仓库没有跟踪或忽略 `compose.yml`。把它保留为部署机器上的未跟踪文件即可，通常不会影响 `git pull`。需要注意：
+
+- 不要使用 `git add .` 把它误提交；
+- 如果将来仓库新增同名文件，`git pull` 会提示未跟踪文件冲突；
+- 如希望彻底避免误提交，可选择性加入当前仓库的本地排除列表：
+
+  ```bash
+  echo "/compose.yml" >> .git/info/exclude
+  ```
+
+本地排除是可选项，不会修改项目的 `.gitignore`，也不会推送到远程仓库。
 
 先检查 Compose 语法和最终合并结果：
 
 ```bash
-docker compose -f docker-compose.production.yml config
+docker compose config
 ```
 
 如果机器使用旧版命令，将 `docker compose` 替换为 `docker-compose`。
 
 ### 5.7 修改 `.env`
 
-### 5.3 配置文件部署
-
-如果使用 `.env`，加入：
+在现有 `.env` 中加入：
 
 ```env
 REQUEST_DEBUG_LOGGING=off
@@ -282,7 +298,7 @@ env_file:
 执行：
 
 ```bash
-docker compose -f docker-compose.production.yml build --pull new-api
+docker compose build --pull new-api
 ```
 
 构建完成后确认本地镜像存在：
@@ -298,8 +314,8 @@ docker image inspect new-api-local:request-debug --format '{{.Id}} {{.Created}}'
 构建成功后只更新 `new-api` 服务：
 
 ```bash
-docker compose -f docker-compose.production.yml up -d --no-deps new-api
-docker compose -f docker-compose.production.yml ps
+docker compose up -d --no-deps new-api
+docker compose ps
 docker logs --tail 100 new-api
 ```
 
@@ -321,9 +337,21 @@ cd /实际路径/new-api
 git fetch origin
 git checkout deploy
 git pull --ff-only origin deploy
-docker compose -f docker-compose.production.yml build new-api
-docker compose -f docker-compose.production.yml up -d --no-deps new-api
-docker compose -f docker-compose.production.yml ps
+docker compose build new-api
+docker compose up -d --no-deps new-api
+docker compose ps
+```
+
+日常启动仍可直接执行：
+
+```bash
+docker compose up -d
+```
+
+代码更新后必须执行 `docker compose build new-api`，或者直接使用：
+
+```bash
+docker compose up -d --build
 ```
 
 不要再执行只会拉取上游公开镜像的：
@@ -446,7 +474,7 @@ docker compose pull new-api
    REQUEST_DEBUG_LOGGING=off
    ```
 
-2. 使用 `docker compose -f docker-compose.production.yml ps` 和 `/api/status` 确认容器健康。
+2. 使用 `docker compose ps` 和 `/api/status` 确认容器健康。
 3. 确认实际运行的是本地镜像：
 
    ```bash
@@ -469,7 +497,7 @@ docker compose pull new-api
 6. 使用以下命令重新创建后端容器，使 `.env` 生效：
 
    ```bash
-   docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate new-api
+   docker compose up -d --no-deps --force-recreate new-api
    ```
 
 7. 观察管理员错误日志。
@@ -546,7 +574,7 @@ git push origin deploy-YYYYMMDD-before-request-debug
 
 如果部署后发现异常，先将 `REQUEST_DEBUG_LOGGING` 设置为 `off` 并重新创建容器。只有确认问题由代码本身引起时，再回退到之前保留的上游镜像。
 
-将 `docker-compose.production.yml` 中：
+将 `compose.yml` 中：
 
 ```yaml
 build:
@@ -564,9 +592,9 @@ image: new-api-upstream-backup:pre-request-debug
 然后执行：
 
 ```bash
-docker compose -f docker-compose.production.yml config
-docker compose -f docker-compose.production.yml up -d --no-deps new-api
-docker compose -f docker-compose.production.yml ps
+docker compose config
+docker compose up -d --no-deps new-api
+docker compose ps
 docker logs --tail 100 new-api
 ```
 
