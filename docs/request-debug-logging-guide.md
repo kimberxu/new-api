@@ -211,10 +211,7 @@ Docker Compose 会自动识别同目录的 `compose.yml`，后续命令无需再
 ```yaml
 services:
   new-api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: new-api-local:request-debug
+    image: ghcr.io/kimberxu/new-api:deploy
     container_name: new-api
     restart: unless-stopped
     mem_limit: 2048m
@@ -250,6 +247,12 @@ services:
 ```
 
 不要把现有 `.env` 内容复制到镜像或提交到 Git。此配置继续使用原来的端口、数据目录、日志目录和 Redis 容器。
+
+如果 GHCR 包是私有的，部署机器需要先登录 GitHub Container Registry。使用 GitHub Personal Access Token，至少授予 `read:packages` 权限：
+
+```bash
+docker login ghcr.io
+```
 
 当前仓库没有跟踪或忽略 `compose.yml`。把它保留为部署机器上的未跟踪文件即可，通常不会影响 `git pull`。需要注意：
 
@@ -291,9 +294,84 @@ env_file:
 
 首次上线保持 `REQUEST_DEBUG_LOGGING=off`。修改 `.env` 后必须重建或重新创建 `new-api` 容器，运行中的容器不会自动读取新值。
 
-### 5.8 构建本地镜像
+### 5.8 使用 GitHub Actions 构建镜像
 
-仓库 `Dockerfile` 会依次构建 default 前端、classic 前端和 Go 后端，因此首次构建需要访问 Bun、Go 和 Debian 软件源，并会占用一定时间和磁盘空间。
+推荐使用 GitHub Actions 构建镜像，部署机器只负责拉取镜像和重建容器，避免在本地占用 CPU、内存和磁盘 I/O。
+
+当前个人 GitHub fork：
+
+```text
+https://github.com/kimberxu/new-api.git
+```
+
+当前仓库已添加 GitHub 远程：
+
+```bash
+git remote add github https://github.com/kimberxu/new-api.git
+```
+
+`workflow_dispatch` 工作流必须存在于 GitHub 仓库默认分支，否则 Actions 页面不会显示手动触发入口。因此需要同时保证：
+
+- `main` 分支包含 `.github/workflows/deploy-image-ghcr.yml`；
+- `deploy` 分支包含要实际构建和部署的请求调试改造代码。
+
+如果 workflow 已经存在于 GitHub `main`，后续只需要推送 `deploy`：
+
+```bash
+git push -u github deploy
+```
+
+如果 Actions 页面看不到 `Build deploy image (GHCR)`，说明 workflow 还没有进入默认分支。此时在开发机执行：
+
+```bash
+git fetch github main
+git switch -C github-main github/main
+git cherry-pick <新增 workflow 的提交>
+git push github github-main:main
+git switch deploy
+```
+
+不要把请求调试业务改造合并进 `main`，只需要让 `main` 拥有手动触发 workflow；workflow 运行时会按 `branch` 输入值 checkout `deploy`。
+
+在 GitHub 页面手动触发：
+
+```text
+Actions -> Build deploy image (GHCR) -> Run workflow
+```
+
+`branch` 输入框保持默认值：
+
+```text
+deploy
+```
+
+构建成功后会发布两个标签：
+
+```text
+ghcr.io/kimberxu/new-api:deploy
+ghcr.io/kimberxu/new-api:deploy-<short-sha>
+```
+
+日常部署使用固定分支标签：
+
+```text
+ghcr.io/kimberxu/new-api:deploy
+```
+
+如需精确回滚到某次构建，可临时改用 `deploy-<short-sha>` 标签。
+
+### 5.8.1 本地构建备用方案
+
+只有 GitHub Actions 或 GHCR 不可用时，才建议在部署机器本地构建。仓库 `Dockerfile` 会依次构建 default 前端、classic 前端和 Go 后端，因此首次构建需要访问 Bun、Go 和 Debian 软件源，并会占用一定时间和磁盘空间。
+
+先将 `compose.yml` 中的镜像配置临时改回本地构建：
+
+```yaml
+build:
+  context: .
+  dockerfile: Dockerfile
+image: new-api-local:request-debug
+```
 
 执行：
 
@@ -311,9 +389,10 @@ docker image inspect new-api-local:request-debug --format '{{.Id}} {{.Created}}'
 
 ### 5.9 替换后端容器
 
-构建成功后只更新 `new-api` 服务：
+GitHub Actions 构建成功后，在部署机器拉取新镜像并只更新 `new-api` 服务：
 
 ```bash
+docker compose pull new-api
 docker compose up -d --no-deps new-api
 docker compose ps
 docker logs --tail 100 new-api
@@ -330,14 +409,26 @@ curl -fsS http://127.0.0.1:23002/api/status
 
 ### 5.10 后续更新
 
-以后更新个人部署分支时执行：
+以后更新个人部署分支时，在开发机完成代码合并和验证后推送 `deploy`：
+
+```bash
+git fetch github
+git checkout deploy
+git pull --ff-only github deploy
+git push github deploy
+```
+
+然后到 GitHub 手动运行：
+
+```text
+Actions -> Build deploy image (GHCR) -> Run workflow
+```
+
+镜像构建完成后，在部署机器执行：
 
 ```bash
 cd /实际路径/new-api
-git fetch origin
-git checkout deploy
-git pull --ff-only origin deploy
-docker compose build new-api
+docker compose pull new-api
 docker compose up -d --no-deps new-api
 docker compose ps
 ```
@@ -348,16 +439,16 @@ docker compose ps
 docker compose up -d
 ```
 
-代码更新后必须执行 `docker compose build new-api`，或者直接使用：
+代码更新后必须重新运行 GitHub Actions 并在部署机器执行 `docker compose pull new-api`。如果使用本地构建备用方案，则执行：
 
 ```bash
 docker compose up -d --build
 ```
 
-不要再执行只会拉取上游公开镜像的：
+不要再拉取上游公开镜像：
 
 ```bash
-docker compose pull new-api
+docker pull calciumion/new-api:latest
 ```
 
 除非你的目标是明确回退到 `calciumion/new-api`。
@@ -475,7 +566,7 @@ docker compose pull new-api
    ```
 
 2. 使用 `docker compose ps` 和 `/api/status` 确认容器健康。
-3. 确认实际运行的是本地镜像：
+3. 确认实际运行的是 GHCR 部署镜像：
 
    ```bash
    docker inspect new-api --format '{{.Config.Image}}'
@@ -484,7 +575,7 @@ docker compose pull new-api
    预期输出：
 
    ```text
-   new-api-local:request-debug
+   ghcr.io/kimberxu/new-api:deploy
    ```
 
 4. 确认服务正常启动，普通请求行为不变。
@@ -577,10 +668,7 @@ git push origin deploy-YYYYMMDD-before-request-debug
 将 `compose.yml` 中：
 
 ```yaml
-build:
-  context: .
-  dockerfile: Dockerfile
-image: new-api-local:request-debug
+image: ghcr.io/kimberxu/new-api:deploy
 ```
 
 替换为：
@@ -607,6 +695,14 @@ image: calciumion/new-api:latest
 ```
 
 但 `latest` 可能已经指向不同版本，因此可靠性低于部署前保存的固定镜像。
+
+如果需要回滚到 GitHub Actions 生成的某次固定构建，也可以将 `compose.yml` 中的镜像改为对应的短 SHA 标签：
+
+```yaml
+image: ghcr.io/kimberxu/new-api:deploy-<short-sha>
+```
+
+该标签来自 GitHub Actions 构建摘要。
 
 ## 11. 上游同步与本地维护
 
