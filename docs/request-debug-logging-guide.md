@@ -102,6 +102,20 @@ REQUEST_DEBUG_MAX_BODY_BYTES=4096
 
 ## 5. 部署步骤
 
+### 5.1 先确认当前部署方式
+
+如果 Compose 中使用的是：
+
+```yaml
+services:
+  new-api:
+    image: calciumion/new-api:latest
+```
+
+那么容器运行的是上游公开镜像。即使服务器上的 Git 仓库已经切换到 `deploy` 分支，执行普通的 `docker compose up -d` 仍不会包含本地请求调试改造。
+
+本地定制版本必须通过本仓库的 `Dockerfile` 构建。推荐在部署机器上从个人 Gitea 的 `deploy` 分支构建，并给本地镜像使用独立名称，避免覆盖上游镜像。
+
 本地 Gitea 仓库使用以下分支：
 
 - `local/request-debug`：请求调试功能分支；
@@ -110,7 +124,7 @@ REQUEST_DEBUG_MAX_BODY_BYTES=4096
 
 完整 Git 工作流见 [local-gitea-workflow.md](local-gitea-workflow.md)。
 
-### 5.1 更新部署分支
+### 5.2 合并并更新 Gitea 部署分支
 
 在开发机完成验证后执行：
 
@@ -121,16 +135,125 @@ git merge --no-ff local/request-debug
 git push origin deploy
 ```
 
-### 5.2 更新部署机器
+### 5.3 首次将原上游克隆切换到个人 Gitea
+
+以下命令只需执行一次。先进入原来运行 Compose 的仓库目录：
 
 ```bash
-cd new-api
+cd /实际路径/new-api
+git remote -v
+```
+
+如果当前只有名为 `origin` 的 GitHub 上游地址，将它保留为 `upstream`，再添加个人 Gitea 为新的 `origin`：
+
+```bash
+git remote rename origin upstream
+git remote add origin ssh://git@gitea.228778.xyz:23022/kim/new-api.git
 git fetch origin
-git checkout deploy
+git fetch upstream
+```
+
+如果仓库已经存在 `upstream`，不要再次执行 `git remote rename`。应检查地址并按实际情况设置：
+
+```bash
+git remote set-url upstream https://github.com/QuantumNous/new-api.git
+git remote set-url origin ssh://git@gitea.228778.xyz:23022/kim/new-api.git
+git fetch --all --prune
+```
+
+不要在未检查 `git remote -v` 的情况下盲目覆盖远程地址。
+
+### 5.4 备份现有部署配置
+
+现有 `.env`、Compose 文件、数据库目录和日志目录都应保留。切换分支前先备份：
+
+```bash
+cd /实际路径/new-api
+cp .env .env.before-request-debug
+cp docker-compose.yml docker-compose.yml.before-request-debug
+git status --short
+```
+
+如果实际文件名是 `docker-compose.yaml` 或 `compose.yml`，命令中的文件名应同步替换。
+
+记录当前上游镜像 ID，并额外创建一个本地回滚标签：
+
+```bash
+docker image inspect calciumion/new-api:latest --format '{{.Id}}'
+docker tag calciumion/new-api:latest new-api-upstream-backup:pre-request-debug
+```
+
+`./data` 和 `./logs` 是绑定挂载目录，不要删除、移动或执行 `docker compose down -v`。
+
+### 5.5 切换到 `deploy` 分支
+
+```bash
+cd /实际路径/new-api
+git fetch origin
+git checkout -B deploy origin/deploy
 git pull --ff-only origin deploy
 ```
 
-然后根据机器现有部署方式重新构建并重启服务。
+如果 `git checkout` 提示本地修改会被覆盖，停止操作。先确认修改是否只来自 `.env` 和 Compose 文件；不要使用 `git reset --hard`。使用前一步的备份恢复部署配置，或把机器专用 Compose 文件改成不受 Git 跟踪的名称。
+
+### 5.6 创建机器专用 Compose 文件
+
+推荐保留仓库的 `docker-compose.yml`，把原生产配置复制成机器专用文件：
+
+```bash
+cp docker-compose.yml.before-request-debug docker-compose.production.yml
+```
+
+编辑 `docker-compose.production.yml`，仅将 `new-api` 服务的公开镜像配置：
+
+```yaml
+image: calciumion/new-api:latest
+```
+
+替换为：
+
+```yaml
+build:
+  context: .
+  dockerfile: Dockerfile
+image: new-api-local:request-debug
+```
+
+根据用户现有配置，`new-api` 服务应类似：
+
+```yaml
+services:
+  new-api:
+    mem_limit: 2048m
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: new-api-local:request-debug
+    container_name: new-api
+    restart: unless-stopped
+    command: --log-dir /app/logs
+    ports:
+      - "23002:3000"
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    depends_on:
+      - redis
+```
+
+原有 Redis、数据库、healthcheck、端口、数据卷和其他环境配置保持不变。不要把现有 `.env` 内容复制到镜像或提交到 Git。
+
+先检查 Compose 语法和最终合并结果：
+
+```bash
+docker compose -f docker-compose.production.yml config
+```
+
+如果机器使用旧版命令，将 `docker compose` 替换为 `docker-compose`。
+
+### 5.7 修改 `.env`
 
 ### 5.3 配置文件部署
 
@@ -141,17 +264,75 @@ REQUEST_DEBUG_LOGGING=off
 REQUEST_DEBUG_MAX_BODY_BYTES=32768
 ```
 
-如果使用 Docker Compose，可在服务的 `environment` 中加入：
+现有 Compose 已通过：
 
 ```yaml
-environment:
-  - REQUEST_DEBUG_LOGGING=off
-  - REQUEST_DEBUG_MAX_BODY_BYTES=32768
+env_file:
+  - .env
 ```
 
-如果使用 systemd，在对应的 `EnvironmentFile` 或 service 配置中加入同名环境变量。
+读取同目录的 `.env`，因此不需要再把相同变量重复写入 `environment`。
 
-修改环境变量后必须重启后端进程，运行中的进程不会动态重新读取这些配置。
+首次上线保持 `REQUEST_DEBUG_LOGGING=off`。修改 `.env` 后必须重建或重新创建 `new-api` 容器，运行中的容器不会自动读取新值。
+
+### 5.8 构建本地镜像
+
+仓库 `Dockerfile` 会依次构建 default 前端、classic 前端和 Go 后端，因此首次构建需要访问 Bun、Go 和 Debian 软件源，并会占用一定时间和磁盘空间。
+
+执行：
+
+```bash
+docker compose -f docker-compose.production.yml build --pull new-api
+```
+
+构建完成后确认本地镜像存在：
+
+```bash
+docker image inspect new-api-local:request-debug --format '{{.Id}} {{.Created}}'
+```
+
+构建失败时不要停止现有容器；修复网络、磁盘或依赖问题后重新构建即可。
+
+### 5.9 替换后端容器
+
+构建成功后只更新 `new-api` 服务：
+
+```bash
+docker compose -f docker-compose.production.yml up -d --no-deps new-api
+docker compose -f docker-compose.production.yml ps
+docker logs --tail 100 new-api
+```
+
+`--no-deps` 可避免无必要地重建或重启 Redis。由于继续使用相同的容器名、端口和绑定挂载目录，原有 `./data`、`./logs` 与外部数据库配置会继续使用。
+
+检查健康状态：
+
+```bash
+docker inspect new-api --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}'
+curl -fsS http://127.0.0.1:23002/api/status
+```
+
+### 5.10 后续更新
+
+以后更新个人部署分支时执行：
+
+```bash
+cd /实际路径/new-api
+git fetch origin
+git checkout deploy
+git pull --ff-only origin deploy
+docker compose -f docker-compose.production.yml build new-api
+docker compose -f docker-compose.production.yml up -d --no-deps new-api
+docker compose -f docker-compose.production.yml ps
+```
+
+不要再执行只会拉取上游公开镜像的：
+
+```bash
+docker compose pull new-api
+```
+
+除非你的目标是明确回退到 `calciumion/new-api`。
 
 ## 6. 快照结构
 
@@ -265,15 +446,34 @@ environment:
    REQUEST_DEBUG_LOGGING=off
    ```
 
-2. 确认服务正常启动，普通请求行为不变。
-3. 仅在需要排查真实失败时切换为：
+2. 使用 `docker compose -f docker-compose.production.yml ps` 和 `/api/status` 确认容器健康。
+3. 确认实际运行的是本地镜像：
+
+   ```bash
+   docker inspect new-api --format '{{.Config.Image}}'
+   ```
+
+   预期输出：
+
+   ```text
+   new-api-local:request-debug
+   ```
+
+4. 确认服务正常启动，普通请求行为不变。
+5. 仅在需要排查真实失败时切换为：
 
    ```env
    REQUEST_DEBUG_LOGGING=error_only
    ```
 
-4. 重启服务后观察管理员错误日志。
-5. 收集到足够信息后立即恢复 `off` 并再次重启。
+6. 使用以下命令重新创建后端容器，使 `.env` 生效：
+
+   ```bash
+   docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate new-api
+   ```
+
+7. 观察管理员错误日志。
+8. 收集到足够信息后立即恢复 `off`，并再次重新创建后端容器。
 
 不要为了验证功能而在生产渠道上故意配置错误密钥，也不要制造可能触发渠道自动禁用的失败请求。
 
@@ -344,7 +544,41 @@ git tag deploy-YYYYMMDD-before-request-debug
 git push origin deploy-YYYYMMDD-before-request-debug
 ```
 
-如果部署后发现异常，先将 `REQUEST_DEBUG_LOGGING` 设置为 `off`。只有确认问题由代码本身引起时，再按 [local-gitea-workflow.md](local-gitea-workflow.md) 中的回滚流程恢复部署分支。
+如果部署后发现异常，先将 `REQUEST_DEBUG_LOGGING` 设置为 `off` 并重新创建容器。只有确认问题由代码本身引起时，再回退到之前保留的上游镜像。
+
+将 `docker-compose.production.yml` 中：
+
+```yaml
+build:
+  context: .
+  dockerfile: Dockerfile
+image: new-api-local:request-debug
+```
+
+替换为：
+
+```yaml
+image: new-api-upstream-backup:pre-request-debug
+```
+
+然后执行：
+
+```bash
+docker compose -f docker-compose.production.yml config
+docker compose -f docker-compose.production.yml up -d --no-deps new-api
+docker compose -f docker-compose.production.yml ps
+docker logs --tail 100 new-api
+```
+
+该回滚不会删除 `./data` 或 `./logs`。不要执行 `docker compose down -v`。
+
+如未创建本地回滚标签，可临时恢复为：
+
+```yaml
+image: calciumion/new-api:latest
+```
+
+但 `latest` 可能已经指向不同版本，因此可靠性低于部署前保存的固定镜像。
 
 ## 11. 上游同步与本地维护
 
