@@ -53,6 +53,7 @@ func trimModelThinking(modelName string) string {
 
 func GeminiHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.NewAPIError) {
 	info.InitChannelMeta(c)
+	relaycommon.CaptureDownstreamRequestDebug(c, info)
 
 	geminiReq, ok := info.Request.(*dto.GeminiChatRequest)
 	if !ok {
@@ -141,6 +142,7 @@ func GeminiHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 		if err != nil {
 			return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 		}
+		relaycommon.CaptureUpstreamRequestDebugFromStorage(c, info)
 		requestBody = common.ReaderOnly(storage)
 	} else {
 		// 使用 ConvertGeminiRequest 转换请求格式
@@ -162,6 +164,7 @@ func GeminiHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 			}
 		}
 
+		relaycommon.CaptureUpstreamRequestDebug(c, info, jsonData)
 		logger.LogDebug(c, "Gemini request body: %s", jsonData)
 
 		body, size, closer, err := relaycommon.NewOutboundJSONBody(jsonData)
@@ -206,6 +209,7 @@ func GeminiHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 
 func GeminiEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.NewAPIError) {
 	info.InitChannelMeta(c)
+	relaycommon.CaptureDownstreamRequestDebug(c, info)
 
 	isBatch := strings.HasSuffix(c.Request.URL.Path, "batchEmbedContents")
 	info.IsGeminiBatchEmbedding = isBatch
@@ -268,6 +272,7 @@ func GeminiEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo) (newAPI
 			return newAPIErrorFromParamOverride(err)
 		}
 	}
+	relaycommon.CaptureUpstreamRequestDebug(c, info, jsonData)
 	logger.LogDebug(c, "Gemini embedding request body: %s", jsonData)
 	body, size, closer, err := relaycommon.NewOutboundJSONBody(jsonData)
 	if err != nil {
