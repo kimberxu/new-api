@@ -130,20 +130,14 @@ git push origin deploy
 
 ## 重新应用本地定制
 
-本地定制应保持小而聚焦。请求调试日志的预期形态：
+请求调试日志的具体改造目标、文件清单、职责、不变量、冲突处理和验证命令见 [request-debug-customization-manifest.md](request-debug-customization-manifest.md)。该 manifest 是上游同步后修复本地改造的权威清单。
 
-- 首版不新增数据库迁移；
-- 首版不新增前端改动；
-- 功能默认关闭；
-- 脱敏、截断和快照组装逻辑集中维护；
-- 快照保存在 `Other.admin_info.request_debug`。
-
-上游更新后如果冲突较多：
+上游更新后如果冲突较多，不要固定 cherry-pick 某个历史 commit，也不要整文件覆盖上游新文件。推荐流程：
 
 1. 从更新后的 `main` 创建新分支；
-2. cherry-pick 本地定制提交；
-3. 解决相关文件冲突；
-4. 运行聚焦测试；
+2. 用 manifest 的文件职责逐项检查当前 `deploy` 与 `main` 的差异；
+3. 只迁移请求调试相关逻辑；
+4. 运行 manifest 中的聚焦测试；
 5. 合并修复后的分支到 `deploy`。
 
 示例：
@@ -152,7 +146,7 @@ git push origin deploy
 git checkout main
 git pull --ff-only origin main
 git checkout -b local/request-debug-refresh
-git cherry-pick <local-request-debug-commit>
+git diff main..deploy -- common relay controller service model docs .github
 ```
 
 ## 验证清单

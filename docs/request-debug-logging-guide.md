@@ -707,7 +707,7 @@ image: ghcr.io/kimberxu/new-api:deploy-<short-sha>
 
 ## 11. 上游同步与本地维护
 
-该功能是本地定制，应保持为单个聚焦提交，便于在同步上游后重新应用。
+该功能是本地定制。具体改造目标、文件清单、职责、不变量、冲突处理和验证命令见 [request-debug-customization-manifest.md](request-debug-customization-manifest.md)。
 
 更新上游后：
 
@@ -719,30 +719,24 @@ git merge upstream/main
 git push origin main
 ```
 
-如果请求调试改造冲突较多：
+再将更新后的 `main` 合入 `deploy`：
+
+```bash
+git checkout deploy
+git pull --ff-only origin deploy
+git merge main
+```
+
+如果请求调试改造冲突较多，不要固定 cherry-pick 某个历史 commit，也不要整文件覆盖上游新文件。应从更新后的 `main` 创建修复分支，并按 manifest 中的文件职责逐项重放本地逻辑：
 
 ```bash
 git checkout main
+git pull --ff-only origin main
 git checkout -b local/request-debug-refresh
-git cherry-pick d25a0524
+git diff main..deploy -- common relay controller service model docs .github
 ```
 
-解决冲突后重新运行第 9 节的聚焦测试，再合并到 `deploy`。
-
-预期容易发生冲突的文件包括：
-
-- `common/constants.go`
-- `common/init.go`
-- `controller/relay.go`
-- `relay/common/relay_info.go`
-- `relay/common/request_debug.go`
-- `relay/compatible_handler.go`
-- `relay/responses_handler.go`
-- `relay/claude_handler.go`
-- `relay/gemini_handler.go`
-- `service/log_info_generate.go`
-
-不要把快照逻辑复制到各个渠道 adaptor 中；应继续集中维护脱敏、截断和快照组装逻辑。
+解决冲突后重新运行第 9 节的聚焦测试，再合并到 `deploy`。冲突修复必须继续满足：功能默认关闭、快照只写入 `Other.admin_info.request_debug`、普通用户不可见 `admin_info`、快照采集失败不影响正常 relay、脱敏和截断逻辑集中维护。
 
 ## 12. 日常操作速查
 
