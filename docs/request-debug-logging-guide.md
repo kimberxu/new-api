@@ -82,6 +82,26 @@ REQUEST_DEBUG_MAX_BODY_BYTES=32768
 
 因此排障时仍可在 `body` 中查看 `model`、`temperature`、`top_p`、`max_tokens`、`stream` 等参数，但不会直接展示大段提示词正文。
 
+### 3.3 自动清理数据库日志
+
+请求调试快照写在既有 `logs` 表的 `Other.admin_info.request_debug` 中，长期启用 `REQUEST_DEBUG_LOGGING=always` 会增加数据库日志体积。自动清理默认关闭，需要显式设置以下环境变量：
+
+```env
+LOG_CLEANUP_ENABLED=false
+LOG_CLEANUP_RETENTION_DAYS=30
+LOG_CLEANUP_INTERVAL_HOURS=24
+```
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `LOG_CLEANUP_ENABLED` | `false` | 是否启用自动数据库日志清理。 |
+| `LOG_CLEANUP_RETENTION_DAYS` | `30` | 保留最近多少天的数据库日志；小于等于 `0` 时恢复默认值。 |
+| `LOG_CLEANUP_INTERVAL_HOURS` | `24` | 自动清理任务的调度间隔；小于等于 `0` 时恢复默认值。 |
+
+该功能复用系统任务 `log_cleanup`，会删除 `created_at < 当前时间 - LOG_CLEANUP_RETENTION_DAYS` 的整条日志记录，不会只清除 `request_debug` 快照。多节点部署时仍由系统任务锁去重。
+
+如果日志库使用 ClickHouse，也可以继续使用 `LOG_SQL_CLICKHOUSE_TTL_DAYS` 做 ClickHouse 表级 TTL；不要同时把两个保留周期配置成互相矛盾的值。
+
 ## 4. 推荐配置
 
 ### 4.1 默认生产配置
@@ -89,6 +109,7 @@ REQUEST_DEBUG_MAX_BODY_BYTES=32768
 ```env
 REQUEST_DEBUG_LOGGING=off
 REQUEST_DEBUG_MAX_BODY_BYTES=32768
+LOG_CLEANUP_ENABLED=false
 ```
 
 ### 4.2 临时排查失败请求
@@ -98,11 +119,22 @@ REQUEST_DEBUG_LOGGING=error_only
 REQUEST_DEBUG_MAX_BODY_BYTES=32768
 ```
 
-### 4.3 本机功能验证
+### 4.3 自动保留最近 30 天数据库日志
+
+```env
+LOG_CLEANUP_ENABLED=true
+LOG_CLEANUP_RETENTION_DAYS=30
+LOG_CLEANUP_INTERVAL_HOURS=24
+```
+
+该配置会定期删除超过 30 天的整条数据库日志。需要长期审计配额使用量时，应先确认保留周期符合审计需求。
+
+### 4.4 本机功能验证
 
 ```env
 REQUEST_DEBUG_LOGGING=always
 REQUEST_DEBUG_MAX_BODY_BYTES=4096
+LOG_CLEANUP_ENABLED=false
 ```
 
 本机验证时使用较小上限，可更容易确认截断逻辑。
@@ -667,11 +699,21 @@ go test ./...
 REQUEST_DEBUG_LOGGING=off
 ```
 
-然后重启服务。关闭后不会生成新的请求调试快照，已有数据库日志不会自动删除。
+然后重启服务。关闭后不会生成新的请求调试快照；已有数据库日志只有在手动执行日志清理，或显式启用 `LOG_CLEANUP_ENABLED=true` 后才会按保留天数清理。
 
 ### 10.2 清理已有日志
 
 请求快照保存在既有日志 `Other` 字段中。不要直接编写跨数据库不兼容的 SQL 批量修改生产日志。
+
+如需自动清理整条旧日志，推荐使用：
+
+```env
+LOG_CLEANUP_ENABLED=true
+LOG_CLEANUP_RETENTION_DAYS=30
+LOG_CLEANUP_INTERVAL_HOURS=24
+```
+
+这会定期创建 `log_cleanup` 系统任务，删除超过保留天数的数据库日志。该操作会删除整条日志记录，包括配额使用日志、错误日志和其中的请求调试快照；如果仍需要历史用量审计，不要把保留天数设置得过短。
 
 如果必须删除已有快照，应先：
 

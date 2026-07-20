@@ -107,6 +107,44 @@ func TestSystemTaskSchedulerSkipsDisabled(t *testing.T) {
 	assert.Equal(t, int64(0), countSystemTasks(t, handler.taskType))
 }
 
+func TestLogCleanupHandlerSchedulesFromEnvironment(t *testing.T) {
+	truncate(t)
+	t.Setenv("LOG_CLEANUP_ENABLED", "true")
+	t.Setenv("LOG_CLEANUP_RETENTION_DAYS", "7")
+	t.Setenv("LOG_CLEANUP_INTERVAL_HOURS", "6")
+
+	handler := logCleanupHandler{}
+	withSystemTaskRegistry(t, handler)
+
+	before := common.GetTimestamp()
+	runSystemTaskScheduler()
+	after := common.GetTimestamp()
+
+	require.Equal(t, int64(1), countSystemTasks(t, model.SystemTaskTypeLogCleanup))
+	task, err := model.GetLatestSystemTask(model.SystemTaskTypeLogCleanup)
+	require.NoError(t, err)
+	require.NotNil(t, task)
+
+	payload := LogCleanupPayload{}
+	require.NoError(t, task.DecodePayload(&payload))
+	assert.Equal(t, logCleanupBatchSize, payload.BatchSize)
+	assert.GreaterOrEqual(t, payload.TargetTimestamp, before-int64(7*24*time.Hour/time.Second))
+	assert.LessOrEqual(t, payload.TargetTimestamp, after-int64(7*24*time.Hour/time.Second))
+	assert.Equal(t, 6*time.Hour, handler.Interval())
+}
+
+func TestLogCleanupHandlerIsDisabledByDefault(t *testing.T) {
+	truncate(t)
+	t.Setenv("LOG_CLEANUP_ENABLED", "")
+
+	handler := logCleanupHandler{}
+	withSystemTaskRegistry(t, handler)
+
+	runSystemTaskScheduler()
+
+	assert.Equal(t, int64(0), countSystemTasks(t, model.SystemTaskTypeLogCleanup))
+}
+
 func TestSystemTaskClaimPassDispatchesByType(t *testing.T) {
 	truncate(t)
 

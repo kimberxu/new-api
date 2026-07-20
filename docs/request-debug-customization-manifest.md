@@ -48,7 +48,11 @@ M relay/gemini_handler.go
 M relay/responses_handler.go
 M service/log_info_generate.go
 A service/request_debug_log_test.go
+M service/system_task.go
+M service/system_task_test.go
 M web/default/src/features/usage-logs/components/dialogs/details-dialog.tsx
+A web/default/src/features/usage-logs/lib/request-debug.ts
+A web/default/src/features/usage-logs/lib/request-debug.test.ts
 M web/default/src/features/usage-logs/types.ts
 ```
 
@@ -104,14 +108,17 @@ M web/default/src/features/usage-logs/types.ts
 ### 日志落库与可见性
 
 - `service/log_info_generate.go`：将 `request_debug` 附加到日志 `Other.admin_info`。
+- `service/system_task.go`：复用既有 `log_cleanup` 系统任务，按环境变量自动清理旧数据库日志，默认关闭。
 - `model/log_format_test.go`：确认普通用户日志格式化时会剥离 `admin_info`，管理员可见。
 - `service/request_debug_log_test.go`：覆盖请求调试快照写入日志的行为。
+- `service/system_task_test.go`：覆盖日志自动清理任务的默认关闭和环境变量调度。
 
 维护重点：
 
 - `request_debug` 必须嵌套在 `admin_info` 下；
 - 非管理员查询日志时必须移除整个 `admin_info`；
 - 日志写入失败路径不能因为请求调试快照导致额外业务失败。
+- 自动日志清理必须默认关闭，只能删除整条旧日志，不做跨数据库 JSON 局部更新。
 
 ### 前端查看入口
 
@@ -152,7 +159,8 @@ M web/default/src/features/usage-logs/types.ts
 7. 敏感字段必须脱敏。
 8. 超限内容必须截断，并保留 `size`、`sha256`、`truncated`。
 9. 快照采集失败不得中断 relay。
-10. 不新增数据库 schema；前端仅提供管理员日志详情查看入口。
+10. 自动日志清理默认关闭，由 `LOG_CLEANUP_ENABLED` 显式启用。
+11. 不新增数据库 schema；前端仅提供管理员日志详情查看入口。
 
 ## 上游更新后的检查顺序
 
@@ -220,6 +228,7 @@ git diff main..deploy -- common relay controller service model docs .github
 go test ./common -run InitRequestDebugConfig -count=1
 go test ./relay/common -run RequestDebug -count=1
 go test ./service -run RequestDebug -count=1
+go test ./service -run LogCleanupHandler -count=1
 go test ./model -run FormatUserLogs -count=1
 cd web/default && bun run typecheck
 ```

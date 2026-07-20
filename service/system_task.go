@@ -17,9 +17,11 @@ import (
 const (
 	// systemTaskRunnerIdleInterval is the fallback poll interval used to pick up
 	// tasks created on other nodes and mark expired leases failed.
-	systemTaskRunnerIdleInterval = 15 * time.Second
-	systemTaskLockTTL            = 60 * time.Second
-	logCleanupBatchSize          = 100
+	systemTaskRunnerIdleInterval   = 15 * time.Second
+	systemTaskLockTTL              = 60 * time.Second
+	logCleanupBatchSize            = 100
+	logCleanupDefaultRetentionDays = 30
+	logCleanupDefaultIntervalHours = 24
 
 	// systemTaskSchedulerInterval throttles how often the scheduler/stale-lock
 	// pass runs, independent of how often the runner wakes to claim tasks.
@@ -81,6 +83,30 @@ func (logCleanupHandler) Type() string { return model.SystemTaskTypeLogCleanup }
 
 func (logCleanupHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
 	runLogCleanupTask(ctx, task, runnerID)
+}
+
+func (logCleanupHandler) Enabled() bool {
+	return common.GetEnvOrDefaultBool("LOG_CLEANUP_ENABLED", false)
+}
+
+func (logCleanupHandler) Interval() time.Duration {
+	intervalHours := common.GetEnvOrDefault("LOG_CLEANUP_INTERVAL_HOURS", logCleanupDefaultIntervalHours)
+	if intervalHours <= 0 {
+		intervalHours = logCleanupDefaultIntervalHours
+	}
+	return time.Duration(intervalHours) * time.Hour
+}
+
+func (logCleanupHandler) NewPayload() any {
+	retentionDays := common.GetEnvOrDefault("LOG_CLEANUP_RETENTION_DAYS", logCleanupDefaultRetentionDays)
+	if retentionDays <= 0 {
+		retentionDays = logCleanupDefaultRetentionDays
+	}
+	targetTimestamp := common.GetTimestamp() - int64(retentionDays)*int64(24*time.Hour/time.Second)
+	return LogCleanupPayload{
+		TargetTimestamp: targetTimestamp,
+		BatchSize:       logCleanupBatchSize,
+	}
 }
 
 func init() {
