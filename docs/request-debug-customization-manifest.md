@@ -70,7 +70,7 @@ M web/default/src/features/usage-logs/types.ts
 
 ### 快照核心逻辑
 
-- `relay/common/request_debug.go`：集中维护请求体快照、敏感字段脱敏、字符串截断、整体截断、SHA-256 摘要和错误兜底。
+- `relay/common/request_debug.go`：集中维护请求体快照、敏感字段脱敏、正文类字段摘要、字符串截断、整体截断、SHA-256 摘要和错误兜底。
 - `relay/common/relay_info.go`：在 relay 请求上下文中承载请求调试状态，使 handler 和日志服务可以传递快照。
 - `relay/common/request_debug_test.go`：覆盖脱敏、截断、快照结构和错误容忍。
 
@@ -79,7 +79,7 @@ M web/default/src/features/usage-logs/types.ts
 - 不要把脱敏、截断和快照组装逻辑复制到各个 provider adaptor；
 - 字段名脱敏匹配应忽略大小写和首尾空格；
 - 已知凭据字段必须脱敏：`authorization`、`api_key`、`apikey`、`access_token`、`refresh_token`、`key`、`token`、`password`、`secret`；
-- 超长内容必须保存 `size`、`sha256`、`truncated` 和截断后的 `body`；
+- 超长内容和正文类字段必须保存 `size`、`sha256`、`truncated` 和处理后的 `body`；
 - 快照处理异常只能进入 `request_debug_error`，不能影响原请求。
 
 ### Relay 接入点

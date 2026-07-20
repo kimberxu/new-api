@@ -184,9 +184,8 @@ func normalizeRequestDebugMode(mode string) string {
 }
 
 func buildRequestDebugBody(data []byte, maxBytes int) *RequestDebugBody {
-	sanitized := sanitizeRequestDebugBody(data)
+	sanitized, truncated := sanitizeRequestDebugBody(data)
 	body := string(sanitized)
-	truncated := false
 	if maxBytes > 0 && len(sanitized) > maxBytes {
 		body = string(sanitized[:maxBytes]) + fmt.Sprintf("...[TRUNCATED %d/%d bytes]", maxBytes, len(sanitized))
 		truncated = true
@@ -200,44 +199,94 @@ func buildRequestDebugBody(data []byte, maxBytes int) *RequestDebugBody {
 	}
 }
 
-func sanitizeRequestDebugBody(data []byte) []byte {
+func sanitizeRequestDebugBody(data []byte) ([]byte, bool) {
 	var value any
 	if err := rootcommon.Unmarshal(data, &value); err != nil {
-		return data
+		return data, false
 	}
-	sanitized := sanitizeRequestDebugValue(value)
+	sanitized, truncated := sanitizeRequestDebugValue(value)
 	result, err := rootcommon.Marshal(sanitized)
 	if err != nil {
-		return data
+		return data, false
 	}
-	return result
+	return result, truncated
 }
 
-func sanitizeRequestDebugValue(value any) any {
+func sanitizeRequestDebugValue(value any) (any, bool) {
 	switch typed := value.(type) {
 	case map[string]any:
 		result := make(map[string]any, len(typed))
+		truncated := false
 		for key, item := range typed {
 			if isRequestDebugSecretKey(key) {
 				result[key] = "[REDACTED]"
+				truncated = true
 				continue
 			}
-			result[key] = sanitizeRequestDebugValue(item)
+			var childTruncated bool
+			if isRequestDebugTextKey(key) {
+				result[key], childTruncated = sanitizeRequestDebugTextValue(item)
+			} else {
+				result[key], childTruncated = sanitizeRequestDebugValue(item)
+			}
+			truncated = truncated || childTruncated
 		}
-		return result
+		return result, truncated
 	case []any:
 		result := make([]any, len(typed))
+		truncated := false
 		for i, item := range typed {
-			result[i] = sanitizeRequestDebugValue(item)
+			var childTruncated bool
+			result[i], childTruncated = sanitizeRequestDebugValue(item)
+			truncated = truncated || childTruncated
 		}
-		return result
+		return result, truncated
 	case string:
 		if len(typed) > maxRequestDebugStringValueBytes {
-			return typed[:maxRequestDebugStringValueBytes] + fmt.Sprintf("...[TRUNCATED string %d bytes]", len(typed))
+			return typed[:maxRequestDebugStringValueBytes] + fmt.Sprintf("...[TRUNCATED string %d bytes]", len(typed)), true
 		}
-		return typed
+		return typed, false
 	default:
-		return value
+		return value, false
+	}
+}
+
+func sanitizeRequestDebugTextValue(value any) (any, bool) {
+	switch typed := value.(type) {
+	case map[string]any:
+		result := make(map[string]any, len(typed))
+		truncated := false
+		for key, item := range typed {
+			if isRequestDebugSecretKey(key) {
+				result[key] = "[REDACTED]"
+				truncated = true
+				continue
+			}
+			var childTruncated bool
+			if isRequestDebugTextKey(key) {
+				result[key], childTruncated = sanitizeRequestDebugTextValue(item)
+			} else {
+				result[key], childTruncated = sanitizeRequestDebugValue(item)
+			}
+			truncated = truncated || childTruncated
+		}
+		return result, truncated
+	case []any:
+		result := make([]any, len(typed))
+		truncated := false
+		for i, item := range typed {
+			var childTruncated bool
+			result[i], childTruncated = sanitizeRequestDebugTextValue(item)
+			truncated = truncated || childTruncated
+		}
+		return result, truncated
+	case string:
+		if typed == "" {
+			return typed, false
+		}
+		return fmt.Sprintf("[TRUNCATED text %d bytes]", len(typed)), true
+	default:
+		return sanitizeRequestDebugValue(value)
 	}
 }
 
@@ -245,6 +294,16 @@ func isRequestDebugSecretKey(key string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(key))
 	switch normalized {
 	case "authorization", "api_key", "apikey", "access_token", "refresh_token", "key", "token", "password", "secret":
+		return true
+	default:
+		return false
+	}
+}
+
+func isRequestDebugTextKey(key string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(key))
+	switch normalized {
+	case "content", "input", "instructions", "prompt", "suffix", "system", "text":
 		return true
 	default:
 		return false

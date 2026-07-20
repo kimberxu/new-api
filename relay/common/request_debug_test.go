@@ -50,6 +50,31 @@ func TestBuildRequestDebugSnapshotRedactsSecretsBeforeTruncation(t *testing.T) {
 	assert.Equal(t, snapshot.Downstream.Body, snapshot.Upstream.Body)
 }
 
+func TestBuildRequestDebugSnapshotSummarizesPromptFields(t *testing.T) {
+	body := []byte(`{"model":"gpt-test","temperature":0.2,"top_p":0.9,"stream":false,"messages":[{"role":"system","content":"` + strings.Repeat("system prompt ", 20) + `"},{"role":"user","content":[{"type":"text","text":"` + strings.Repeat("user prompt ", 20) + `"}]}],"prompt":"` + strings.Repeat("legacy prompt ", 20) + `","instructions":"` + strings.Repeat("instruction ", 20) + `","input":"` + strings.Repeat("responses input ", 20) + `"}`)
+
+	snapshot := BuildRequestDebugSnapshot(RequestDebugSnapshotInput{
+		Mode:         "always",
+		Downstream:   body,
+		MaxBodyBytes: 32 * 1024,
+	})
+
+	require.NotNil(t, snapshot.Downstream)
+	assert.True(t, snapshot.Downstream.Truncated)
+	assert.Contains(t, snapshot.Downstream.Body, `"model":"gpt-test"`)
+	assert.Contains(t, snapshot.Downstream.Body, `"temperature":0.2`)
+	assert.Contains(t, snapshot.Downstream.Body, `"top_p":0.9`)
+	assert.Contains(t, snapshot.Downstream.Body, `"stream":false`)
+	assert.Contains(t, snapshot.Downstream.Body, `"role":"system"`)
+	assert.Contains(t, snapshot.Downstream.Body, `"type":"text"`)
+	assert.Contains(t, snapshot.Downstream.Body, "[TRUNCATED text")
+	assert.NotContains(t, snapshot.Downstream.Body, "system prompt system prompt")
+	assert.NotContains(t, snapshot.Downstream.Body, "user prompt user prompt")
+	assert.NotContains(t, snapshot.Downstream.Body, "legacy prompt legacy prompt")
+	assert.NotContains(t, snapshot.Downstream.Body, "instruction instruction")
+	assert.NotContains(t, snapshot.Downstream.Body, "responses input responses input")
+}
+
 func TestCaptureRequestDebugSnapshotsFromBodyStorage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	downstream := []byte(`{"model":"client","api_key":"sk-client"}`)
