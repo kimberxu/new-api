@@ -10,7 +10,7 @@
 
 - 默认关闭，不影响正常生产请求；
 - 不新增数据库表或字段；
-- 不新增前端功能；
+- 仅在管理员使用日志详情中新增查看入口，不新增配置页或后端查询接口；
 - 快照只写入既有日志的 `Other.admin_info.request_debug`；
 - 普通用户日志视图不得看到 `admin_info`；
 - 采集、脱敏、截断和快照组装集中维护，避免复制到各渠道 adaptor；
@@ -48,6 +48,8 @@ M relay/gemini_handler.go
 M relay/responses_handler.go
 M service/log_info_generate.go
 A service/request_debug_log_test.go
+M web/default/src/features/usage-logs/components/dialogs/details-dialog.tsx
+M web/default/src/features/usage-logs/types.ts
 ```
 
 如果该列表变化，先判断变化是否属于请求调试、部署工作流或文档维护；不要把无关本地改动混入该定制。
@@ -109,6 +111,19 @@ A service/request_debug_log_test.go
 - 非管理员查询日志时必须移除整个 `admin_info`；
 - 日志写入失败路径不能因为请求调试快照导致额外业务失败。
 
+### 前端查看入口
+
+- `web/default/src/features/usage-logs/types.ts`：声明 `admin_info.request_debug`、`downstream` 和 `upstream` 的前端类型。
+- `web/default/src/features/usage-logs/components/dialogs/details-dialog.tsx`：在管理员使用日志详情中折叠展示请求调试快照。
+
+维护重点：
+
+- 前端只读取既有日志 JSON，不新增后端接口或额外查询；
+- 只有 `isAdmin` 为真且 `admin_info.request_debug` 存在时显示；
+- 界面只如实展示当前日志保存的快照，不推断重试过程；
+- 缺少 `downstream` 或 `upstream` 时只显示已有部分；
+- 请求体内容继续依赖后端脱敏和截断结果，前端不要二次改写。
+
 ### 部署与文档
 
 - `.github/workflows/deploy-image-ghcr.yml`：手动触发 GitHub Actions 构建 `deploy` 分支并推送 GHCR 镜像。
@@ -135,7 +150,7 @@ A service/request_debug_log_test.go
 7. 敏感字段必须脱敏。
 8. 超限内容必须截断，并保留 `size`、`sha256`、`truncated`。
 9. 快照采集失败不得中断 relay。
-10. 不新增数据库 schema，不新增前端 UI。
+10. 不新增数据库 schema；前端仅提供管理员日志详情查看入口。
 
 ## 上游更新后的检查顺序
 
@@ -147,8 +162,9 @@ A service/request_debug_log_test.go
 4. 如果冲突在 `service/log_info_generate.go`，确认 `request_debug` 仍写入 `admin_info`，并且不影响 quota、错误日志和普通日志字段。
 5. 如果冲突在 `model` 日志格式化，确认非管理员视图仍剥离 `admin_info`。
 6. 如果冲突在配置初始化，确认非法配置回退和默认关闭仍成立。
-7. 运行聚焦测试。
-8. 推送 `deploy` 后手动运行 GitHub Actions 构建镜像。
+7. 如果冲突在前端使用日志详情，确认“请求调试快照”仍只对管理员可见，且只展示已有字段。
+8. 运行聚焦测试。
+9. 推送 `deploy` 后手动运行 GitHub Actions 构建镜像。
 
 ## 冲突处理策略
 
@@ -192,6 +208,7 @@ git diff main..deploy -- common relay controller service model docs .github
 - 快照核心逻辑继续集中在 `relay/common/request_debug.go`；
 - 配置入口继续在 `common`；
 - 日志可见性继续依赖 `admin_info` 的管理员隔离。
+- 前端入口继续只消费 `admin_info.request_debug`，不要新增独立日志接口。
 
 ## 验证命令
 
@@ -202,6 +219,7 @@ go test ./common -run InitRequestDebugConfig -count=1
 go test ./relay/common -run RequestDebug -count=1
 go test ./service -run RequestDebug -count=1
 go test ./model -run FormatUserLogs -count=1
+cd web/default && bun run typecheck
 ```
 
 相关包验证：
@@ -217,8 +235,9 @@ go test ./common ./controller ./model ./relay ./relay/common ./service \
 2. 临时切换 `REQUEST_DEBUG_LOGGING=error_only`。
 3. 触发真实失败请求。
 4. 管理员日志应看到 `Other.admin_info.request_debug`。
-5. 普通用户日志不应看到 `admin_info`。
-6. 验证完成后立即恢复 `REQUEST_DEBUG_LOGGING=off` 并重建容器。
+5. 管理员 Web 使用日志详情应显示“请求调试快照”折叠区。
+6. 普通用户日志不应看到 `admin_info`，也不应看到“请求调试快照”。
+7. 验证完成后立即恢复 `REQUEST_DEBUG_LOGGING=off` 并重建容器。
 
 ## 发布与回滚
 

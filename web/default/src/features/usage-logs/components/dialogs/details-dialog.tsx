@@ -30,6 +30,7 @@ import {
   UserCog,
   Info,
   LogIn,
+  ChevronDown,
 } from 'lucide-react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
@@ -37,6 +38,11 @@ import { useTranslation } from 'react-i18next'
 import { Dialog } from '@/components/dialog'
 import { StatusBadge, type StatusBadgeProps } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { Label } from '@/components/ui/label'
 import { DynamicPricingBreakdown } from '@/features/pricing/components/dynamic-pricing-breakdown'
@@ -63,7 +69,12 @@ import {
   isPerCallBilling,
   isTimingLogType,
 } from '../../lib/utils'
-import { USAGE_BILLING_PATH, type LogOtherData } from '../../types'
+import {
+  USAGE_BILLING_PATH,
+  type LogOtherData,
+  type RequestDebugBody,
+  type RequestDebugSnapshot,
+} from '../../types'
 
 // Maps a channel-update changed-field token (as recorded by the backend audit)
 // to its i18n label key for display in the audit details.
@@ -449,6 +460,126 @@ function TokenBreakdown(props: { log: UsageLog; other: LogOtherData }) {
   )
 }
 
+function RequestDebugBodyBlock(props: {
+  title: string
+  body: RequestDebugBody
+  copiedText: string | null
+  copyToClipboard: (text: string) => Promise<boolean>
+}) {
+  return (
+    <div className='bg-background/60 min-w-0 space-y-2 rounded-md border p-2'>
+      <div className='flex min-w-0 items-center justify-between gap-2'>
+        <span className='text-xs font-semibold'>{props.title}</span>
+        <Button
+          variant='ghost'
+          size='sm'
+          className='h-6 px-2 text-xs'
+          onClick={() => props.copyToClipboard(props.body.body)}
+          title='复制请求体'
+          aria-label='复制请求体'
+        >
+          {props.copiedText === props.body.body ? (
+            <Check className='size-3 text-green-600' />
+          ) : (
+            <Copy className='size-3' />
+          )}
+        </Button>
+      </div>
+      <div className='space-y-1'>
+        <DetailRow label='大小' value={String(props.body.size)} mono />
+        <DetailRow label='SHA-256' value={props.body.sha256} mono />
+        <DetailRow
+          label='是否截断'
+          value={props.body.truncated ? '是' : '否'}
+          mono
+        />
+      </div>
+      <pre className='bg-muted/50 max-h-56 min-w-0 overflow-auto rounded border p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap'>
+        {props.body.body || '-'}
+      </pre>
+    </div>
+  )
+}
+
+function RequestDebugSection(props: {
+  snapshot: RequestDebugSnapshot
+  copiedText: string | null
+  copyToClipboard: (text: string) => Promise<boolean>
+}) {
+  const hasMeta =
+    props.snapshot.mode ||
+    props.snapshot.request_path ||
+    props.snapshot.relay_mode != null ||
+    props.snapshot.content_type
+
+  return (
+    <Collapsible className='min-w-0 overflow-hidden rounded-md border bg-muted/30 p-2.5 max-sm:p-2'>
+      <CollapsibleTrigger className='group flex w-full cursor-pointer items-center justify-between gap-2 text-left'>
+        <Label className='cursor-pointer text-xs font-semibold'>
+          请求调试快照
+        </Label>
+        <ChevronDown
+          className='text-muted-foreground size-4 shrink-0 transition-transform group-data-[panel-open]:rotate-180'
+          aria-hidden='true'
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className='mt-2 min-w-0 space-y-2'>
+          {hasMeta && (
+            <div className='space-y-1'>
+              {props.snapshot.mode && (
+                <DetailRow label='模式' value={props.snapshot.mode} mono />
+              )}
+              {props.snapshot.request_path && (
+                <DetailRow
+                  label='路径'
+                  value={props.snapshot.request_path}
+                  mono
+                />
+              )}
+              {props.snapshot.relay_mode != null && (
+                <DetailRow
+                  label='Relay 模式'
+                  value={String(props.snapshot.relay_mode)}
+                  mono
+                />
+              )}
+              {props.snapshot.content_type && (
+                <DetailRow
+                  label='Content-Type'
+                  value={props.snapshot.content_type}
+                  mono
+                />
+              )}
+            </div>
+          )}
+          {props.snapshot.request_debug_error && (
+            <div className='rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700 wrap-break-word dark:border-red-900 dark:bg-red-950/20 dark:text-red-300'>
+              {props.snapshot.request_debug_error}
+            </div>
+          )}
+          {props.snapshot.downstream && (
+            <RequestDebugBodyBlock
+              title='下游请求体'
+              body={props.snapshot.downstream}
+              copiedText={props.copiedText}
+              copyToClipboard={props.copyToClipboard}
+            />
+          )}
+          {props.snapshot.upstream && (
+            <RequestDebugBodyBlock
+              title='上游请求体'
+              body={props.snapshot.upstream}
+              copiedText={props.copiedText}
+              copyToClipboard={props.copyToClipboard}
+            />
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
 interface DetailsDialogProps {
   log: UsageLog
   isAdmin: boolean
@@ -479,6 +610,7 @@ export function DetailsDialog(props: DetailsDialogProps) {
   const showAdminIp =
     !!props.log.ip && (showTiming || (props.isAdmin && isTopup))
   const adminInfo = other?.admin_info
+  const requestDebug = props.isAdmin ? adminInfo?.request_debug : undefined
   const topupAuditFields =
     isTopup && props.isAdmin && adminInfo
       ? ([
@@ -610,7 +742,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
       contentClassName={cn(
         'min-w-0 overflow-hidden',
         'max-sm:max-h-[calc(100dvh-1.5rem)] max-sm:w-[calc(100vw-1.5rem)] max-sm:max-w-[calc(100vw-1.5rem)] max-sm:p-4',
-        isTieredBilling ? 'sm:max-w-4xl lg:max-w-5xl' : 'sm:max-w-lg'
+        isTieredBilling || requestDebug
+          ? 'sm:max-w-4xl lg:max-w-5xl'
+          : 'sm:max-w-lg'
       )}
       headerClassName='max-sm:gap-1'
       titleClassName='flex items-center gap-2 text-base'
@@ -758,6 +892,14 @@ export function DetailsDialog(props: DetailsDialogProps) {
               </div>
             </div>
           </DetailSection>
+        )}
+
+        {requestDebug && (
+          <RequestDebugSection
+            snapshot={requestDebug}
+            copiedText={copiedText}
+            copyToClipboard={copyToClipboard}
+          />
         )}
 
         {/* Quota saturation marker (admin only) */}

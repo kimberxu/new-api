@@ -499,6 +499,25 @@ docker pull calciumion/new-api:latest
 | `body` | 脱敏、字符串限制和整体截断后的内容 |
 | `request_debug_error` | 快照采集失败原因；该错误不会中断正常 relay |
 
+### 6.1 Web 管理界面查看
+
+管理员可以在 Web 管理界面查看请求调试快照：
+
+```text
+控制台 -> 使用日志 -> 找到对应日志 -> 详情 -> 请求调试快照
+```
+
+该区域默认折叠，只在当前日志的 `Other.admin_info.request_debug` 存在时显示。界面会如实展示当前日志中保存的快照：
+
+- 基本信息：`mode`、`request_path`、`relay_mode`、`content_type`；
+- 下游请求体：`downstream.size`、`downstream.sha256`、`downstream.truncated`、`downstream.body`；
+- 上游请求体：`upstream.size`、`upstream.sha256`、`upstream.truncated`、`upstream.body`；
+- 采集错误：`request_debug_error`。
+
+Web 界面不会推断或重组重试过程。日志中记录了什么快照，界面就显示什么快照；如果某个请求只有下游快照、没有上游快照，界面也只显示已有部分。
+
+普通用户查询日志时后端会剥离整个 `admin_info`，因此普通用户不会看到“请求调试快照”区域。
+
 ## 7. 排障方法
 
 ### 7.1 参数覆盖问题
@@ -753,4 +772,4 @@ REQUEST_DEBUG_MAX_BODY_BYTES=32768
 REQUEST_DEBUG_LOGGING=off
 ```
 
-检查配置后必须重启服务。管理员查看 `Other.admin_info.request_debug`，普通用户不应看到 `admin_info`。
+检查配置后必须重启服务。管理员可在 Web 管理界面“控制台 -> 使用日志 -> 详情 -> 请求调试快照”查看，也可直接检查 `Other.admin_info.request_debug`；普通用户不应看到 `admin_info`。

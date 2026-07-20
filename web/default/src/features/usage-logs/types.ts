@@ -106,6 +106,23 @@ export const USAGE_BILLING_PATH = {
 export type UsageBillingPath =
   (typeof USAGE_BILLING_PATH)[keyof typeof USAGE_BILLING_PATH]
 
+export interface RequestDebugBody {
+  size: number
+  sha256: string
+  truncated: boolean
+  body: string
+}
+
+export interface RequestDebugSnapshot {
+  mode: string
+  request_path?: string
+  relay_mode?: number
+  content_type?: string
+  request_debug_error?: string
+  downstream?: RequestDebugBody
+  upstream?: RequestDebugBody
+}
+
 export interface LogOtherData {
   admin_info?: {
     is_multi_key?: boolean
@@ -135,6 +152,7 @@ export interface LogOtherData {
       original: number
       clamped: number
     }
+    request_debug?: RequestDebugSnapshot
   }
   // Language-independent operation descriptor (audit/login logs).
   // Frontend renders localized content from action + params via i18n templates.
