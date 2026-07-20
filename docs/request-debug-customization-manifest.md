@@ -73,6 +73,8 @@ M web/default/src/features/usage-logs/types.ts
 - `relay/common/request_debug.go`：集中维护请求体快照、敏感字段脱敏、正文类字段摘要、字符串截断、整体截断、SHA-256 摘要和错误兜底。
 - `relay/common/relay_info.go`：在 relay 请求上下文中承载请求调试状态，使 handler 和日志服务可以传递快照。
 - `relay/common/request_debug_test.go`：覆盖脱敏、截断、快照结构和错误容忍。
+- `web/default/src/features/usage-logs/components/dialogs/details-dialog.tsx`：负责请求调试快照的详情展示；JSON `body` 会在界面里格式化显示，复制仍保持原始字符串。
+- `web/default/src/features/usage-logs/lib/request-debug.ts`：封装请求调试 `body` 的 JSON 展示格式化逻辑，供详情弹窗复用。
 
 维护重点：
 

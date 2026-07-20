@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -32,7 +33,6 @@ import {
   LogIn,
   ChevronDown,
 } from 'lucide-react'
-import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 
 import { Dialog } from '@/components/dialog'
@@ -64,6 +64,7 @@ import {
   getResponseTimeColor,
   renderAuditContent,
 } from '../../lib/format'
+import { formatRequestDebugBody } from '../../lib/request-debug'
 import {
   getLogTypeConfig,
   isPerCallBilling,
@@ -190,7 +191,9 @@ function getUsageBillingPathLabel(
   }
 }
 
-function isUsageBillingPathLocal(adminInfo: LogOtherData['admin_info']): boolean {
+function isUsageBillingPathLocal(
+  adminInfo: LogOtherData['admin_info']
+): boolean {
   if (adminInfo?.usage_billing_path) {
     return adminInfo.usage_billing_path === USAGE_BILLING_PATH.LOCAL
   }
@@ -466,6 +469,8 @@ function RequestDebugBodyBlock(props: {
   copiedText: string | null
   copyToClipboard: (text: string) => Promise<boolean>
 }) {
+  const displayBody = formatRequestDebugBody(props.body.body)
+
   return (
     <div className='bg-background/60 min-w-0 space-y-2 rounded-md border p-2'>
       <div className='flex min-w-0 items-center justify-between gap-2'>
@@ -495,7 +500,7 @@ function RequestDebugBodyBlock(props: {
         />
       </div>
       <pre className='bg-muted/50 max-h-56 min-w-0 overflow-auto rounded border p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap'>
-        {props.body.body || '-'}
+        {displayBody || '-'}
       </pre>
     </div>
   )
@@ -513,7 +518,7 @@ function RequestDebugSection(props: {
     props.snapshot.content_type
 
   return (
-    <Collapsible className='min-w-0 overflow-hidden rounded-md border bg-muted/30 p-2.5 max-sm:p-2'>
+    <Collapsible className='bg-muted/30 min-w-0 overflow-hidden rounded-md border p-2.5 max-sm:p-2'>
       <CollapsibleTrigger className='group flex w-full cursor-pointer items-center justify-between gap-2 text-left'>
         <Label className='cursor-pointer text-xs font-semibold'>
           请求调试快照
@@ -554,7 +559,7 @@ function RequestDebugSection(props: {
             </div>
           )}
           {props.snapshot.request_debug_error && (
-            <div className='rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700 wrap-break-word dark:border-red-900 dark:bg-red-950/20 dark:text-red-300'>
+            <div className='rounded-md border border-red-200 bg-red-50 p-2 text-xs wrap-break-word text-red-700 dark:border-red-900 dark:bg-red-950/20 dark:text-red-300'>
               {props.snapshot.request_debug_error}
             </div>
           )}
