@@ -111,8 +111,10 @@ func SyncChannelCache(frequency int) {
 	}
 }
 
-func GetRandomSatisfiedChannel(group string, model string, retry int, requestPath string) (*Channel, error) {
-	// if memory cache is disabled, get channel directly from database
+func GetRandomSatisfiedChannel(group string, model string, retry int, requestPath string, excludeChannels []int) (*Channel, error) {
+	// if memory cache is disabled, get channel directly from database.
+	// The non-memory-cache path ignores excludeChannels and falls back to the
+	// legacy priority-by-retry selection in GetChannel.
 	if !common.MemoryCacheEnabled {
 		return GetChannel(group, model, retry, requestPath)
 	}
@@ -128,6 +130,25 @@ func GetRandomSatisfiedChannel(group string, model string, retry int, requestPat
 		normalizedModel := ratio_setting.FormatMatchingModelName(model)
 		channels = filterChannelsByRequestPathAndModel(group2model2channels[group][normalizedModel], requestPath, model)
 	}
+
+	if len(channels) == 0 {
+		return nil, nil
+	}
+
+	// Build excluded channel id set for O(1) lookup. excludeChannels holds the
+	// ids of channels already tried in the current request's retry loop, so the
+	// same priority tier keeps being tried until exhausted before cascading down.
+	excludeSet := make(map[int]bool, len(excludeChannels))
+	for _, id := range excludeChannels {
+		excludeSet[id] = true
+	}
+	var filteredChannels []int
+	for _, id := range channels {
+		if !excludeSet[id] {
+			filteredChannels = append(filteredChannels, id)
+		}
+	}
+	channels = filteredChannels
 
 	if len(channels) == 0 {
 		return nil, nil

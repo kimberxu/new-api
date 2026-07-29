@@ -86,6 +86,8 @@ func InitEnv() {
 	// Initialize variables from constants.go that were using environment variables
 	DebugEnabled = os.Getenv("DEBUG") == "true"
 	MemoryCacheEnabled = os.Getenv("MEMORY_CACHE_ENABLED") == "true"
+	initRequestDebugConfigFromEnv()
+	initLogCleanupConfigFromEnv()
 	IsMasterNode = os.Getenv("NODE_TYPE") != "slave"
 	initNodeNameIdentity()
 	TLSInsecureSkipVerify = GetEnvOrDefaultBool("TLS_INSECURE_SKIP_VERIFY", false)
@@ -171,6 +173,40 @@ func positiveUserSessionEnv(name string, fallback int) int {
 		return fallback
 	}
 	return value
+}
+
+func initRequestDebugConfigFromEnv() {
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("REQUEST_DEBUG_LOGGING")))
+	switch mode {
+	case "always", "error_only":
+		RequestDebugLogging = mode
+	case "":
+		RequestDebugLogging = "off"
+	default:
+		RequestDebugLogging = "off"
+		SysError(fmt.Sprintf("invalid REQUEST_DEBUG_LOGGING value: %q, falling back to 'off'", mode))
+	}
+
+	maxBytes, err := strconv.Atoi(os.Getenv("REQUEST_DEBUG_MAX_BODY_BYTES"))
+	if err != nil || maxBytes <= 0 {
+		RequestDebugMaxBodyBytes = 32 * 1024
+	} else {
+		RequestDebugMaxBodyBytes = maxBytes
+	}
+}
+
+func initLogCleanupConfigFromEnv() {
+	LogCleanupEnabled = GetEnvOrDefaultBool("LOG_CLEANUP_ENABLED", false)
+	retentionDays := GetEnvOrDefault("LOG_CLEANUP_RETENTION_DAYS", 30)
+	if retentionDays <= 0 {
+		retentionDays = 30
+	}
+	LogCleanupRetentionDays = retentionDays
+	intervalHours := GetEnvOrDefault("LOG_CLEANUP_INTERVAL_HOURS", 24)
+	if intervalHours <= 0 {
+		intervalHours = 24
+	}
+	LogCleanupIntervalHours = intervalHours
 }
 
 func initConstantEnv() {

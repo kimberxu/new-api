@@ -108,6 +108,12 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 
 	AppendChannelAffinityAdminInfo(ctx, adminInfo)
 
+	if relayInfo != nil && relayInfo.RequestDebugSnapshot != nil {
+		if relaycommon.ShouldAttachRequestDebug(relayInfo.RequestDebugSnapshot.Mode, true) {
+			AppendRequestDebugAdminInfo(relayInfo, adminInfo, true)
+		}
+	}
+
 	other["admin_info"] = adminInfo
 	appendRequestPath(ctx, relayInfo, other)
 	appendRequestConversionChain(relayInfo, other)
@@ -116,6 +122,19 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	appendParamOverrideInfo(relayInfo, other)
 	appendStreamStatus(relayInfo, other)
 	return other
+}
+
+func AppendRequestDebugAdminInfo(relayInfo *relaycommon.RelayInfo, adminInfo map[string]interface{}, success bool) {
+	if relayInfo == nil {
+		return
+	}
+	snapshot := relayInfo.RequestDebugSnapshot
+	if snapshot == nil {
+		return
+	}
+	if relaycommon.ShouldAttachRequestDebug(snapshot.Mode, success) {
+		adminInfo["request_debug"] = snapshot
+	}
 }
 
 func appendParamOverrideInfo(relayInfo *relaycommon.RelayInfo, other map[string]interface{}) {

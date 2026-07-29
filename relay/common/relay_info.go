@@ -163,6 +163,11 @@ type RelayInfo struct {
 	// It is surfaced onto the consume/task log's admin_info for auditing.
 	QuotaClamp *common.QuotaClamp
 
+	// RequestDebugSnapshot captures downstream and upstream request bodies
+	// for the request debug logging feature. Populated by CaptureDownstreamRequestDebug
+	// and CaptureUpstreamRequestDebug. Only set when REQUEST_DEBUG_LOGGING is enabled.
+	RequestDebugSnapshot *RequestDebugSnapshot
+
 	// TieredBillingSnapshot is a frozen snapshot of tiered billing rules
 	// captured at pre-consume time. Non-nil only when billing mode is "tiered_expr".
 	TieredBillingSnapshot *billingexpr.BillingSnapshot

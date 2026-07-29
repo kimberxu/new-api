@@ -83,6 +83,22 @@ func (logCleanupHandler) Run(ctx context.Context, task *model.SystemTask, runner
 	runLogCleanupTask(ctx, task, runnerID)
 }
 
+func (logCleanupHandler) Enabled() bool {
+	return common.GetEnvOrDefaultBool("LOG_CLEANUP_ENABLED", false)
+}
+
+func (logCleanupHandler) Interval() time.Duration {
+	intervalHours := common.GetEnvOrDefault("LOG_CLEANUP_INTERVAL_HOURS", 24)
+	if intervalHours <= 0 {
+		intervalHours = 24
+	}
+	return time.Duration(intervalHours) * time.Hour
+}
+
+func (logCleanupHandler) NewPayload() any {
+	return &LogCleanupPayload{}
+}
+
 func init() {
 	RegisterSystemTaskHandler(logCleanupHandler{})
 }
