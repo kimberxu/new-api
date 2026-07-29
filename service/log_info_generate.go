@@ -118,7 +118,12 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 		other.SetPublic("is_system_prompt_overwritten", true)
 	}
 
-	AppendRelayLogAdminInfo(ctx, relayInfo, other)
+AppendRelayLogAdminInfo(ctx, relayInfo, other)
+	if relayInfo != nil && relayInfo.RequestDebugSnapshot != nil {
+		if relaycommon.ShouldAttachRequestDebug(relayInfo.RequestDebugSnapshot.Mode, true) {
+			AppendRequestDebugAdminInfo(relayInfo, other, true)
+		}
+	}
 	appendRequestPath(ctx, relayInfo, other)
 	appendRequestConversionChain(relayInfo, other)
 	appendFinalRequestFormat(relayInfo, other)
@@ -126,6 +131,19 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	appendParamOverrideInfo(relayInfo, other)
 	appendStreamStatus(relayInfo, other)
 	return other
+}
+
+func AppendRequestDebugAdminInfo(relayInfo *relaycommon.RelayInfo, other *model.LogOther, success bool) {
+	if relayInfo == nil || other == nil {
+		return
+	}
+	snapshot := relayInfo.RequestDebugSnapshot
+	if snapshot == nil {
+		return
+	}
+	if relaycommon.ShouldAttachRequestDebug(snapshot.Mode, success) {
+		other.SetAdmin("request_debug", snapshot)
+	}
 }
 
 func appendParamOverrideInfo(relayInfo *relaycommon.RelayInfo, other *model.LogOther) {

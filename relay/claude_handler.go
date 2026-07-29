@@ -21,6 +21,8 @@ import (
 
 func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.NewAPIError) {
 
+	relaycommon.CaptureDownstreamRequestDebug(c, info)
+
 	info.InitChannelMeta(c)
 
 	claudeReq, ok := info.Request.(*dto.ClaudeRequest)
@@ -91,7 +93,9 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 		if err != nil {
 			return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 		}
+		info.UpstreamRequestBodySize = storage.Size()
 		requestBody = common.NewReplayableBodyReader(storage)
+		relaycommon.CaptureUpstreamRequestDebugFromStorage(c, info)
 	} else {
 		convertedRequest, err := adaptor.ConvertClaudeRequest(c, info, request)
 		if err != nil {
@@ -99,6 +103,7 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 		}
 		relaycommon.AppendRequestConversionFromRequest(info, convertedRequest)
 		jsonData, err := common.Marshal(convertedRequest)
+		relaycommon.CaptureUpstreamRequestDebug(c, info, jsonData)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
 		}

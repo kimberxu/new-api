@@ -1,0 +1,7 @@
+{
+  "servers": {
+    "typescript-language-server": {
+      "rootMarkers": [".git", "package.json", "tsconfig.json", "jsconfig.json"]
+    }
+  }
+}

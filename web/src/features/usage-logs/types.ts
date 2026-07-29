@@ -142,7 +142,7 @@ export interface LogOtherData {
       original: number
       clamped: number
     }
-    // Reject / intercept reason (admin only)
+// Reject / intercept reason (admin only)
     reject_reason?: string
     task_plugin?: TaskPluginInfo
   }
@@ -150,6 +150,7 @@ export interface LogOtherData {
     task_plugin?: TaskPluginRuntimeInfo
     upstream_task_id?: string
     node_name?: string
+    request_debug?: RequestDebugSnapshot
   }
   // Language-independent operation descriptor (audit/login logs).
   // Frontend renders localized content from action + params via i18n templates.
@@ -469,6 +470,23 @@ export interface FetchLogsConfig {
 // ============================================================================
 // User Info Types
 // ============================================================================
+
+export interface RequestDebugBody {
+  size: number
+  sha256: string
+  truncated: boolean
+  body: string
+}
+
+export interface RequestDebugSnapshot {
+  mode: string
+  request_path?: string
+  relay_mode?: number
+  content_type?: string
+  request_debug_error?: string
+  downstream?: RequestDebugBody
+  upstream?: RequestDebugBody
+}
 
 export interface UserInfo {
   id: number

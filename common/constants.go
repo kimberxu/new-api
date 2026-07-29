@@ -93,6 +93,13 @@ var MemoryCacheEnabled bool
 
 var LogConsumeEnabled = true
 
+var RequestDebugLogging = "off"
+var RequestDebugMaxBodyBytes = 32 * 1024
+
+var LogCleanupEnabled = false
+var LogCleanupRetentionDays = 30
+var LogCleanupIntervalHours = 24
+
 var TLSInsecureSkipVerify bool
 var InsecureTLSConfig = &tls.Config{InsecureSkipVerify: true}
 
