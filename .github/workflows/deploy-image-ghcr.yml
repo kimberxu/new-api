@@ -1,0 +1,76 @@
+name: Build deploy image (GHCR)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to build"
+        required: true
+        default: "deploy"
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build and push image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          ref: ${{ inputs.branch }}
+
+      - name: Resolve image tags
+        id: tags
+        run: |
+          OWNER=$(printf '%s' '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          IMAGE="ghcr.io/${OWNER}/new-api"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "deploy_tag=${IMAGE}:deploy" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${IMAGE}:deploy-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "version=deploy-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Write VERSION
+        run: echo "${{ steps.tags.outputs.version }}" > VERSION
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4 # v4.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ steps.tags.outputs.image }}
+
+      - name: Build and push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.deploy_tag }}
+            ${{ steps.tags.outputs.sha_tag }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image summary
+        run: |
+          echo "### Published image" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.tags.outputs.deploy_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.tags.outputs.sha_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

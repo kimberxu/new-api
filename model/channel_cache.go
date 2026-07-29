@@ -119,8 +119,11 @@ func GetRandomSatisfiedChannel(
 	model string,
 	retry int,
 	filters []dto.ChannelFilter,
+	excludeChannels []int,
 ) (*Channel, error) {
-	// if memory cache is disabled, get channel directly from database
+	// if memory cache is disabled, get channel directly from database.
+	// The non-memory-cache path ignores excludeChannels and falls back to the
+	// legacy priority-by-retry selection in GetChannel.
 	if !common.MemoryCacheEnabled {
 		return GetChannel(group, model, retry, filters)
 	}
@@ -136,6 +139,25 @@ func GetRandomSatisfiedChannel(
 		normalizedModel := ratio_setting.RoutingMatchModelName(model)
 		channels, _ = filterCandidateIDs(group2model2channels[group][normalizedModel], model, filters)
 	}
+
+	if len(channels) == 0 {
+		return nil, nil
+	}
+
+	// Build excluded channel id set for O(1) lookup. excludeChannels holds the
+	// ids of channels already tried in the current request's retry loop, so the
+	// same priority tier keeps being tried until exhausted before cascading down.
+	excludeSet := make(map[int]bool, len(excludeChannels))
+	for _, id := range excludeChannels {
+		excludeSet[id] = true
+	}
+	var filteredChannels []int
+	for _, id := range channels {
+		if !excludeSet[id] {
+			filteredChannels = append(filteredChannels, id)
+		}
+	}
+	channels = filteredChannels
 
 	if len(channels) == 0 {
 		return nil, nil

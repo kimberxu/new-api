@@ -36,12 +36,20 @@ func AppendTaskPluginIdentityFilter(c *gin.Context, pluginKey string) {
 }
 
 type RetryParam struct {
-	Ctx          *gin.Context
-	TokenGroup   string
-	ModelName    string
-	RequestPath  string
-	Retry        *int
-	resetNextTry bool
+	Ctx             *gin.Context
+	TokenGroup      string
+	ModelName       string
+	RequestPath     string
+	Retry           *int
+	ExcludeChannels []int
+	resetNextTry    bool
+}
+
+func (p *RetryParam) ExcludeChannel(id int) {
+	if p.ExcludeChannels == nil {
+		p.ExcludeChannels = []int{}
+	}
+	p.ExcludeChannels = append(p.ExcludeChannels, id)
 }
 
 func (p *RetryParam) GetRetry() int {
@@ -146,6 +154,7 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 				param.ModelName,
 				priorityRetry,
 				filters,
+				param.ExcludeChannels,
 			)
 			if channel == nil {
 				// Current group has no available channel for this model, try next group
@@ -189,6 +198,7 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			param.ModelName,
 			param.GetRetry(),
 			filters,
+			param.ExcludeChannels,
 		)
 		if err != nil {
 			return nil, param.TokenGroup, err

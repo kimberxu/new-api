@@ -240,6 +240,10 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError, relayInfo)
 
+		// Exclude this failed channel from future retry selection within the same priority tier,
+		// so the next retry picks another channel at the same priority before cascading to lower tiers.
+		retryParam.ExcludeChannel(channel.Id)
+
 		if !shouldRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry()) {
 			break
 		}
@@ -415,10 +419,13 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		if c.Request != nil && c.Request.URL != nil {
 			other.SetPublic("request_path", c.Request.URL.Path)
 		}
-		other.SetPublic("error_type", err.GetErrorType())
+other.SetPublic("error_type", err.GetErrorType())
 		other.SetPublic("error_code", err.GetErrorCode())
 		other.SetPublic("status_code", err.StatusCode)
 		service.AppendRelayLogAdminInfo(c, relayInfo, other)
+		if relayInfo != nil {
+			service.AppendRequestDebugAdminInfo(relayInfo, other, false)
+		}
 		service.AppendTaskPluginContextAuditInfo(c, other)
 		startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
 		if startTime.IsZero() {
@@ -678,6 +685,10 @@ func executeTaskSubmissionWith(
 				types.NewOpenAIError(taskErr.Error, types.ErrorCodeBadResponseStatusCode, taskErr.StatusCode),
 				relayInfo)
 		}
+
+		// Exclude this failed channel from future retry selection within the same priority tier,
+		// so the next retry picks another channel at the same priority before cascading to lower tiers.
+		retryParam.ExcludeChannel(channel.Id)
 
 		willRetry := shouldRetryTaskRelay(c, channel.Id, taskErr, common.RetryTimes-retryParam.GetRetry())
 		diagnostics.attemptFailed(retryParam.GetRetry()+1, channel, taskErr, willRetry)
