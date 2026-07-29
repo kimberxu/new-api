@@ -127,6 +127,7 @@ func relayResponsesRequest(c *gin.Context, info *relaycommon.RelayInfo, adaptor 
 	relaycommon.AppendRequestConversionFromRequest(info, convertedRequest)
 
 	jsonData, err := common.Marshal(convertedRequest)
+	relaycommon.CaptureUpstreamRequestDebug(c, info, jsonData)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
 	}
