@@ -42,6 +42,7 @@ import {
   Settings,
   SlidersHorizontal,
   Wand2,
+  Gauge,
 } from 'lucide-react'
 import {
   type ReactNode,
@@ -743,6 +744,7 @@ export function ChannelMutateDrawer({
   const upstreamModelUpdateCheckEnabled = form.watch(
     'upstream_model_update_check_enabled'
   )
+  const rateLimitEnabled = form.watch('rate_limit_enabled')
   const currentSettings = form.watch('settings')
   const currentAdvancedCustom = form.watch('advanced_custom')
   const currentPriority = form.watch('priority')
@@ -3338,6 +3340,105 @@ export function ChannelMutateDrawer({
                                   />
                                 )}
                             </ChannelAuthSection>
+
+                            {/* ── Rate Limit (universal) ── */}
+                            <Separator className='my-4' />
+                            <div className='space-y-3'>
+                              <div className='flex items-center gap-2 px-4'>
+                                <Gauge className='h-4 w-4 text-muted-foreground' />
+                                <span className='text-sm font-medium'>
+                                  {t('Rate Limit')}
+                                </span>
+                              </div>
+                              <FormField
+                                control={form.control}
+                                name='rate_limit_enabled'
+                                render={({ field }) => (
+                                  <FormItem className='flex items-center justify-between px-4 py-3'>
+                                    <div className='space-y-0.5'>
+                                      <FormLabel>
+                                        {t('Rate Limit')}
+                                      </FormLabel>
+                                      <FormDescription>
+                                        {t(
+                                          'Enable per-channel rate limiting'
+                                        )}
+                                      </FormDescription>
+                                    </div>
+                                    <FormControl>
+                                      <Switch
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              {rateLimitEnabled && (
+                                <div className='grid gap-4 px-4 pb-3 sm:grid-cols-2'>
+                                  <FormField
+                                    control={form.control}
+                                    name='rate_limit_rpm'
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>
+                                          {t('RPM (Requests Per Minute)')}
+                                        </FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            type='number'
+                                            min={0}
+                                            placeholder='0'
+                                            {...field}
+                                            onChange={(e) =>
+                                              field.onChange(
+                                                Number(e.target.value)
+                                              )
+                                            }
+                                          />
+                                        </FormControl>
+                                        <FormDescription>
+                                          {t(
+                                            '0 uses the global default setting'
+                                          )}
+                                        </FormDescription>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name='rate_limit_tpm'
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>
+                                          {t('TPM (Tokens Per Minute)')}
+                                        </FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            type='number'
+                                            min={0}
+                                            placeholder='0'
+                                            {...field}
+                                            onChange={(e) =>
+                                              field.onChange(
+                                                Number(e.target.value)
+                                              )
+                                            }
+                                          />
+                                        </FormControl>
+                                        <FormDescription>
+                                          {t(
+                                            '0 uses the global default setting'
+                                          )}
+                                        </FormDescription>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              )}
+                            </div>
                           </fieldset>
                         </div>
                       </ChannelApiAccessSection>
