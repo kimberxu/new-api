@@ -90,6 +90,9 @@ type ChannelOtherSettings struct {
 	// rejection. Empty follows the default allow policy. Accepted values:
 	// "", "allow", "safe", "strict".
 	ToolLossPolicy string `json:"tool_loss_policy,omitempty"`
+	RateLimitEnabled                      bool                  `json:"rate_limit_enabled,omitempty"`
+	RateLimitRPM                          int                   `json:"rate_limit_rpm,omitempty"`
+	RateLimitTPM                          int                   `json:"rate_limit_tpm,omitempty"`
 }
 
 func (s *ChannelOtherSettings) IsOpenRouterEnterprise() bool {
