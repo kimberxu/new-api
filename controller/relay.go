@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -201,12 +202,18 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			newAPIError = channelErr
 			break
 		}
-		addUsedChannel(c, channel.Id)
-		if billingErr := service.PrepareTieredBillingForSelectedGroup(c, relayInfo); billingErr != nil {
-			newAPIError = billingErr
-			break
+
+		// Per-channel rate limit check: skip to next channel if this one is rate-limited.
+		rpm := service.GetChannelRPM(channel.Id)
+		if rpm > 0 && !service.CheckChannelRateLimit(channel.Id) {
+			logger.LogInfo(c, fmt.Sprintf("channel #%d rate limited, excluding for retry", channel.Id))
+			common.SetContextKey(c, constant.ContextKeyAllChannelsRateLimited, true)
+			common.SetContextKey(c, constant.ContextKeyChannelRateLimitRetryAfter, 60)
+			retryParam.ExcludeChannel(channel.Id)
+			continue
 		}
 
+		addUsedChannel(c, channel.Id)
 		bodyStorage, bodyErr := common.GetBodyStorage(c)
 		if bodyErr != nil {
 			// Ensure consistent 413 for oversized bodies even when error occurs later (e.g., retry path)
@@ -255,6 +262,20 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		logger.LogInfo(c, retryLogStr)
 	}
 	if newAPIError != nil {
+		// If all tried channels were rate-limited, return 429 so clients can
+		// distinguish a rate-limit backoff from a permanent no-channel failure.
+		if common.GetContextKeyBool(c, constant.ContextKeyAllChannelsRateLimited) {
+			retryAfter := common.GetContextKeyInt(c, constant.ContextKeyChannelRateLimitRetryAfter)
+			if retryAfter > 0 {
+				c.Header("Retry-After", strconv.Itoa(retryAfter))
+			}
+			newAPIError = types.NewError(
+				fmt.Errorf("all channels for model %s rate limited", relayInfo.OriginModelName),
+				types.ErrorCodeChannelRateLimited,
+				types.ErrOptionWithStatusCode(http.StatusTooManyRequests),
+			)
+		}
+
 		gopool.Go(func() {
 			perfmetrics.RecordRelaySample(relayInfo, false, 0)
 		})
@@ -336,7 +357,10 @@ func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
 }
 
 func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service.RetryParam) (*model.Channel, *types.NewAPIError) {
-	if info.ChannelMeta == nil {
+	// Use the middleware-set channel only on the first attempt (retry==0 AND ChannelMeta not yet initialized).
+	// On retry (ChannelMeta was initialized by a previous relayHandler call, or retry>0), use
+	// CacheGetRandomSatisfiedChannel so rate-limited channels from the first attempt can be skipped.
+	if info.ChannelMeta == nil && retryParam.GetRetry() == 0 {
 		autoBan := c.GetBool("auto_ban")
 		autoBanInt := 1
 		if !autoBan {
@@ -349,15 +373,17 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 			AutoBan: &autoBanInt,
 		}, nil
 	}
+
 	channel, selectGroup, err := service.CacheGetRandomSatisfiedChannel(retryParam)
+
+	info.PriceData.GroupRatioInfo = helper.HandleGroupRatio(c, info)
+
 	if err != nil {
 		return nil, types.NewError(fmt.Errorf("获取分组 %s 下模型 %s 的可用渠道失败（retry）: %s", selectGroup, info.OriginModelName, err.Error()), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 	}
 	if channel == nil {
 		return nil, types.NewError(fmt.Errorf("分组 %s 下模型 %s 的可用渠道不存在（retry）", selectGroup, info.OriginModelName), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 	}
-
-	info.PriceData.GroupRatioInfo = helper.HandleGroupRatio(c, info)
 
 	newAPIError := middleware.SetupContextForSelectedChannel(c, channel, info.OriginModelName)
 	if newAPIError != nil {

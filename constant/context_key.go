@@ -74,4 +74,12 @@ const (
 	// fallback in authHelper (finishAdminAudit) skips its record to avoid
 	// duplicate entries.
 	ContextKeyAuditLogged ContextKey = "audit_logged"
+
+	// ContextKeyAllChannelsRateLimited tracks whether any channel hit a rate limit
+	// during channel selection. Used to return 429 instead of 503 when all
+	// channels are rate-limited.
+	ContextKeyAllChannelsRateLimited ContextKey = "all_channels_rate_limited"
+	// ContextKeyChannelRateLimitRetryAfter stores the minimum retry-after seconds
+	// across all rate-limited channels for the 429 response.
+	ContextKeyChannelRateLimitRetryAfter ContextKey = "channel_rate_limit_retry_after"
 )
