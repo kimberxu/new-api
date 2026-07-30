@@ -86,7 +86,7 @@ type ChannelOtherSettings struct {
 	UpstreamModelUpdateIgnoredModels      []string              `json:"upstream_model_update_ignored_models,omitempty"`       // 手动忽略的模型
 	AdvancedCustom                        *AdvancedCustomConfig `json:"advanced_custom,omitempty"`
 	RateLimitEnabled                      bool                  `json:"rate_limit_enabled,omitempty"`
-	RateLimitRPM                          int                   `json:"rate_limit_rpm,omitempty"`
+	RateLimitRPM                          float64               `json:"rate_limit_rpm,omitempty"`
 	RateLimitTPM                          int                   `json:"rate_limit_tpm,omitempty"`
 }
 

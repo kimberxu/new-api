@@ -314,6 +314,36 @@ func CacheUpdateChannelStatus(id int, status int) {
 	}
 }
 
+// GetChannelIDsForGroupModel returns all enabled channel IDs for the given group
+// and model from the memory cache. Returns nil when cache is disabled or no
+// channels are found.
+func GetChannelIDsForGroupModel(group string, modelName string) []int {
+	if !common.MemoryCacheEnabled {
+		return nil
+	}
+	channelSyncLock.RLock()
+	defer channelSyncLock.RUnlock()
+
+	modelMap, ok := group2model2channels[group]
+	if !ok {
+		return nil
+	}
+	ids, ok := modelMap[modelName]
+	if !ok {
+		normalizedModel := ratio_setting.FormatMatchingModelName(modelName)
+		ids, ok = modelMap[normalizedModel]
+		if !ok {
+			return nil
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	result := make([]int, len(ids))
+	copy(result, ids)
+	return result
+}
+
 func CacheUpdateChannel(channel *Channel) {
 	if !common.MemoryCacheEnabled {
 		return
