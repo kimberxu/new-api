@@ -108,6 +108,9 @@ export interface ChannelOtherSettings {
   upstream_model_update_ignored_models?: string[]
   upstream_model_update_last_check_time?: number
   upstream_model_update_last_detected_models?: string[]
+  rate_limit_enabled?: boolean
+  rate_limit_rpm?: number
+  rate_limit_tpm?: number
   advanced_custom?: AdvancedCustomConfig
 }
 
