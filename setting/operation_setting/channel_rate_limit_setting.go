@@ -3,9 +3,9 @@ package operation_setting
 import "github.com/QuantumNous/new-api/setting/config"
 
 type ChannelRateLimitSetting struct {
-	Enabled    bool `json:"enabled"`
-	DefaultRPM int  `json:"default_rpm"`
-	DefaultTPM int  `json:"default_tpm"`
+	Enabled    bool    `json:"enabled"`
+	DefaultRPM float64 `json:"default_rpm"`
+	DefaultTPM int     `json:"default_tpm"`
 }
 
 var channelRateLimitSetting = ChannelRateLimitSetting{

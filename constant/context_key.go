@@ -79,4 +79,11 @@ const (
 	ContextKeyTokenAuditParams ContextKey = "token_audit_params"
 	// ContextKeyTokenAuditSucceeded disambiguates token responses that exceed the audit buffer.
 	ContextKeyTokenAuditSucceeded ContextKey = "token_audit_succeeded"
+	// ContextKeyAllChannelsRateLimited tracks whether any channel hit a rate limit
+	// during channel selection. Used to return 429 instead of 503 when all
+	// channels are rate-limited.
+	ContextKeyAllChannelsRateLimited ContextKey = "all_channels_rate_limited"
+	// ContextKeyChannelRateLimitRetryAfter stores the minimum retry-after seconds
+	// across all rate-limited channels for the 429 response.
+	ContextKeyChannelRateLimitRetryAfter ContextKey = "channel_rate_limit_retry_after"
 )
