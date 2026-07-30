@@ -281,7 +281,7 @@ export const channelFormSchema = z
     claude_beta_query: z.boolean().optional(), // Anthropic: beta query passthrough
     disable_task_polling_sleep: z.boolean().optional(),
     rate_limit_enabled: z.boolean().optional(),
-    rate_limit_rpm: z.number().int().min(0).optional(),
+    rate_limit_rpm: z.number().min(0).optional(),
     rate_limit_tpm: z.number().int().min(0).optional(),
     // Upstream model update settings (stored in settings JSON)
     upstream_model_update_check_enabled: z.boolean().optional(),
