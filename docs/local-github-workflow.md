@@ -4,9 +4,9 @@
 
 ## 标准触发短语
 
-向维护助手说 **「同步上游到 deploy」** 即按本文档执行完整同步流程：fetch upstream → merge 进 deploy → 按「保留魔改 + 采纳上游语义」解决冲突 → 合并后验证 → push origin deploy → 更新本文档头部标记。
+向维护助手说 **「同步上游到 deploy」** 即按本文档执行完整同步流程：fetch upstream → merge 进 deploy → 按「保留魔改 + 采纳上游语义」解决冲突 → 合并后验证 → push origin deploy → 更新本文档头部标记。**默认同时同步 `main`**（merge upstream/main 后推送）。
 
-可选追加：`也同步 main`（main 一并合并推送）、`不更新文档`（跳过头部标记更新）、`跳过验证`（不推荐）。
+可选追加：`不同步 main`（仅同步 deploy）、`不更新文档`（跳过头部标记更新）、`跳过验证`（不推荐）。
 
 本仓库只保留两类远程：`origin` (个人 fork) 和 `upstream` (官方上游)。
 
