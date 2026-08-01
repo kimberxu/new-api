@@ -1,4 +1,22 @@
-# 定制功能清单
+# 定制功能清单（deploy 分支）
+
+> 对应分支：`deploy` @ `e0b9f243`（2026-08-01 更新）
+> 以下功能均为 `deploy` 相对 `upstream/main` 的定制（可用 `git diff upstream/main...deploy` 核对）。
+> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）
+
+## 功能总览
+
+| 功能 | 引入提交 | 上游冲突风险 |
+|------|----------|--------------|
+| 请求调试日志 | `bfa99ad6` | 中（`controller/relay.go`、`relay/common/relay_info.go`） |
+| 日志自动清理 | `bfa99ad6` | 低 |
+| 同优先级渠道重试 | `bfa99ad6` | 中（`controller/relay.go`） |
+| GHCR 部署镜像构建 | `bfa99ad6` | 低 |
+| 渠道请求频率限制（RPM/TPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） |
+
+> **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`，`deploy` 与上游文件一致。
+
+---
 
 ## 请求调试日志
 
@@ -22,23 +40,27 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 ### 文件清单
 
-- `relay/common/request_debug.go` - 核心模块
+- `relay/common/request_debug.go` - 核心模块（快照结构、脱敏、截断）
 - `common/init.go` / `common/constants.go` - 配置初始化
-- `controller/relay.go` - 重试逻辑 + 错误日志集成
-- `service/log_info_generate.go` - 管理员信息附加
+- `controller/relay.go` - 捕获调用 + 重试逻辑 + 错误日志集成
+- `service/log_info_generate.go` - 快照写入 `other.admin_info.request_debug`（仅管理员可见）
 - `service/system_task.go` - 日志清理定时任务
-- `relay/*_handler.go` - 各 handler 集成点
-- 前端层：`types.ts`, `request-debug.ts`, `details-dialog.tsx`
+- `relay/chat_completions_via_responses.go`、`relay/claude_handler.go`、`relay/compatible_handler.go`、`relay/gemini_handler.go`、`relay/responses_handler.go` - 各 handler 捕获集成点
+- 测试：`relay/common/request_debug_test.go`、`common/request_debug_config_test.go`、`service/request_debug_log_test.go`
+- 前端层：`web/src/features/usage-logs/lib/request-debug.ts`（+ `request-debug.test.ts`）、`types.ts`、`details-dialog.tsx`
 
 ---
 
-## CustomEvent 锁移除
+## 日志自动清理
 
-移除 `CustomEvent.Mutex`。同步写职责上移至调用方（流式 SSE writer），减少单次 event 渲染的锁开销。
+### 机制
+
+`LOG_CLEANUP_ENABLED=true` 时，master 节点注册 `SystemTaskTypeLogCleanup` 定时任务（间隔 `LOG_CLEANUP_INTERVAL_HOURS` 小时），按 `LOG_CLEANUP_RETENTION_DAYS` 计算截止时间戳，分批（每批 100 条）删除 `logs` 表中超期记录，处理进度写入任务状态；一次运行全部删完为止。
 
 ### 文件清单
 
-- `common/custom-event.go`
+- `service/system_task.go` - 任务注册与执行（`runLogCleanupTask`）
+- `common/init.go` / `common/constants.go` - 配置初始化
 
 ---
 
@@ -51,19 +73,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 ### 文件清单
 
 - `service/channel_select.go` - `RetryParam` 新增 `ExcludeChannels` 和 `ExcludeChannel()`
-
----
-
-## OIDC 自定义显示名称
-
-### 功能概述
-
-OIDC 登陆按钮可配置自定义显示名称，不设置时默认显示 "OIDC"。显示在登陆页第三方 OAuth 列表中和管理后台的 OIDC 配置区域。
-
-### 文件清单
-
-- `setting/system_setting/oidc.go` - `OIDCSettings` 新增 `DisplayName` 字段 + `GetEffectiveDisplayName()` 方法
-- 前端层：`oauth-section.tsx`、`oauth-providers.tsx`、`types.ts`
+- `controller/relay.go` - 请求失败后调用 `retryParam.ExcludeChannel(channel.Id)`；全渠道均被限流时返回 429
 
 ---
 
@@ -90,15 +100,17 @@ OIDC 登陆按钮可配置自定义显示名称，不设置时默认显示 "OIDC
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `rate_limit_enabled` | bool | 是否启用该渠道的限流 |
-| `rate_limit_rpm` | int | 每分钟最大请求数（0 = 使用全局默认值） |
+| `rate_limit_rpm` | float | 每分钟最大请求数（0 = 使用全局默认值；支持小数） |
 | `rate_limit_tpm` | int | 每分钟最大 Token 数（0 = 使用全局默认值） |
 
 ### 限流行为
 
 - 窗口：固定 60 秒
 - 检查时机：渠道选择后、请求转发前（`Distribute` 中间件中）
-- 超限响应：HTTP 429，`{"error": {"message": "该渠道已超过速率限制,请稍后重试", ...}}`
+- 单渠道超限：跳过该渠道并排除出重试候选，继续尝试同优先级其他渠道
+- 全渠道均被限流：HTTP 429 + `Retry-After: 60`，错误码 `channel:rate_limited`，客户端可据此退避
 - 回退行为：Redis 不可用时自动切到内存模式；Redis 或内存均出错时放行
+- 演进：`26271295` 引入基础 RPM/TPM；`e09babdf` 改为上下文感知（仅对当前请求生效）+ RPM 支持小数；`102747fd` 前端 RPM 输入框加 `step='any'`
 
 ### 文件清单
 
@@ -107,6 +119,10 @@ OIDC 登陆按钮可配置自定义显示名称，不设置时默认显示 "OIDC
 - `service/channel_rate_limit.go` - 核心限流逻辑
 - `relaykit/dto/channel_settings.go` - `ChannelOtherSettings` 新增 `RateLimitEnabled`、`RateLimitRPM`、`RateLimitTPM`
 - `middleware/distributor.go` - 分发时插入 `CheckChannelRateLimit` 检查
+- `controller/relay.go` - 限流渠道排除重试 + 全渠道限流 429 兜底
+- `constant/context_key.go` - `ContextKeyAllChannelsRateLimited`、`ContextKeyChannelRateLimitRetryAfter`
+- `model/channel_cache.go` - 渠道缓存携带限流配置
+- `relaykit/types/error.go` - `ErrorCodeChannelRateLimited`
 - `i18n/keys.go` - 新增 `MsgDistributorChannelRateLimited`
 - `i18n/locales/en.yaml`、`zh-CN.yaml`、`zh-TW.yaml` - 翻译
 
