@@ -4,7 +4,7 @@
 
 ## 标准触发短语
 
-向维护助手说 **「同步上游到 deploy」** 即按本文档执行完整同步流程：fetch upstream → merge 进 deploy → 按「保留魔改 + 采纳上游语义」解决冲突 → 合并后验证 → push origin deploy → 更新本文档头部标记。**默认同时同步 `main`**（merge upstream/main 后推送）。
+向维护助手说 **「同步上游到 deploy」**(参考 `docs/local-github-workflow.md`) 即按本文档执行完整同步流程:fetch upstream → merge 进 deploy → 按「保留魔改 + 采纳上游语义」解决冲突 → 合并后验证 → push origin deploy → 更新本文档头部标记。**默认同时同步 `main`**(merge upstream/main 后推送)。
 
 可选追加：`不同步 main`（仅同步 deploy）、`不更新文档`（跳过头部标记更新）、`跳过验证`（不推荐）。
 
