@@ -81,38 +81,48 @@ func (p *RetryParam) ResetRetryNextTry() {
 // CacheGetRandomSatisfiedChannel tries to get a random channel that satisfies the requirements.
 // 尝试获取一个满足要求的随机渠道。
 //
-// For "auto" tokenGroup with cross-group Retry enabled:
-// 对于启用了跨分组重试的 "auto" tokenGroup：
+// Channel selection is exclude-driven: the caller accumulates the ids of
+// already-tried (failed or rate-limited) channels in param.ExcludeChannels, and
+// each call re-rolls only among the highest priority tier of the remaining
+// channels. Retries therefore prefer another channel at the same priority;
+// only when that tier is fully excluded does selection cascade to the next
+// lower priority tier, and (for "auto" groups) to the next group.
+// 渠道选择由排除集合驱动:调用方将已尝试(失败或限流)的渠道 id 累积在
+// param.ExcludeChannels 中,每次调用只在剩余渠道的最高优先级层内重新随机。
+// 因此重试会优先选择同一优先级的其他渠道;只有该层被全部排除后,选择才会
+// 级联到下一个较低优先级层,以及(对于 "auto" 分组)下一个分组。
 //
-//   - Each group will exhaust all its priorities before moving to the next group.
-//     每个分组会用完所有优先级后才会切换到下一个分组。
+// For "auto" tokenGroup with cross-group Retry enabled:
+// 对于启用了跨分组重试的 "auto" tokenGroup:
 //
 //   - Uses ContextKeyAutoGroupIndex to track current group index.
 //     使用 ContextKeyAutoGroupIndex 跟踪当前分组索引。
 //
-//   - Uses ContextKeyAutoGroupRetryIndex to track the global Retry count when current group started.
-//     使用 ContextKeyAutoGroupRetryIndex 跟踪当前分组开始时的全局重试次数。
+//   - When GetRandomSatisfiedChannel returns nil for the current group, moves to next group.
+//     当当前分组无可用渠道(GetRandomSatisfiedChannel 返回 nil)时,切换到下一个分组。
 //
-//   - priorityRetry = Retry - startRetryIndex, represents the priority level within current group.
-//     priorityRetry = Retry - startRetryIndex，表示当前分组内的优先级级别。
+//   - Each group gets at most RetryTimes+1 attempts (same budget as the legacy
+//     per-group priority indexing): a group is left after either its channels
+//     are exhausted (nil result) or the pre-switch condition
+//     (crossGroupRetry && priorityRetry >= RetryTimes) fires.
+//     每个分组最多尝试 RetryTimes+1 次(与旧的按优先级索引语义预算一致):
+//     分组在渠道全部排除(nil 结果)或满足预切换条件
+//     (crossGroupRetry && priorityRetry >= RetryTimes)后切换。
 //
-//   - When GetRandomSatisfiedChannel returns nil (priorities exhausted), moves to next group.
-//     当 GetRandomSatisfiedChannel 返回 nil（优先级用完）时，切换到下一个分组。
+// Example flow (2 groups, RetryTimes=3, exclude-driven re-roll within a tier):
+// 示例流程(2个分组,RetryTimes=3,层内排除驱动重选):
 //
-// Example flow (2 groups, each with 2 priorities, RetryTimes=3):
-// 示例流程（2个分组，每个有2个优先级，RetryTimes=3）：
+//	Retry=0: GroupA, highest remaining priority tier
+//	         分组A, 剩余最高优先级层
 //
-//	Retry=0: GroupA, priority0 (startRetryIndex=0, priorityRetry=0)
-//	         分组A, 优先级0
+//	Retry=1: GroupA, same tier while any channel remains, else next tier
+//	         分组A, 层内仍有渠道则同层,否则降级到下一层
 //
-//	Retry=1: GroupA, priority1 (startRetryIndex=0, priorityRetry=1)
-//	         分组A, 优先级1
+//	Retry=2: GroupA exhausted (or pre-switch) → GroupB
+//	         分组A用完(或预切换)→ 分组B
 //
-//	Retry=2: GroupA exhausted → GroupB, priority0 (startRetryIndex=2, priorityRetry=0)
-//	         分组A用完 → 分组B, 优先级0
-//
-//	Retry=3: GroupB, priority1 (startRetryIndex=2, priorityRetry=1)
-//	         分组B, 优先级1
+//	Retry=3: GroupB, highest remaining priority tier
+//	         分组B, 剩余最高优先级层
 func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, error) {
 	var channel *model.Channel
 	var err error
@@ -139,11 +149,14 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 
 		for i := startGroupIndex; i < len(autoGroups); i++ {
 			autoGroup := autoGroups[i]
-			// Calculate priorityRetry for current group
-			// 计算当前分组的 priorityRetry
+			// Retry counter within the current group. It is passed to
+			// GetRandomSatisfiedChannel only for signature compatibility;
+			// selection itself is exclude-driven and no longer indexes a
+			// priority list. It is still compared against RetryTimes for the
+			// cross-group pre-switch below.
 			priorityRetry := param.GetRetry()
-			// If moved to a new group, reset priorityRetry and update startRetryIndex
-			// 如果切换到新分组，重置 priorityRetry 并更新 startRetryIndex
+			// If moved to a new group, reset priorityRetry
+			// 如果切换到新分组,重置 priorityRetry
 			if i > startGroupIndex {
 				priorityRetry = 0
 			}
@@ -158,13 +171,12 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			)
 			if channel == nil {
 				// Current group has no available channel for this model, try next group
-				// 当前分组没有该模型的可用渠道，尝试下一个分组
+				// 当前分组没有该模型的可用渠道,尝试下一个分组
 				logger.LogDebug(param.Ctx, "No available channel in group %s for model %s at priorityRetry %d, trying next group", autoGroup, param.ModelName, priorityRetry)
 				// 重置状态以尝试下一个分组
 				common.SetContextKey(param.Ctx, constant.ContextKeyAutoGroupIndex, i+1)
-				common.SetContextKey(param.Ctx, constant.ContextKeyAutoGroupRetryIndex, 0)
 				// Reset retry counter so outer loop can continue for next group
-				// 重置重试计数器，以便外层循环可以为下一个分组继续
+				// 重置重试计数器,以便外层循环可以为下一个分组继续
 				param.SetRetry(0)
 				continue
 			}
