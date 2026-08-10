@@ -60,56 +60,26 @@ func GetAllEnableAbilities() []Ability {
 	return abilities
 }
 
-func getPriority(group string, model string, retry int) (int, error) {
-
-	var priorities []int
-	err := DB.Model(&Ability{}).
-		Select("DISTINCT(priority)").
-		Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, model, true).
-		Order("priority DESC").              // 按优先级降序排序
-		Pluck("priority", &priorities).Error // Pluck用于将查询的结果直接扫描到一个切片中
-
-	if err != nil {
-		// 处理错误
-		return 0, err
-	}
-
-	if len(priorities) == 0 {
-		// 如果没有查询到优先级，则返回错误
-		return 0, errors.New("数据库一致性被破坏")
-	}
-
-	// 确定要使用的优先级
-	var priorityToUse int
-	if retry >= len(priorities) {
-		// 如果重试次数大于优先级数，则使用最小的优先级
-		priorityToUse = priorities[len(priorities)-1]
-	} else {
-		priorityToUse = priorities[retry]
-	}
-	return priorityToUse, nil
-}
-
-func getChannelQuery(group string, model string, retry int) (*gorm.DB, error) {
+func getChannelQuery(group string, model string) (*gorm.DB, error) {
+	// Select only the highest-priority enabled channels for the group/model.
+	// Retries never demote to a lower priority tier here: once the top tier is
+	// exhausted (all its channels failed or were excluded), a retry re-enters
+	// this query, and because failed channels are excluded by the caller only
+	// on the memory-cache path, the DB path conservatively keeps serving the
+	// top tier. Cross-tier fallback is handled by the caller (auto-groups).
 	maxPrioritySubQuery := DB.Model(&Ability{}).Select("MAX(priority)").Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, model, true)
 	channelQuery := DB.Where(commonGroupCol+" = ? and model = ? and enabled = ? and priority = (?)", group, model, true, maxPrioritySubQuery)
-	if retry != 0 {
-		priority, err := getPriority(group, model, retry)
-		if err != nil {
-			return nil, err
-		} else {
-			channelQuery = DB.Where(commonGroupCol+" = ? and model = ? and enabled = ? and priority = ?", group, model, true, priority)
-		}
-	}
-
 	return channelQuery, nil
 }
 
 func GetChannel(group string, model string, retry int, requestPath string) (*Channel, error) {
+	// retry is accepted for signature compatibility only; selection always
+	// targets the highest priority tier. Excluding already-tried channels is
+	// done by the caller on the memory-cache path; the legacy DB path cannot
+	// exclude by id set, so repeated retries re-roll within the top tier.
 	var abilities []Ability
 
-	var err error = nil
-	channelQuery, err := getChannelQuery(group, model, retry)
+	channelQuery, err := getChannelQuery(group, model)
 	if err != nil {
 		return nil, err
 	}

@@ -114,7 +114,7 @@ func SyncChannelCache(frequency int) {
 func GetRandomSatisfiedChannel(group string, model string, retry int, requestPath string, excludeChannels []int) (*Channel, error) {
 	// if memory cache is disabled, get channel directly from database.
 	// The non-memory-cache path ignores excludeChannels and falls back to the
-	// legacy priority-by-retry selection in GetChannel.
+	// legacy selection in GetChannel, which also targets the highest priority.
 	if !common.MemoryCacheEnabled {
 		return GetChannel(group, model, retry, requestPath)
 	}
@@ -136,8 +136,10 @@ func GetRandomSatisfiedChannel(group string, model string, retry int, requestPat
 	}
 
 	// Build excluded channel id set for O(1) lookup. excludeChannels holds the
-	// ids of channels already tried in the current request's retry loop, so the
-	// same priority tier keeps being tried until exhausted before cascading down.
+	// ids of channels already tried in the current request's retry loop. The
+	// remaining channels are filtered to the highest priority tier, so retries
+	// re-roll within the same tier until it is exhausted; only then does the
+	// caller (auto-groups) cascade to a lower tier or lower group.
 	excludeSet := make(map[int]bool, len(excludeChannels))
 	for _, id := range excludeChannels {
 		excludeSet[id] = true
@@ -158,44 +160,42 @@ func GetRandomSatisfiedChannel(group string, model string, retry int, requestPat
 		if channel, ok := channelsIDM[channels[0]]; ok {
 			return channel, nil
 		}
-		return nil, fmt.Errorf("数据库一致性错误，渠道# %d 不存在，请联系管理员修复", channels[0])
+		return nil, fmt.Errorf("数据库一致性错误,渠道# %d 不存在,请联系管理员修复", channels[0])
 	}
 
-	uniquePriorities := make(map[int]bool)
+	// Pick the highest priority among the remaining (non-excluded) channels.
+	// retry no longer indexes into a sorted priority list: the same tier keeps
+	// being re-rolled until its channels are exhausted via excludeChannels.
+	highestPriority := int64(0)
+	first := true
 	for _, channelId := range channels {
-		if channel, ok := channelsIDM[channelId]; ok {
-			uniquePriorities[int(channel.GetPriority())] = true
-		} else {
-			return nil, fmt.Errorf("数据库一致性错误，渠道# %d 不存在，请联系管理员修复", channelId)
+		channel, ok := channelsIDM[channelId]
+		if !ok {
+			return nil, fmt.Errorf("数据库一致性错误,渠道# %d 不存在,请联系管理员修复", channelId)
+		}
+		priority := channel.GetPriority()
+		if first || priority > highestPriority {
+			highestPriority = priority
+			first = false
 		}
 	}
-	var sortedUniquePriorities []int
-	for priority := range uniquePriorities {
-		sortedUniquePriorities = append(sortedUniquePriorities, priority)
-	}
-	sort.Sort(sort.Reverse(sort.IntSlice(sortedUniquePriorities)))
 
-	if retry >= len(uniquePriorities) {
-		retry = len(uniquePriorities) - 1
-	}
-	targetPriority := int64(sortedUniquePriorities[retry])
-
-	// get the priority for the given retry number
+	// get the channels for the highest priority
 	var sumWeight = 0
 	var targetChannels []*Channel
 	for _, channelId := range channels {
 		if channel, ok := channelsIDM[channelId]; ok {
-			if channel.GetPriority() == targetPriority {
+			if channel.GetPriority() == highestPriority {
 				sumWeight += channel.GetWeight()
 				targetChannels = append(targetChannels, channel)
 			}
 		} else {
-			return nil, fmt.Errorf("数据库一致性错误，渠道# %d 不存在，请联系管理员修复", channelId)
+			return nil, fmt.Errorf("数据库一致性错误,渠道# %d 不存在,请联系管理员修复", channelId)
 		}
 	}
 
 	if len(targetChannels) == 0 {
-		return nil, errors.New(fmt.Sprintf("no channel found, group: %s, model: %s, priority: %d", group, model, targetPriority))
+		return nil, errors.New(fmt.Sprintf("no channel found, group: %s, model: %s, priority: %d", group, model, highestPriority))
 	}
 
 	// smoothing factor and adjustment
