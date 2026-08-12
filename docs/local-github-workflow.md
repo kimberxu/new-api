@@ -80,11 +80,11 @@ cd web && bun run build                                          # 前端
 日常发布流程：
 
 ```bash
-git push origin deploy        # 推送代码（不触发构建）
-git tag deploy && git push origin deploy    # 打滚动 tag → 自动构建
+git push origin deploy                    # 推送代码（不触发构建）
+git tag deploy && git push origin refs/tags/deploy    # 打滚动 tag → 自动构建
 ```
 
-> 滚动 tag `deploy` 再次发布时需覆盖：`git tag -f deploy && git push -f origin deploy`。如不想覆盖历史，可打不可变 tag：`git tag deploy-<short_sha> && git push origin deploy-<short_sha>`（同样触发构建）。
+> 滚动 tag `deploy` 与部署分支同名，git 会因 refspec 歧义报「源引用规格匹配超过一个」，推送 tag 必须用显式 `refs/tags/deploy`。再次发布时需覆盖：`git tag -f deploy && git push -f origin refs/tags/deploy`。如不想覆盖历史，可打不可变 tag：`git tag deploy-<short_sha> && git push origin deploy-<short_sha>`（同样触发构建）。
 
 1. 推送 `deploy*` tag 后，GitHub Actions 自动构建，无需进网页
 2. 构建产物（`<owner>` 为仓库属主小写）：
@@ -103,5 +103,5 @@ git tag deploy && git push origin deploy    # 打滚动 tag → 自动构建
 git checkout deploy
 git merge local/<feature>
 git push origin deploy      # 推送代码本身不触发构建
-git tag deploy && git push origin deploy    # 打 tag 触发 GHCR 构建
+git tag deploy && git push origin refs/tags/deploy    # 打 tag 触发 GHCR 构建
 ```
