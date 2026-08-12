@@ -74,17 +74,17 @@ cd web && bun run build                                          # 前端
 
 `deploy` 分支的镜像构建**不是每次 push 自动触发**。`.github/workflows/deploy-image-ghcr.yml` 支持两种触发：
 
-- **自动（推荐）**：推送以 `deploy` 开头的 git tag（如 `deploy`、`deploy-<short_sha>`）即触发构建；
+- **自动（推荐）**：推送以 `deploy` 开头的 git tag（如 `deploy-image`、`deploy-image-<short_sha>`）即触发构建；
 - **手动兜底**：`workflow_dispatch`，在 GitHub → **Actions** → **Build deploy image (GHCR)** → **Run workflow**（branch 输入默认 `deploy`）。
 
 日常发布流程：
 
 ```bash
 git push origin deploy                    # 推送代码（不触发构建）
-git tag deploy && git push origin refs/tags/deploy    # 打滚动 tag → 自动构建
+git tag deploy-image && git push origin deploy-image    # 打滚动 tag → 自动构建
 ```
 
-> 滚动 tag `deploy` 与部署分支同名，git 会因 refspec 歧义报「源引用规格匹配超过一个」，推送 tag 必须用显式 `refs/tags/deploy`。再次发布时需覆盖：`git tag -f deploy && git push -f origin refs/tags/deploy`。如不想覆盖历史，可打不可变 tag：`git tag deploy-<short_sha> && git push origin deploy-<short_sha>`（同样触发构建）。
+> 滚动 tag 用 `deploy-image` 而非 `deploy`，避免与部署分支同名引发 git refspec 歧义。再次发布需覆盖滚动 tag：`git tag -f deploy-image && git push -f origin deploy-image`；如需留档可改打不可变 tag：`git tag deploy-image-<short_sha> && git push origin deploy-image-<short_sha>`（同样触发构建）。
 
 1. 推送 `deploy*` tag 后，GitHub Actions 自动构建，无需进网页
 2. 构建产物（`<owner>` 为仓库属主小写）：
@@ -103,5 +103,5 @@ git tag deploy && git push origin refs/tags/deploy    # 打滚动 tag → 自动
 git checkout deploy
 git merge local/<feature>
 git push origin deploy      # 推送代码本身不触发构建
-git tag deploy && git push origin refs/tags/deploy    # 打 tag 触发 GHCR 构建
+git tag deploy-image && git push origin deploy-image    # 打 tag 触发 GHCR 构建
 ```
