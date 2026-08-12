@@ -1,6 +1,9 @@
 name: Build deploy image (GHCR)
 
 on:
+  push:
+    tags:
+      - 'deploy*'
   workflow_dispatch:
     inputs:
       branch:
@@ -23,7 +26,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
-          ref: ${{ inputs.branch }}
+          ref: ${{ inputs.branch || github.sha }}
 
       - name: Resolve image tags
         id: tags

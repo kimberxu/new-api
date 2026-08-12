@@ -72,9 +72,21 @@ cd web && bun run build                                          # 前端
 
 ## 部署
 
-`deploy` 分支的镜像构建**不是 push 自动触发**（`.github/workflows/deploy-image-ghcr.yml` 为 `workflow_dispatch` 手动触发）。
+`deploy` 分支的镜像构建**不是每次 push 自动触发**。`.github/workflows/deploy-image-ghcr.yml` 支持两种触发：
 
-1. push `deploy` 后，到 GitHub → **Actions** → **Build deploy image (GHCR)** → **Run workflow**（branch 输入默认 `deploy`）
+- **自动（推荐）**：推送以 `deploy` 开头的 git tag（如 `deploy`、`deploy-<short_sha>`）即触发构建；
+- **手动兜底**：`workflow_dispatch`，在 GitHub → **Actions** → **Build deploy image (GHCR)** → **Run workflow**（branch 输入默认 `deploy`）。
+
+日常发布流程：
+
+```bash
+git push origin deploy        # 推送代码（不触发构建）
+git tag deploy && git push origin deploy    # 打滚动 tag → 自动构建
+```
+
+> 滚动 tag `deploy` 再次发布时需覆盖：`git tag -f deploy && git push -f origin deploy`。如不想覆盖历史，可打不可变 tag：`git tag deploy-<short_sha> && git push origin deploy-<short_sha>`（同样触发构建）。
+
+1. 推送 `deploy*` tag 后，GitHub Actions 自动构建，无需进网页
 2. 构建产物（`<owner>` 为仓库属主小写）：
    - `ghcr.io/<owner>/new-api:deploy` — 滚动 tag，始终指向最新构建
    - `ghcr.io/<owner>/new-api:deploy-<short_sha>` — 不可变 tag，对应具体提交
@@ -83,10 +95,13 @@ cd web && bun run build                                          # 前端
    - 日常更新：拉 `:deploy`
    - 回滚：拉上一个已知良好的 `:deploy-<short_sha>`
 
+> 注意：tag 触发构建时，镜像 tag 的 `<short_sha>` 取自该 tag 指向的提交，与 git tag 名无关。
+
 ## 定制功能分支合并
 
 ```bash
 git checkout deploy
 git merge local/<feature>
-git push origin deploy      # 随后手动触发上方 GHCR 构建
+git push origin deploy      # 推送代码本身不触发构建
+git tag deploy && git push origin deploy    # 打 tag 触发 GHCR 构建
 ```
