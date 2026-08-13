@@ -1,8 +1,8 @@
 # 定制功能清单（deploy 分支）
 
-> 对应分支：`deploy` @ `e0b9f243`（2026-08-01 更新）
+> 对应分支：`deploy` @ `e0b9f243`（2026-08-13 更新）
 > 以下功能均为 `deploy` 相对 `upstream/main` 的定制（可用 `git diff upstream/main...deploy` 核对）。
-> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）
+> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）
 
 ## 功能总览
 
@@ -13,6 +13,7 @@
 | 同优先级渠道重试 | `bfa99ad6` | 中（`controller/relay.go`） |
 | GHCR 部署镜像构建 | `bfa99ad6` | 低 |
 | 渠道请求频率限制（RPM/TPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） |
+| 渠道测试请求文案定制 | `d0fdb047` | 低（`controller/channel-test.go`） |
 
 > **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`，`deploy` 与上游文件一致。
 
@@ -132,3 +133,17 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - `types.ts` - `ChannelOtherSettings` 接口新增字段
 - `lib/channel-form.ts` - Schema、默认值、transform、buildSettingsJSON
 - `components/drawers/channel-mutate-drawer.tsx` - 限流开关 + RPM/TPM 输入框 UI
+
+---
+
+## 渠道测试请求文案定制
+
+### 功能概述
+
+很多中转渠道把单个 `hi` 列为屏蔽词（视为无意义刷量请求），导致渠道测试/自动健康检查误报失败。本次将渠道测试（`buildTestRequest`）向上游发送的用户消息由 `hi` 改为「彩虹有几种颜色」——一个简单、少见、非敏感的中文短问句，几乎不会命中中转屏蔽词表。
+
+覆盖全部含用户消息的测试请求格式：OpenAI chat/completions、OpenAI Responses、Responses compact、Claude、Gemini。（Embedding / Image / Rerank 测试请求不含用户消息文本，不受影响。）
+
+### 文件清单
+
+- `controller/channel-test.go` - `buildTestRequest` 中 7 处测试用户消息（`content` / `text` / `input`）
