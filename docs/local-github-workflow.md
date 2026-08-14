@@ -1,6 +1,6 @@
 # 本地 GitHub Fork 工作流
 
-> 对应分支:`deploy` @ `ff840258`(2026-08-14 更新)
+> 对应分支:`deploy` @ `ffcf971a`(2026-08-14 更新)
 
 ## 标准触发短语
 
@@ -79,14 +79,14 @@ cd web && bun run build                                          # 前端
 - **自动（推荐）**：推送以 `deploy` 开头的 git tag（如 `deploy-image`、`deploy-image-<short_sha>`）即触发构建；
 - **手动兜底**：`workflow_dispatch`，在 GitHub → **Actions** → **Build deploy image (GHCR)** → **Run workflow**（branch 输入默认 `deploy`）。
 
-日常发布流程：
+日常发布流程（**每次发布只打一个滚动 tag**，单次构建即同时产出滚动与留档镜像 tag）：
 
 ```bash
 git push origin deploy                    # 推送代码（不触发构建）
-git tag deploy-image && git push origin deploy-image    # 打滚动 tag → 自动构建
+git tag -f deploy-image && git push -f origin deploy-image    # 覆盖滚动 tag → 自动构建
 ```
 
-> 滚动 tag 用 `deploy-image` 而非 `deploy`，避免与部署分支同名引发 git refspec 歧义。再次发布需覆盖滚动 tag：`git tag -f deploy-image && git push -f origin deploy-image`；如需留档可改打不可变 tag：`git tag deploy-image-<short_sha> && git push origin deploy-image-<short_sha>`（同样触发构建）。
+> 滚动 tag 用 `deploy-image` 而非 `deploy`，避免与部署分支同名引发 git refspec 歧义。**不要额外打 `deploy-image-<short_sha>` 等留档 git tag**——workflow 单次构建已同时推送 `:deploy`（滚动）与 `:deploy-<short_sha>`（留档）两个镜像 tag（见下「构建产物」），多打 git tag 只会多触发一次重复构建。再次发布直接 `git tag -f` 覆盖滚动 tag 即可；回滚用已知良好的 `:deploy-<short_sha>` 镜像 tag。
 
 1. 推送 `deploy*` tag 后，GitHub Actions 自动构建，无需进网页
 2. 构建产物（`<owner>` 为仓库属主小写）：
@@ -119,6 +119,6 @@ curl -s "https://api.github.com/repos/<owner>/new-api/actions/runs?event=push&pe
 ```bash
 git checkout deploy
 git merge local/<feature>
-git push origin deploy      # 推送代码本身不触发构建
-git tag deploy-image && git push origin deploy-image    # 打 tag 触发 GHCR 构建
+git push origin deploy              # 推送代码本身不触发构建
+git tag -f deploy-image && git push -f origin deploy-image    # 覆盖滚动 tag 触发 GHCR 构建
 ```
