@@ -77,3 +77,40 @@ jobs:
           echo "${{ steps.tags.outputs.deploy_tag }}" >> "$GITHUB_STEP_SUMMARY"
           echo "${{ steps.tags.outputs.sha_tag }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prune old image versions (keep newest 3)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          IMAGE="new-api"
+          KEEP=3
+          # 所有版本按创建时间降序；deploy 滚动 tag 总指向最新构建，
+          # 必然落在前 KEEP 内，此处仍显式保护以防异常。
+          gh api --paginate "/user/packages/container/${IMAGE}/versions?per_page=100" \
+            --jq 'sort_by(.created_at) | reverse | .[] | [.id, ([.metadata.container.tags[]?] | join(","))] | @tsv' \
+            > /tmp/versions.tsv || {
+              echo "::warning::无法列出镜像版本，跳过清理"
+              exit 0
+            }
+          if [ ! -s /tmp/versions.tsv ]; then
+            echo "没有可清理的镜像版本"
+            exit 0
+          fi
+          deploy_id=$(awk -F'\t' '$2 ~ /(^|,)deploy(,|$)/ {print $1}' /tmp/versions.tsv | head -1)
+          i=0
+          deleted=0
+          while IFS=$'\t' read -r id tags; do
+            i=$((i + 1))
+            if [ "$i" -le "$KEEP" ] || [ "$id" = "$deploy_id" ]; then
+              echo "保留 version $id (tags: $tags)"
+              continue
+            fi
+            if gh api --method DELETE "/user/packages/container/${IMAGE}/versions/${id}" --silent 2>/tmp/prune_err.txt; then
+              echo "已删除 version $id (tags: $tags)"
+              deleted=$((deleted + 1))
+            else
+              echo "::warning::删除 version $id 失败: $(cat /tmp/prune_err.txt)"
+            fi
+          done < /tmp/versions.tsv
+          echo "清理完成，共删除 ${deleted} 个版本"
