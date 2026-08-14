@@ -1,6 +1,6 @@
 # 本地 GitHub Fork 工作流
 
-> 对应分支:`deploy` @ `c6c4bcf8`(2026-08-14 更新)
+> 对应分支:`deploy` @ `b368b99a`(2026-08-14 更新)
 
 ## 标准触发短语
 
@@ -96,6 +96,21 @@ git tag deploy-image && git push origin deploy-image    # 打滚动 tag → 自�
    - 回滚：拉上一个已知良好的 `:deploy-<short_sha>`
 
 > 注意：tag 触发构建时，镜像 tag 的 `<short_sha>` 取自该 tag 指向的提交，与 git tag 名无关。
+
+### 确认构建状态（无需 GitHub token）
+
+本机无 GitHub token / gh CLI 时，无法命令行直查 Actions 页面，但仓库是公开的，可用 GitHub 公开 API 定时轮询构建状态（未认证限流 60 次/小时，足够轮询）：
+
+```bash
+# 查询最近按 tag push 触发的构建（head_branch 即 tag 名）
+curl -s "https://api.github.com/repos/<owner>/new-api/actions/runs?event=push&per_page=5" \
+  | jq '.workflow_runs[] | {name, tag: .head_branch, sha: (.head_sha[0:7]), status, conclusion}'
+```
+
+- `status`: `queued` / `in_progress` / `completed`
+- `conclusion`: 完成后为 `success` / `failure`；进行中为 `null`
+- 按 tag 过滤：`?event=push&branch=deploy-image`（`head_branch` 即触发 tag 名）
+- 轮询建议：每 30~60 秒一次，直到 `status == "completed"`；`conclusion == "success"` 即构建成功，可通知部署机拉取新镜像
 
 ## 定制功能分支合并
 
