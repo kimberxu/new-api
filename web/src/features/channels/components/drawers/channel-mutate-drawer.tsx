@@ -1187,13 +1187,23 @@ export function ChannelMutateDrawer({
         Array<{ source: string; target: string }>
       >((acc, [rawSource, rawTarget]) => {
         const source = String(rawSource).trim()
-        const target = String(rawTarget ?? '').trim()
+        if (!source) return acc
 
-        if (!source || !target) {
+        if (typeof rawTarget === 'string') {
+          const target = rawTarget.trim()
+          if (target) acc.push({ source, target })
           return acc
         }
 
-        acc.push({ source, target })
+        // 加权数组 value：每个条目的 model 都是一个 target
+        if (Array.isArray(rawTarget)) {
+          for (const item of rawTarget) {
+            if (typeof item !== 'object' || item === null) continue
+            const target = String(item.model ?? '').trim()
+            if (target) acc.push({ source, target })
+          }
+        }
+
         return acc
       }, [])
 
