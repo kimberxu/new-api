@@ -36,7 +36,7 @@ export function parseModelsString(modelsStr: string): string[] {
  * Format models array to string
  */
 export function formatModelsArray(models: string[]): string {
-  return Array.from(new Set(models)).join(',')
+  return [...new Set(models)].join(',')
 }
 
 /**
@@ -65,7 +65,7 @@ export function extractMappingSourceModels(modelMapping: string): string[] {
       .map((key) => key.trim())
       .filter(Boolean)
 
-    return Array.from(new Set(keys))
+    return [...new Set(keys)]
   } catch {
     return []
   }
@@ -103,7 +103,7 @@ export function extractRedirectModels(modelMapping: string): string[] {
       return []
     })
 
-    return Array.from(new Set(values))
+    return [...new Set(values)]
   } catch {
     return []
   }
@@ -170,7 +170,7 @@ export function findMissingModelsInMapping(
     .map((key) => normalizeModelName(key))
     .filter((key) => key && !modelSet.has(key))
 
-  return Array.from(new Set(missingModels))
+  return [...new Set(missingModels)]
 }
 
 /**
@@ -224,6 +224,10 @@ export function validateModelMappingJson(modelMapping: string): {
 /**
  * Get redirect models that are also in the models list
  * (These should be removed from models list to keep /v1/models clean)
+ *
+ * Models that are both a mapping source key and a redirect target are NOT
+ * reported: the source key is the routing entry (requests arrive under that
+ * name), so removing it from Models would make the channel unreachable.
  */
 export function findExposedTargetModels(
   modelMapping: string,
@@ -232,11 +236,14 @@ export function findExposedTargetModels(
   const redirectModels = extractRedirectModels(modelMapping)
   if (redirectModels.length === 0) return []
 
+  const sourceKeys = new Set(extractMappingSourceModels(modelMapping))
   const normalizedModels = currentModels.map((m) => normalizeModelName(m))
   const modelSet = new Set(normalizedModels)
 
-  return redirectModels.filter((model) =>
-    modelSet.has(normalizeModelName(model))
+  return redirectModels.filter(
+    (model) =>
+      !sourceKeys.has(normalizeModelName(model)) &&
+      modelSet.has(normalizeModelName(model))
   )
 }
 
@@ -266,9 +273,7 @@ export function categorizeModelsWithRedirect(
   ])
 
   const redirectOnlySet = new Set(
-    Array.from(normalizedRedirectModels).filter(
-      (m) => !normalizedCurrentModels.has(m)
-    )
+    [...normalizedRedirectModels].filter((m) => !normalizedCurrentModels.has(m))
   )
 
   return {
