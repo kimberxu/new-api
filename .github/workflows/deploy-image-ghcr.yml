@@ -81,49 +81,65 @@ jobs:
       - name: Prune old image versions (keep newest 3)
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           IMAGE="new-api"
           KEEP=3
-          # 先拉取全部 versions（--paginate 拼接数组），再本地 jq 处理
-          # 避免 --paginate + --jq 逐页处理的 bug（gh cli#10459）
-          gh api --paginate "/user/packages/container/${IMAGE}/versions?per_page=100" \
-            > /tmp/versions.json 2>/tmp/prune_fetch_err.txt || {
+          SUMMARY="$GITHUB_STEP_SUMMARY"
+          # 优先 user-scoped API；失败时降级 repo-scoped API
+          if ! gh api --paginate "/user/packages/container/${IMAGE}/versions?per_page=100" > /tmp/versions.json 2>/dev/null; then
+            gh api --paginate "/repos/${GH_REPO}/packages/container/${IMAGE}/versions?per_page=100" > /tmp/versions.json 2>/tmp/prune_fetch_err.txt || {
               echo "::warning::无法列出镜像版本 ($(cat /tmp/prune_fetch_err.txt))，跳过清理"
               exit 0
             }
-          jq -r 'sort_by(.created_at) | reverse | .[] | [.id, ([.metadata.container.tags[]?] | join(",")), .created_at] | @tsv' \
-            /tmp/versions.json > /tmp/versions.tsv 2>/tmp/prune_jq_err.txt || {
-              echo "::warning::解析版本列表失败 ($(cat /tmp/prune_jq_err.txt))，跳过清理"
-              exit 0
-            }
-          total=$(wc -l < /tmp/versions.tsv)
-          echo "发现 ${total} 个镜像版本"
-          echo "### Prune old image versions (keep newest ${KEEP})" >> "$GITHUB_STEP_SUMMARY"
-          echo "共 ${total} 个镜像版本" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          cat /tmp/versions.tsv >> "$GITHUB_STEP_SUMMARY"
-          deploy_id=$(awk -F'\t' '$2 ~ /(^|,)deploy(,|$)/ {print $1}' /tmp/versions.tsv | head -1)
-          echo "deploy tag holder version id: ${deploy_id:-无}"
-          echo "deploy tag holder version id: ${deploy_id:-无}" >> "$GITHUB_STEP_SUMMARY"
-          i=0
+          fi
+          # 每次构建在 GHCR 产生 1 个带 tag 的主 digest + 2 个无 tag 的平台辅助 digest。
+          # 只有带 deploy* tag 的 version 才是可回滚版本；无 tag 辅助 digest 不占名额。
+          # 带 tag 版本独立编号，按创建时间倒序保留最近 KEEP 个（deploy 滚动 tag holder 恒为最新，
+          # 必在被保留之列；仍显式保护以防异常）；无 tag 辅助 digest 一律删除。
+          jq -r '
+            sort_by(.created_at) | reverse
+            | [.[] | select((.metadata.container.tags // []) | any(startswith("deploy")))] as $tagged
+            | [.[] | select(((.metadata.container.tags // []) | any(startswith("deploy"))) | not)] as $untagged
+            | ($tagged | to_entries | map(
+                .value as $v
+                | ($v.metadata.container.tags // []) as $tags
+                | (if (.key + 1) <= '"$KEEP"' or ($tags | index("deploy") != null)
+                   then "KEEP" else "DELETE" end) as $a
+                | "\($a)|\($v.id)|\($tags | join(","))|\($v.created_at)"
+              ))
+              + ($untagged | map(
+                . as $v
+                | ($v.metadata.container.tags // []) as $tags
+                | "DELETE|\($v.id)|\($tags | join(","))|\($v.created_at)"
+              ))
+            | .[]
+          ' /tmp/versions.json > /tmp/prune_plan.tsv 2>/tmp/prune_jq_err.txt || {
+            echo "::warning::解析版本列表失败 ($(cat /tmp/prune_jq_err.txt))，跳过清理"
+            exit 0
+          }
+          total=$(wc -l < /tmp/prune_plan.tsv)
+          echo "发现 ${total} 个镜像版本（含无 tag 辅助 digest）"
+          echo "### Prune old image versions (keep newest ${KEEP} tagged)" >> "$SUMMARY"
+          echo "共 ${total} 个镜像版本（按创建时间倒序）" >> "$SUMMARY"
+          echo '```' >> "$SUMMARY"
+          cat /tmp/prune_plan.tsv >> "$SUMMARY"
           deleted=0
-          while IFS=$'\t' read -r id tags created; do
-            i=$((i + 1))
-            if [ "$i" -le "$KEEP" ] || [ "$id" = "$deploy_id" ]; then
+          while IFS='|' read -r action id tags created; do
+            if [ "$action" = "KEEP" ]; then
               echo "保留 version $id (tags: $tags, created: $created)"
-              echo "KEEP  version $id (tags: $tags, created: $created)" >> "$GITHUB_STEP_SUMMARY"
               continue
             fi
-            if gh api --method DELETE "/user/packages/container/${IMAGE}/versions/${id}" --silent 2>/tmp/prune_err.txt; then
-              echo "已删除 version $id (tags: $tags, created: $created)"
-              echo "DELETE version $id (tags: $tags, created: $created)" >> "$GITHUB_STEP_SUMMARY"
+            echo "删除 version $id (tags: $tags, created: $created)"
+            if gh api --method DELETE "/user/packages/container/${IMAGE}/versions/${id}" --silent 2>/tmp/prune_del_err.txt \
+                || gh api --method DELETE "/repos/${GH_REPO}/packages/container/${IMAGE}/versions/${id}" --silent 2>>/tmp/prune_del_err.txt; then
               deleted=$((deleted + 1))
+              echo "DELETED version $id" >> "$SUMMARY"
             else
-              echo "::warning::删除 version $id 失败: $(cat /tmp/prune_err.txt)"
-              echo "DELETE FAILED version $id: $(cat /tmp/prune_err.txt)" >> "$GITHUB_STEP_SUMMARY"
+              echo "::warning::删除 version $id 失败: $(tail -1 /tmp/prune_del_err.txt)"
             fi
-          done < /tmp/versions.tsv
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "保留 ${KEEP} 个最新版本 + deploy holder，共删除 ${deleted} 个版本"
-          echo "共删除 ${deleted} 个版本" >> "$GITHUB_STEP_SUMMARY"
+          done < /tmp/prune_plan.tsv
+          echo '```' >> "$SUMMARY"
+          echo "共删除 ${deleted} 个版本，保留最新 ${KEEP} 个带 deploy tag 的版本"
+          echo "共删除 ${deleted} 个版本" >> "$SUMMARY"
