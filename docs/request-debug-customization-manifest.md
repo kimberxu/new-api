@@ -1,8 +1,8 @@
 # 定制功能清单（deploy 分支）
 
-> 对应分支：`deploy` @ `e0b9f243`（2026-08-13 更新）
+> 对应分支：`deploy` @ `c6c4bcf8`（2026-08-14 更新）
 > 以下功能均为 `deploy` 相对 `upstream/main` 的定制（可用 `git diff upstream/main...deploy` 核对）。
-> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）
+> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）
 
 ## 功能总览
 
@@ -14,6 +14,7 @@
 | GHCR 部署镜像构建 | `bfa99ad6` | 低 |
 | 渠道请求频率限制（RPM/TPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） |
 | 渠道测试请求文案定制 | `d0fdb047` | 低（`controller/channel-test.go`） |
+| 加权模型映射（1 对多） | `9a20e660`、`c6c4bcf8` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） |
 
 > **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`，`deploy` 与上游文件一致。
 
@@ -147,3 +148,43 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 ### 文件清单
 
 - `controller/channel-test.go` - `buildTestRequest` 中 7 处测试用户消息（`content` / `text` / `input`）
+
+---
+
+## 加权模型映射（1 对多）
+
+### 功能概述
+
+上游渠道可能存在多个等价模型（如 `deepseek-v4-flash`、`deepseek-ai/deepseek-v4-flash-0731`），希望下游用一个模型名按权重分发到多个上游模型。原有 `model_mapping` 仅支持 1:1（字符串 value），本次扩展为支持加权数组 value：
+
+```json
+{
+  "ds-v4": [
+    {"model": "deepseek-v4-flash", "weight": 5},
+    {"model": "deepseek-ai/deepseek-v4-flash-0731", "weight": 3}
+  ],
+  "glm-5.2": "GLM-5.2"
+}
+```
+
+同一映射对象中 1:1 与 1:N 可混用。`weight` 缺省（缺失或 `null`）时补全为 `1`；负权重 / 非数字权重由后端拒绝。
+
+### 行为
+
+- 请求到达选中渠道后，`ModelMappedHelper` 解析 mapping：value 为数组时按权重随机选一个 target，随后照常走链式映射（A → B → C）
+- 计费基于 `OriginModelName`（下游模型名），选中哪个上游模型不影响价格
+- 上游模型同步（`channel_upstream_update.go`）会收集加权数组中的全部 target，避免误删
+
+### 前端
+
+- 渠道编辑页 model mapping 编辑器的视觉模式将加权条目渲染为只读摘要（`加权映射 model×weight, ...`），编辑需切换到 JSON 模式
+- 「将重定向的上游模型从 Models 移除」守卫（`channel-mutate-drawer.tsx`）会展开加权数组，识别全部 target
+- 保存时（`channel-form.ts` 的 `normalizeModelMapping`）自动为缺失 `weight` 的条目补全为 `1`
+
+### 文件清单
+
+- `relay/common/weighted_model.go` - `WeightedModelItem` 类型
+- `relay/helper/model_mapped.go` - `resolveModelMappingValue` / `pickWeightedModel` 加权解析与随机选择
+- `controller/channel_upstream_update.go` - `normalizeChannelModelMapping` 返回 `map[string][]string`，`collectMappingTargets` 提取数组 target
+- 前端：`model-mapping-editor.tsx`、`channel-form.ts`、`model-mapping-validation.ts`、`channel-mutate-drawer.tsx`
+- 测试：`relay/helper/model_mapped_test.go`、`controller/channel_upstream_update_test.go`
