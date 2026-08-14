@@ -1,6 +1,6 @@
 # 本地 GitHub Fork 工作流
 
-> 对应分支:`deploy` @ `b368b99a`(2026-08-14 更新)
+> 对应分支:`deploy` @ `70f269b7`(2026-08-14 更新)
 
 ## 标准触发短语
 
@@ -71,6 +71,8 @@ cd web && bun run build                                          # 前端
 > 注意：本机 `/usr/bin/go` 是 1.19，无法解析 go.mod 的 `go 1.25.1` 指令。使用 `/usr/local/go/bin/go`（1.26），或先 `hash -r` 清除 shell 命令缓存。
 
 ## 部署
+
+> **强约束：只有用户明确要求触发构建/发布时才执行本流程。** 纯文档改动（`docs/`、`AGENTS.md`、manifest 登记、说明性提交）不触发构建——只 `git push origin deploy` 即可，不推送任何 `deploy*` tag。判断依据：改动是否影响运行产物（Go 源码、前端源码、Dockerfile、依赖清单等）；仅文档/注释变更视为不触发。
 
 `deploy` 分支的镜像构建**不是每次 push 自动触发**。`.github/workflows/deploy-image-ghcr.yml` 支持两种触发：
 

@@ -17,7 +17,7 @@ deploy 分支作业约定：
 
 - 魔改功能**必须**登记进 `docs/request-debug-customization-manifest.md`（功能总览表 + 详情章节），并更新其头部 `对应分支` commit 标记与魔改提交序列；`docs/local-github-workflow.md`、`docs/request-debug-logging-guide.md` 头部 commit 标记同步刷新。
 - 涉及 `controller/relay.go`、`relay/common/relay_info.go`、`web/src/features/usage-logs/components/dialogs/details-dialog.tsx` 等已知高风险冲突文件时，遵循 `docs/local-github-workflow.md` 的冲突处理原则（保留魔改 + 采纳上游语义）。
-- 构建/发布：push `deploy` 分支本身不触发构建；需按 `docs/local-github-workflow.md` 打 `deploy*` tag（滚动 `deploy-image` / 留档 `deploy-image-<short_sha>`）推送后触发 GHCR 构建。无 GitHub token 时，用公开 API 定时轮询确认构建状态（方法见该文档「确认构建状态」）。
+- 构建/发布（强约束）：**仅当用户明确要求触发构建/发布时才执行** tag 推送流程。纯文档改动（`docs/`、`AGENTS.md`、manifest 登记、说明性提交）**禁止触发构建**——只提交推送 `deploy` 分支即可，不推送任何 `deploy*` tag。触发方式：按 `docs/local-github-workflow.md` 打 `deploy*` tag（滚动 `deploy-image` / 留档 `deploy-image-<short_sha>`）。无 GitHub token 时，用公开 API 定时轮询确认构建状态（方法见该文档「确认构建状态」）。
 
 ## Overview
 
