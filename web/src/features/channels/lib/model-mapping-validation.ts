@@ -86,9 +86,22 @@ export function extractRedirectModels(modelMapping: string): string[] {
       return []
     }
 
-    const values = Object.values(parsed)
-      .map((value) => (typeof value === 'string' ? value.trim() : undefined))
-      .filter((value): value is string => Boolean(value))
+    const values = Object.values(parsed).flatMap((value) => {
+      if (typeof value === 'string') {
+        const trimmed = value.trim()
+        return trimmed ? [trimmed] : []
+      }
+      if (Array.isArray(value)) {
+        return value
+          .map((item) =>
+            typeof item === 'object' && item !== null
+              ? String(item.model ?? '').trim()
+              : ''
+          )
+          .filter(Boolean)
+      }
+      return []
+    })
 
     return Array.from(new Set(values))
   } catch {
@@ -179,10 +192,24 @@ export function validateModelMappingJson(modelMapping: string): {
         error: 'Model mapping must be a valid JSON object',
       }
     }
-    if (Object.values(parsed).some((value) => typeof value !== 'string')) {
+    if (
+      Object.values(parsed).some((value) => {
+        if (typeof value === 'string') return false
+        if (Array.isArray(value)) {
+          return !value.every(
+            (item) =>
+              typeof item === 'object' &&
+              item !== null &&
+              typeof item.model === 'string' &&
+              item.model.trim() !== ''
+          )
+        }
+        return true
+      })
+    ) {
       return {
         valid: false,
-        error: 'Model mapping values must be strings',
+        error: 'Model mapping values must be strings or weighted arrays',
       }
     }
     return { valid: true }
