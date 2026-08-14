@@ -2,6 +2,23 @@
 
 DO NOT send optional commentary
 
+## deploy 分支特有指引
+
+`deploy` 分支相对 `upstream/main` 存在**独有魔改功能与文档**。开始作业前，**必须先读取**以下分支独有文档并遵循其约定：
+
+| 文档 | 内容 | 何时必须读 |
+|------|------|------------|
+| `docs/local-github-workflow.md` | 分支工作流：同步上游、冲突处理原则、**tag 触发构建规范**（`deploy-image` 滚动 tag / `deploy-image-<short_sha>` 留档）、部署流程 | 每次作业开始、涉及 git 操作/构建发布时 |
+| `docs/request-debug-customization-manifest.md` | deploy 分支**定制功能清单**：全部魔改功能、引入提交、上游冲突风险文件、功能详情与文件清单 | 每次作业开始；新增魔改功能时必须在此登记；需要核对既有魔改时 |
+| `docs/request-debug-logging-guide.md` | 请求调试日志部署指南（环境变量、日志清理、生产建议） | 作业涉及请求调试/日志相关功能时 |
+| `docs/superpowers/specs/2026-07-19-request-debug-logging-design.md` | 请求调试日志设计文档（架构、安全） | 作业涉及请求调试模块设计/改动时 |
+
+deploy 分支作业约定：
+
+- 魔改功能**必须**登记进 `docs/request-debug-customization-manifest.md`（功能总览表 + 详情章节），并更新其头部 `对应分支` commit 标记与魔改提交序列；`docs/local-github-workflow.md`、`docs/request-debug-logging-guide.md` 头部 commit 标记同步刷新。
+- 涉及 `controller/relay.go`、`relay/common/relay_info.go`、`web/src/features/usage-logs/components/dialogs/details-dialog.tsx` 等已知高风险冲突文件时，遵循 `docs/local-github-workflow.md` 的冲突处理原则（保留魔改 + 采纳上游语义）。
+- 构建/发布：push `deploy` 分支本身不触发构建；需按 `docs/local-github-workflow.md` 打 `deploy*` tag（滚动 `deploy-image` / 留档 `deploy-image-<short_sha>`）推送后触发 GHCR 构建。
+
 ## Overview
 
 This is an AI API gateway/proxy built with Go. It aggregates 40+ upstream AI providers (OpenAI, Claude, Gemini, Azure, AWS Bedrock, etc.) behind a unified API, with user management, billing, rate limiting, and an admin dashboard.
