@@ -17,7 +17,7 @@ deploy 分支作业约定：
 
 - 魔改功能**必须**登记进 `docs/request-debug-customization-manifest.md`（功能总览表 + 详情章节），并更新其头部 `对应分支` commit 标记与魔改提交序列；`docs/local-github-workflow.md`、`docs/request-debug-logging-guide.md` 头部 commit 标记同步刷新。
 - 涉及 `controller/relay.go`、`relay/common/relay_info.go`、`web/src/features/usage-logs/components/dialogs/details-dialog.tsx` 等已知高风险冲突文件时，遵循 `docs/local-github-workflow.md` 的冲突处理原则（保留魔改 + 采纳上游语义）。
-- 构建/发布：push `deploy` 分支本身不触发构建；需按 `docs/local-github-workflow.md` 打 `deploy*` tag（滚动 `deploy-image` / 留档 `deploy-image-<short_sha>`）推送后触发 GHCR 构建。
+- 构建/发布：push `deploy` 分支本身不触发构建；需按 `docs/local-github-workflow.md` 打 `deploy*` tag（滚动 `deploy-image` / 留档 `deploy-image-<short_sha>`）推送后触发 GHCR 构建。无 GitHub token 时，用公开 API 定时轮询确认构建状态（方法见该文档「确认构建状态」）。
 
 ## Overview
 
