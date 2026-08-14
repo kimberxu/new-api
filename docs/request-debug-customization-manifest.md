@@ -1,6 +1,6 @@
 # 定制功能清单（deploy 分支）
 
-> 对应分支：`deploy` @ `ffcf971a`（2026-08-14 更新）
+> 对应分支：`deploy` @ `ae34ad6a`（2026-08-14 更新）
 > 以下功能均为 `deploy` 相对 `upstream/main` 的定制（可用 `git diff upstream/main...deploy` 核对）。
 > 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）
 
@@ -12,6 +12,7 @@
 | 日志自动清理 | `bfa99ad6` | 低 |
 | 同优先级渠道重试 | `bfa99ad6` | 中（`controller/relay.go`） |
 | GHCR 部署镜像构建 | `bfa99ad6` | 低 |
+| GHCR 镜像自动清理 | `ae34ad6a` | 低（`.github/workflows/deploy-image-ghcr.yml`） |
 | 渠道请求频率限制（RPM/TPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） |
 | 渠道测试请求文案定制 | `d0fdb047` | 低（`controller/channel-test.go`） |
 | 加权模型映射（1 对多） | `9a20e660`、`c6c4bcf8`、`83329f48` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） |
@@ -63,6 +64,26 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 - `service/system_task.go` - 任务注册与执行（`runLogCleanupTask`）
 - `common/init.go` / `common/constants.go` - 配置初始化
+
+---
+
+## GHCR 镜像自动清理
+
+### 功能概述
+
+`.github/workflows/deploy-image-ghcr.yml` 构建并推送镜像后，自动删除 GHCR 上的旧镜像版本，只保留最近 `KEEP=3` 个带 `deploy*` tag 的版本（含 `deploy` 滚动 tag 指向的当前版本与最近两个留档版本），其余版本全部删除。
+
+### 背景与关键点
+
+- 每次 buildx 构建会在 GHCR 产生 **3 个 digest version**：1 个带 tag 的主 index digest（`deploy` + `deploy-<short_sha>`）+ 2 个无 tag 的平台辅助 digest（同时间戳）。
+- 清理只对**带 `deploy*` tag** 的 version 计数保留——无 tag 的辅助 digest 不是可回滚版本，不占名额、一律删除。
+- 历史教训（2026-08-14）：早期版本按 `created_at` 全局排序取前 3，导致无 tag 辅助 digest 挤占保留名额、误删真实留档（如 `deploy-d57f803`）。`ae34ad6a` 起改为"带 tag 版本独立编号"。
+- 不使用 `gh api --paginate` + `--jq` 组合（gh CLI 逐页应用 jq 的已知问题，cli/cli#10459），先拉取完整 JSON 再本地 jq 决策。
+- 清理决策写入 step summary 便于核对；删除失败仅警告不阻断构建。
+
+### 文件清单
+
+- `.github/workflows/deploy-image-ghcr.yml` - 构建后 `Prune old image versions` 步骤
 
 ---
 
