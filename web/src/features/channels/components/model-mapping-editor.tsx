@@ -34,10 +34,16 @@ type ModelMappingEditorProps = {
   targetModelOptions?: string[]
 }
 
+type WeightedTarget = {
+  model: string
+  weight: number
+}
+
 type MappingRow = {
   id: string
   from: string
   to: string
+  weightedTargets?: WeightedTarget[]
 }
 
 const DUPLICATE_MAPPING_SENTINEL = '{ "duplicate_source_models": '
@@ -57,6 +63,25 @@ function getDuplicateSources(rows: MappingRow[]): string[] {
   }
 
   return Array.from(duplicates)
+}
+
+// Parses a weighted mapping value like
+// [{"model": "deepseek-v4-flash", "weight": 5}, ...].
+// Returns null when the value is not a valid weighted target array.
+// weight 缺失/null/非数字/负数均补为 1（保存时由后端做严格校验）。
+function parseWeightedTargets(value: unknown): WeightedTarget[] | null {
+  if (!Array.isArray(value)) return null
+  const targets: WeightedTarget[] = []
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null) return null
+    const { model, weight } = item as Record<string, unknown>
+    if (typeof model !== 'string' || model.trim() === '') return null
+    // weight 缺失或无效时默认 1
+    const normalizedWeight =
+      typeof weight === 'number' && weight >= 0 ? weight : 1
+    targets.push({ model: model.trim(), weight: normalizedWeight })
+  }
+  return targets.length > 0 ? targets : null
 }
 
 export function ModelMappingEditor(props: ModelMappingEditorProps) {
@@ -88,33 +113,51 @@ export function ModelMappingEditor(props: ModelMappingEditorProps) {
         return false
       }
       const entries = Object.entries(parsed)
-      const invalidValue = entries.find(([, to]) => typeof to !== 'string')
+      const invalidValue = entries.find(([, to]) => {
+        if (typeof to === 'string') return false
+        return parseWeightedTargets(to) === null
+      })
       if (invalidValue) {
-        setJsonError(t('Model mapping values must be strings'))
+        setJsonError(t('Model mapping values must be strings or weighted arrays'))
         return false
       }
       setRows((previousRows) => {
         const remainingRows = [...previousRows]
         return entries.map(([from, to], index) => {
-          const toString = String(to)
           const existingIndex = remainingRows.findIndex(
             (row) =>
               row.from === from ||
-              (row.from === from && row.to === toString) ||
+              (row.from === from && row.to === String(to)) ||
               previousRows[index]?.id === row.id
           )
           if (existingIndex >= 0) {
             const [existing] = remainingRows.splice(existingIndex, 1)
+            if (typeof to === 'string') {
+              return {
+                id: existing.id,
+                from,
+                to,
+              }
+            }
             return {
               id: existing.id,
               from,
-              to: toString,
+              to: '',
+              weightedTargets: parseWeightedTargets(to) ?? undefined,
+            }
+          }
+          if (typeof to === 'string') {
+            return {
+              id: createRowId(),
+              from,
+              to,
             }
           }
           return {
             id: createRowId(),
             from,
-            to: toString,
+            to: '',
+            weightedTargets: parseWeightedTargets(to) ?? undefined,
           }
         })
       })
@@ -137,9 +180,14 @@ export function ModelMappingEditor(props: ModelMappingEditorProps) {
     if (updatedRows.length === 0) {
       return ''
     }
-    const obj: Record<string, string> = {}
+    const obj: Record<string, string | WeightedTarget[]> = {}
     updatedRows.forEach((row) => {
-      if (row.from.trim()) {
+      if (!row.from.trim()) return
+      if (row.weightedTargets && row.weightedTargets.length > 0) {
+        obj[row.from.trim()] = row.weightedTargets
+        return
+      }
+      if (row.to.trim()) {
         obj[row.from.trim()] = row.to.trim()
       }
     })
@@ -283,15 +331,39 @@ export function ModelMappingEditor(props: ModelMappingEditorProps) {
                     disabled={props.disabled}
                     list={sourceListId}
                   />
-                  <Input
-                    value={row.to}
-                    onChange={(e) =>
-                      handleRowChange(row.id, 'to', e.target.value)
-                    }
-                    placeholder='gpt-3.5-turbo-0125'
-                    disabled={props.disabled}
-                    list={targetListId}
-                  />
+                  {row.weightedTargets && row.weightedTargets.length > 0 ? (
+                    <div
+                      className='flex h-10 items-center gap-1 overflow-hidden rounded-md border border-dashed bg-muted/50 px-3 text-xs text-muted-foreground'
+                      title={row.weightedTargets
+                        .map(
+                          (target) =>
+                            `${target.model} (${target.weight})`
+                        )
+                        .join('\n')}
+                    >
+                      <span className='shrink-0 font-medium'>
+                        {t('Weighted mapping')}
+                      </span>
+                      <span className='truncate'>
+                        {row.weightedTargets
+                          .map(
+                            (target) =>
+                              `${target.model}×${target.weight}`
+                          )
+                          .join(', ')}
+                      </span>
+                    </div>
+                  ) : (
+                    <Input
+                      value={row.to}
+                      onChange={(e) =>
+                        handleRowChange(row.id, 'to', e.target.value)
+                      }
+                      placeholder='gpt-3.5-turbo-0125'
+                      disabled={props.disabled}
+                      list={targetListId}
+                    />
+                  )}
                   <Button
                     type='button'
                     variant='ghost'

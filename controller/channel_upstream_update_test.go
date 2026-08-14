@@ -501,8 +501,8 @@ func TestNormalizeChannelModelMapping(t *testing.T) {
 	}
 
 	result := normalizeChannelModelMapping(channel)
-	require.Equal(t, map[string]string{
-		"alias-model": "upstream-model",
+	require.Equal(t, map[string][]string{
+		"alias-model": {"upstream-model"},
 	}, result)
 }
 
@@ -511,8 +511,8 @@ func TestCollectPendingUpstreamModelChangesFromModels_WithModelMapping(t *testin
 		[]string{"alias-model", "gpt-4o", "stale-model"},
 		[]string{"gpt-4o", "gpt-4.1", "mapped-target"},
 		[]string{"gpt-4.1"},
-		map[string]string{
-			"alias-model": "mapped-target",
+		map[string][]string{
+			"alias-model": {"mapped-target"},
 		},
 	)
 
