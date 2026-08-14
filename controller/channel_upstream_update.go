@@ -149,7 +149,7 @@ func applySelectedModelChanges(originModels []string, addModels []string, remove
 	return subtractModelNames(mergeModelNames(originModels, normalizedAdd), normalizedRemove)
 }
 
-func normalizeChannelModelMapping(channel *model.Channel) map[string]string {
+func normalizeChannelModelMapping(channel *model.Channel) map[string][]string {
 	if channel == nil || channel.ModelMapping == nil {
 		return nil
 	}
@@ -157,18 +157,21 @@ func normalizeChannelModelMapping(channel *model.Channel) map[string]string {
 	if rawMapping == "" || rawMapping == "{}" {
 		return nil
 	}
-	parsed := make(map[string]string)
+	parsed := make(map[string]any)
 	if err := common.UnmarshalJsonStr(rawMapping, &parsed); err != nil {
 		return nil
 	}
-	normalized := make(map[string]string, len(parsed))
-	for source, target := range parsed {
+	normalized := make(map[string][]string, len(parsed))
+	for source, rawValue := range parsed {
 		normalizedSource := strings.TrimSpace(source)
-		normalizedTarget := strings.TrimSpace(target)
-		if normalizedSource == "" || normalizedTarget == "" {
+		if normalizedSource == "" {
 			continue
 		}
-		normalized[normalizedSource] = normalizedTarget
+		targets := collectMappingTargets(rawValue)
+		if len(targets) == 0 {
+			continue
+		}
+		normalized[normalizedSource] = targets
 	}
 	if len(normalized) == 0 {
 		return nil
@@ -176,11 +179,41 @@ func normalizeChannelModelMapping(channel *model.Channel) map[string]string {
 	return normalized
 }
 
+// collectMappingTargets 从 model_mapping 的单个 value 中提取所有目标模型名。
+// string → [string]; 加权数组 → [所有 model 字段]; 其他 → nil
+func collectMappingTargets(rawValue any) []string {
+	switch v := rawValue.(type) {
+	case string:
+		target := strings.TrimSpace(v)
+		if target == "" {
+			return nil
+		}
+		return []string{target}
+	case []any:
+		targets := make([]string, 0, len(v))
+		for _, item := range v {
+			itemMap, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			modelRaw, _ := itemMap["model"].(string)
+			model := strings.TrimSpace(modelRaw)
+			if model == "" {
+				continue
+			}
+			targets = append(targets, model)
+		}
+		return targets
+	default:
+		return nil
+	}
+}
+
 func collectPendingUpstreamModelChangesFromModels(
 	localModels []string,
 	upstreamModels []string,
 	ignoredModels []string,
-	modelMapping map[string]string,
+	modelMapping map[string][]string,
 ) (pendingAddModels []string, pendingRemoveModels []string) {
 	localSet := make(map[string]struct{})
 	localModels = normalizeModelNames(localModels)
@@ -195,11 +228,14 @@ func collectPendingUpstreamModelChangesFromModels(
 
 	normalizedIgnoredModels := normalizeModelNames(ignoredModels)
 
+	// 统计所有 redirect source 和 target（加权映射包含多个 target）
 	redirectSourceSet := make(map[string]struct{}, len(modelMapping))
-	redirectTargetSet := make(map[string]struct{}, len(modelMapping))
-	for source, target := range modelMapping {
+	redirectTargetSet := make(map[string]struct{})
+	for source, targets := range modelMapping {
 		redirectSourceSet[source] = struct{}{}
-		redirectTargetSet[target] = struct{}{}
+		for _, target := range targets {
+			redirectTargetSet[target] = struct{}{}
+		}
 	}
 
 	coveredUpstreamSet := make(map[string]struct{}, len(localSet)+len(redirectTargetSet))

@@ -124,7 +124,19 @@ function isOptionalModelMapping(value: string | undefined): boolean {
     const parsed = parseOptionalJson(value)
     if (parsed === undefined) return true
     if (!isJsonObjectValue(parsed)) return false
-    return Object.values(parsed).every((item) => typeof item === 'string')
+    return Object.values(parsed).every((item) => {
+      if (typeof item === 'string') return true
+      if (Array.isArray(item)) {
+        return item.every(
+          (entry) =>
+            typeof entry === 'object' &&
+            entry !== null &&
+            typeof entry.model === 'string' &&
+            entry.model.trim() !== ''
+        )
+      }
+      return false
+    })
   } catch {
     return false
   }
@@ -457,6 +469,46 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   upstream_model_update_auto_sync_enabled: false,
   upstream_model_update_ignored_models: '',
   advanced_custom: '',
+}
+
+// ============================================================================
+// Model Mapping 补全
+// ============================================================================
+
+/**
+ * 补全 model_mapping 中加权数组条目缺失的 weight 字段为 1。
+ * 格式错误（非对象、model 为空等）时返回原值，不做校验。
+ * 保存时调用，确保 weight 缺失的条目被补全。
+ */
+function normalizeModelMapping(modelMapping: string | undefined | null): string | undefined | null {
+  if (!modelMapping) return modelMapping
+  try {
+    const parsed = JSON.parse(modelMapping)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return modelMapping
+    }
+    let changed = false
+    const result: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(parsed)) {
+      if (!Array.isArray(value)) {
+        result[key] = value
+        continue
+      }
+      result[key] = value.map((entry: unknown) => {
+        if (typeof entry !== 'object' || entry === null) return entry
+        const e = entry as Record<string, unknown>
+        if (typeof e.model !== 'string' || e.model.trim() === '') return entry
+        if (e.weight === undefined || e.weight === null) {
+          changed = true
+          return { ...e, weight: 1 }
+        }
+        return entry
+      })
+    }
+    return changed ? JSON.stringify(result, null, 2) : modelMapping
+  } catch {
+    return modelMapping
+  }
 }
 
 // ============================================================================
@@ -813,7 +865,7 @@ export function transformFormDataToCreatePayload(formData: ChannelFormValues): {
     openai_organization: formData.openai_organization || null,
     models: formData.models,
     group: formatGroups(formData.group),
-    model_mapping: formData.model_mapping || null,
+    model_mapping: normalizeModelMapping(formData.model_mapping) || null,
     priority: formData.priority || null,
     weight: formData.weight || null,
     test_model: formData.test_model || null,
@@ -861,7 +913,7 @@ export function transformFormDataToUpdatePayload(
     openai_organization: formData.openai_organization || null,
     models: formData.models,
     group: formatGroups(formData.group),
-    model_mapping: formData.model_mapping || null,
+    model_mapping: normalizeModelMapping(formData.model_mapping) || null,
     priority: formData.priority ?? 0,
     weight: formData.weight ?? 0,
     test_model: formData.test_model || null,
@@ -894,7 +946,7 @@ export function transformFormDataToUpdatePayload(
   payload.test_model = formData.test_model || ''
   payload.tag = formData.tag || ''
   payload.remark = formData.remark || ''
-  payload.model_mapping = formData.model_mapping || ''
+  payload.model_mapping = normalizeModelMapping(formData.model_mapping) || ''
   payload.status_code_mapping = formData.status_code_mapping || ''
   payload.param_override = formData.param_override || ''
   payload.header_override = formData.header_override || ''
