@@ -1198,12 +1198,21 @@ export function ChannelMutateDrawer({
         ),
       ]
 
+      // 映射 source key 是路由入口：请求以该名字到达渠道，从 Models 移除会
+      // 使渠道不可达。因此既是 source 又是 target 的模型不提示移除。
+      const sourceKeys = new Set(
+        Object.keys(parsed)
+          .map((key) => String(key).trim())
+          .filter(Boolean)
+      )
+
       const exposedTargetModels = [
         ...new Set(
           entries
             .filter(
               (entry) =>
                 Boolean(entry.target) &&
+                !sourceKeys.has(entry.target) &&
                 currentModelsArray.includes(entry.target)
             )
             .map((entry) => entry.target)
