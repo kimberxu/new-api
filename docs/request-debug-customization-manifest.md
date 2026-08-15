@@ -1,6 +1,6 @@
 # 定制功能清单（deploy 分支）
 
-> 对应分支：`deploy` @ `91b3f9d9`（2026-08-15 更新）
+> 对应分支：`deploy` @ `626aafe4`（2026-08-15 更新）
 > 以下功能均为 `deploy` 相对 `upstream/main` 的定制（可用 `git diff upstream/main...deploy` 核对）。
 > 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）
 
