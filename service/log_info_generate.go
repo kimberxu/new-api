@@ -120,8 +120,12 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 
 AppendRelayLogAdminInfo(ctx, relayInfo, other)
 	if relayInfo != nil && relayInfo.RequestDebugSnapshot != nil {
-		if relaycommon.ShouldAttachRequestDebug(relayInfo.RequestDebugSnapshot.Mode, true) {
-			AppendRequestDebugAdminInfo(relayInfo, other, true)
+// error_only must treat interrupted/aborted streams as failures too;
+		// the consume handler returns success for them, so base the decision
+		// on the actual stream outcome instead of the handler error result.
+		success := relayInfo.StreamSucceeded()
+		if relaycommon.ShouldAttachRequestDebug(relayInfo.RequestDebugSnapshot.Mode, success) {
+			AppendRequestDebugAdminInfo(relayInfo, other, success)
 		}
 	}
 	appendRequestPath(ctx, relayInfo, other)
@@ -163,8 +167,10 @@ func appendStreamStatus(relayInfo *relaycommon.RelayInfo, other *model.LogOther)
 		status = "error"
 	}
 	streamInfo := map[string]interface{}{
-		"status":     status,
-		"end_reason": string(ss.EndReason),
+		"status":         status,
+		"outcome":        string(ss.Outcome(relayInfo.ReceivedResponseCount)),
+		"failure_domain": string(ss.FailureDomain()),
+		"end_reason":     string(ss.EndReason),
 	}
 	if ss.EndError != nil {
 		streamInfo["end_error"] = ss.EndError.Error()
