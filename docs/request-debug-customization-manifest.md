@@ -1,8 +1,8 @@
 # 定制功能清单（deploy 分支）
 
-> 对应分支：`deploy` @ `c200b473`（2026-08-15 更新）
+> 对应分支：`deploy` @ `4ce5615c`（2026-08-15 更新）
 > 以下功能均为 `deploy` 相对 `upstream/main` 的定制（可用 `git diff upstream/main...deploy` 核对）。
-> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ 当前工作树（504/524 超时重试开关 + 超时自动禁用，待提交）
+> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ 当前工作树（流式结束原因分类与中断流语义，待提交）
 
 ## 功能总览
 
@@ -11,14 +11,15 @@
 | 请求调试日志 | `bfa99ad6` | 中（`controller/relay.go`、`relay/common/relay_info.go`） |
 | 日志自动清理 | `bfa99ad6` | 低 |
 | 同优先级渠道重试 | `bfa99ad6` | 中（`controller/relay.go`） |
-| 504/524 超时重试开关与自动禁用 | 当前工作树（待提交） | 中（`controller/relay.go`、`setting/operation_setting/status_code_ranges.go`、系统设置前端） |
+| 504/524 超时重试开关与自动禁用 | `ff2462de` | 中（`controller/relay.go`、`setting/operation_setting/status_code_ranges.go`、系统设置前端） |
+| 流式结束原因分类与中断流语义 | 当前工作树（待提交） | 中（`relay/common/stream_status.go`、`relay/channel/openai/relay-openai.go`、`service/log_info_generate.go`） |
 | GHCR 部署镜像构建 | `bfa99ad6` | 低 |
 | GHCR 镜像自动清理 | `ae34ad6a` | 低（`.github/workflows/deploy-image-ghcr.yml`） |
 | 渠道请求频率限制（RPM/TPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） |
 | 渠道测试请求文案定制 | `d0fdb047` | 低（`controller/channel-test.go`） |
 | 加权模型映射（1 对多） | `9a20e660`、`c6c4bcf8`、`83329f48` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） |
 | 额度显示模式切换修复 | `d8378ee7` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） |
-| token 大数 K/M/B 分级显示 | `ea91ebf1` | 低（`web/src/lib/currency.ts`） |
+| token 大数 K/M/B 分级显示 | `ea91ebf1`、`4ce5615c` | 低（`web/src/lib/currency.ts`） |
 
 > **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`，`deploy` 与上游文件一致。
 
@@ -74,6 +75,39 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - `relay/chat_completions_via_responses.go`、`relay/claude_handler.go`、`relay/compatible_handler.go`、`relay/gemini_handler.go`、`relay/responses_handler.go` - 各 handler 捕获集成点
 - 测试：`relay/common/request_debug_test.go`、`common/request_debug_config_test.go`、`service/request_debug_log_test.go`
 - 前端层：`web/src/features/usage-logs/lib/request-debug.ts`（+ `request-debug.test.ts`）、`types.ts`、`details-dialog.tsx`
+
+---
+
+## 流式结束原因分类与中断流语义
+
+### 功能概述
+
+对流式请求的异常终止（如 HTTP/2 `RST_STREAM`、上游断流、客户端取消）建立统一的分类模型，修复此前「日志显示 error、性能指标计成功」的语义分裂：
+
+- `StreamStatus` 新增 `Outcome`（`success` / `partial_failure` / `failed` / `cancelled`）与 `FailureDomain`（`none` / `upstream` / `downstream` / `gateway` / `protocol`）分类方法
+- 消费日志 `other.stream_status` 增加 `outcome`、`failure_domain` 字段；前端详情页对 `cancelled` 显示预警色徽章，并展示故障归属
+- 性能指标（`perfmetrics.RecordRelaySample`）与 `REQUEST_DEBUG_LOGGING=error_only` 快照改按真实流结果判断，不再一律按成功处理
+- OpenAI chat 流处理器按分类落地终止语义：
+  - 零输出上游失败（`scanner_error` / `timeout`，尚未向下游写入任何模型数据）→ 转为可重试渠道错误（502），由现有重试循环切换渠道；预扣会话兜底，最终失败全额退还
+  - 已输出部分内容后上游中断 → 补发最后一块并发送明确 SSE 错误事件，**不再伪装 `[DONE]`**
+  - 客户端放弃（`client_gone` / `ping_fail`）→ 停止向下游输出，按已收内容结算，不归咎上游、不触发重试
+
+### 风险与兼容
+
+- 仅 OpenAI 共享流处理器区分处理；Claude/Gemini/图片等其它 handler 仍沿用原语义（分类与日志字段对其同样生效）
+- 可重试仅限「零输出 + upstream/gateway 域」（`scanner_error`、`timeout`），避免部分输出后重试造成重复生成与重复上游计费
+- `stream_status.status` 保持 `ok`/`error` 兼容值，前端读取 `outcome` 区分 `cancelled`
+- 与上游冲突风险：`relay/common/stream_status.go`、`relay/channel/openai/relay-openai.go`（`OaiStreamHandler` 尾部语义分派）、`service/log_info_generate.go`（`appendStreamStatus`）
+
+### 文件清单
+
+- `relay/common/stream_status.go` - `StreamOutcome` / `StreamFailureDomain` 与 `Outcome()` / `FailureDomain()` 分类
+- `relay/common/relay_info.go` - `StreamSucceeded()` 统一判定入口
+- `relay/channel/openai/relay-openai.go` - 语义分派 + `sendStreamErrorEvent`
+- `service/log_info_generate.go` - `appendStreamStatus` 分类字段 + `error_only` 按流结果附加快照
+- `service/text_quota.go` / `service/quota.go` - 性能指标按 `StreamSucceeded()` 记录
+- 前端：`web/src/features/usage-logs/types.ts`、`details-dialog.tsx`、`web/src/i18n/locales/*.json`（`Failure Domain`）
+- 测试：`relay/common/stream_status_test.go`、`relay/channel/openai/relay-openai-stream_test.go`
 
 ---
 

@@ -771,6 +771,18 @@ func (info *RelayInfo) GetIsStream() bool {
 	return info != nil && info.IsStream
 }
 
+// StreamSucceeded reports whether the request completed as a full stream
+// success. Non-stream requests and requests without stream tracking are
+// always successful here; callers feed this into success metrics and
+// request-debug snapshot decisions so aborted (client_gone) and interrupted
+// (scanner_error / timeout) streams are no longer counted as clean success.
+func (info *RelayInfo) StreamSucceeded() bool {
+	if info == nil || !info.IsStream || info.StreamStatus == nil {
+		return true
+	}
+	return info.StreamStatus.Outcome(info.ReceivedResponseCount) == StreamOutcomeSuccess
+}
+
 func (info *RelayInfo) GetReasoningEffort() string {
 	if info == nil {
 		return ""

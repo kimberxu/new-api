@@ -165,6 +165,39 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		}
 	}
 
+	// 流结束语义分派：根据结束原因与已消费数据量决定下游行为。
+	// - cancelled（client_gone / ping_fail）：客户端已放弃，不再写入任何终结内容；
+	// - failed 且零输出（scanner_error / timeout）：上游在输出前中断，转为可重试渠道错误；
+	// - failed / partial_failure 且已输出部分内容：发送明确错误事件，不伪装 [DONE]；
+	// - 其余：正常发送最后一块、usage 与 [DONE]。
+	aborted := false
+	sendErrorEvent := false
+	if ss := info.StreamStatus; ss != nil {
+		switch ss.Outcome(info.ReceivedResponseCount) {
+		case relaycommon.StreamOutcomeCancelled:
+			aborted = true
+		case relaycommon.StreamOutcomePartialFailure:
+			aborted = true
+			sendErrorEvent = true
+		case relaycommon.StreamOutcomeFailed:
+			if ss.EndReason == relaycommon.StreamEndReasonScannerErr ||
+				ss.EndReason == relaycommon.StreamEndReasonTimeout {
+				// 未向下游输出任何模型数据：让调用方切换到其它渠道重试。
+				// 预扣会话由 controller 兜底（最终失败时全额退还），未写入任何字节。
+				msg := "upstream stream interrupted before any output"
+				logger.LogError(c, fmt.Sprintf("retryable stream failure: %s", msg))
+				return nil, types.NewOpenAIError(
+					fmt.Errorf("%s", msg),
+					types.ErrorCodeBadResponse,
+					http.StatusBadGateway,
+					types.ErrOptionWithHideErrMsg(msg),
+				)
+			}
+			aborted = true
+			sendErrorEvent = true
+		}
+	}
+
 	// 处理最后的响应
 	shouldSendLastResp := true
 	if err := handleLastResponse(lastStreamData, &responseId, &createAt, &systemFingerprint, &model, &usage,
@@ -173,7 +206,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	}
 
 	if info.RelayFormat == types.RelayFormatOpenAI {
-		if shouldSendLastResp {
+		if shouldSendLastResp && !aborted {
 			_ = sendStreamData(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent)
 		}
 	}
@@ -189,9 +222,43 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		info.CountBillableToolCall(dto.BuildInCallFunctionCall, name)
 	}
 
+	if aborted {
+		if sendErrorEvent && info.StreamStatus != nil {
+			// 已输出部分内容：补发最后一块，并以明确错误事件终止，
+			// 避免客户端把截断的流当作完整结果。
+			if shouldSendLastResp {
+				_ = sendStreamData(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent)
+			}
+			sendStreamErrorEvent(c, info.StreamStatus)
+		}
+		// cancelled：不向客户端输出任何终结内容
+		return usage, nil
+	}
+
 	HandleFinalResponse(c, info, lastStreamData, responseId, createAt, model, systemFingerprint, usage, containStreamUsage)
 
 	return usage, nil
+}
+
+// sendStreamErrorEvent 向客户端发送一条明确的 SSE 错误终止事件（不发送 [DONE]）。
+func sendStreamErrorEvent(c *gin.Context, ss *relaycommon.StreamStatus) {
+	if c == nil || ss == nil {
+		return
+	}
+	msg := "upstream stream interrupted"
+	if ss.EndError != nil {
+		msg = ss.EndError.Error()
+	}
+	_ = helper.ObjectData(c, struct {
+		Error types.OpenAIError `json:"error"`
+	}{
+		Error: types.OpenAIError{
+			Message: msg,
+			Type:    "upstream_stream_error",
+			Param:   "",
+			Code:    string(ss.EndReason),
+		},
+	})
 }
 
 func collectStreamFunctionCallNames(data string, seen map[string]struct{}, names *[]string) {

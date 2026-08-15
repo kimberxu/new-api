@@ -1245,13 +1245,28 @@ export function DetailsDialog(props: DetailsDialogProps) {
               label={t('Status')}
               value={
                 <StatusBadge
-                  label={other.stream_status.status || t('Error')}
-                  variant='red'
+                  label={
+                    other.stream_status.outcome ??
+                    other.stream_status.status ??
+                    t('Error')
+                  }
+                  variant={
+                    other.stream_status.outcome === 'cancelled'
+                      ? 'warning'
+                      : 'red'
+                  }
                   size='sm'
                   copyable={false}
                 />
               }
             />
+            {other.stream_status.failure_domain &&
+              other.stream_status.failure_domain !== 'none' && (
+                <DetailRow
+                  label={t('Failure Domain')}
+                  value={other.stream_status.failure_domain}
+                />
+              )}
             {other.stream_status.end_reason && (
               <DetailRow
                 label={t('End Reason')}

@@ -1,9 +1,12 @@
 package common
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -22,6 +25,39 @@ const (
 )
 
 const maxStreamErrorEntries = 20
+
+// StreamOutcome classifies what a stream termination means for the request.
+// It is derived from the end reason plus how much was consumed, and feeds
+// success metrics, debug-snapshot attach policy and downstream termination
+// semantics (see relay/helper/stream_scanner.go and relay/channel/openai/relay-openai.go).
+type StreamOutcome string
+
+const (
+	// StreamOutcomeSuccess: the stream completed normally (done/eof).
+	StreamOutcomeSuccess StreamOutcome = "success"
+	// StreamOutcomePartialFailure: upstream terminated abnormally after some
+	// data had already been consumed; the response is incomplete.
+	StreamOutcomePartialFailure StreamOutcome = "partial_failure"
+	// StreamOutcomeFailed: upstream terminated abnormally before any usable
+	// data was consumed.
+	StreamOutcomeFailed StreamOutcome = "failed"
+	// StreamOutcomeCancelled: the downstream client went away (client_gone /
+	// ping_fail). Not an upstream fault.
+	StreamOutcomeCancelled StreamOutcome = "cancelled"
+)
+
+// StreamFailureDomain attributes a non-successful termination to a party.
+// It keeps channel health metrics free of downstream/gateway noise while
+// still flagging upstream transport faults.
+type StreamFailureDomain string
+
+const (
+	StreamFailureDomainNone       StreamFailureDomain = "none"
+	StreamFailureDomainUpstream   StreamFailureDomain = "upstream"
+	StreamFailureDomainDownstream StreamFailureDomain = "downstream"
+	StreamFailureDomainGateway    StreamFailureDomain = "gateway"
+	StreamFailureDomainProtocol   StreamFailureDomain = "protocol"
+)
 
 type StreamErrorEntry struct {
 	Message   string
@@ -92,6 +128,76 @@ func (s *StreamStatus) IsNormalEnd() bool {
 	return s.EndReason == StreamEndReasonDone ||
 		s.EndReason == StreamEndReasonEOF ||
 		s.EndReason == StreamEndReasonHandlerStop
+}
+
+// isDownstreamWriteError reports whether the recorded end error indicates a
+// failed write toward the downstream client (as opposed to an upstream or
+// protocol fault).
+func isDownstreamWriteError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, net.ErrClosed) || errors.Is(err, syscall.EPIPE)
+}
+
+// Outcome classifies the stream termination. receivedCount is the number of
+// complete upstream data lines consumed (RelayInfo.ReceivedResponseCount); it
+// distinguishes a mid-stream break (partial_failure) from a failure before
+// any usable output (failed).
+func (s *StreamStatus) Outcome(receivedCount int) StreamOutcome {
+	if s == nil {
+		return StreamOutcomeSuccess
+	}
+	switch s.EndReason {
+	case StreamEndReasonDone, StreamEndReasonEOF:
+		return StreamOutcomeSuccess
+	case StreamEndReasonClientGone, StreamEndReasonPingFail:
+		return StreamOutcomeCancelled
+	case StreamEndReasonScannerErr, StreamEndReasonTimeout:
+		if receivedCount > 0 {
+			return StreamOutcomePartialFailure
+		}
+		return StreamOutcomeFailed
+	case StreamEndReasonHandlerStop:
+		if s.HasErrors() {
+			return StreamOutcomeFailed
+		}
+		return StreamOutcomeSuccess
+	case StreamEndReasonPanic:
+		return StreamOutcomeFailed
+	case StreamEndReasonNone:
+		if s.HasErrors() {
+			return StreamOutcomeFailed
+		}
+		return StreamOutcomeSuccess
+	}
+	return StreamOutcomeFailed
+}
+
+// FailureDomain attributes the termination to a party. Only meaningful when
+// Outcome() != success.
+func (s *StreamStatus) FailureDomain() StreamFailureDomain {
+	if s == nil {
+		return StreamFailureDomainNone
+	}
+	switch s.EndReason {
+	case StreamEndReasonDone, StreamEndReasonEOF, StreamEndReasonNone:
+		return StreamFailureDomainNone
+	case StreamEndReasonScannerErr:
+		return StreamFailureDomainUpstream
+	case StreamEndReasonTimeout:
+		return StreamFailureDomainGateway
+	case StreamEndReasonClientGone, StreamEndReasonPingFail:
+		return StreamFailureDomainDownstream
+	case StreamEndReasonHandlerStop:
+		if isDownstreamWriteError(s.EndError) {
+			return StreamFailureDomainDownstream
+		}
+		return StreamFailureDomainProtocol
+	case StreamEndReasonPanic:
+		return StreamFailureDomainGateway
+	}
+	return StreamFailureDomainGateway
 }
 
 func (s *StreamStatus) Summary() string {

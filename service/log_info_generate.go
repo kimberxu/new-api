@@ -109,8 +109,12 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	AppendChannelAffinityAdminInfo(ctx, adminInfo)
 
 	if relayInfo != nil && relayInfo.RequestDebugSnapshot != nil {
-		if relaycommon.ShouldAttachRequestDebug(relayInfo.RequestDebugSnapshot.Mode, true) {
-			AppendRequestDebugAdminInfo(relayInfo, adminInfo, true)
+		// error_only must treat interrupted/aborted streams as failures too;
+		// the consume handler returns success for them, so base the decision
+		// on the actual stream outcome instead of the handler error result.
+		success := relayInfo.StreamSucceeded()
+		if relaycommon.ShouldAttachRequestDebug(relayInfo.RequestDebugSnapshot.Mode, success) {
+			AppendRequestDebugAdminInfo(relayInfo, adminInfo, success)
 		}
 	}
 
@@ -154,8 +158,10 @@ func appendStreamStatus(relayInfo *relaycommon.RelayInfo, other map[string]inter
 		status = "error"
 	}
 	streamInfo := map[string]interface{}{
-		"status":     status,
-		"end_reason": string(ss.EndReason),
+		"status":         status,
+		"outcome":        string(ss.Outcome(relayInfo.ReceivedResponseCount)),
+		"failure_domain": string(ss.FailureDomain()),
+		"end_reason":     string(ss.EndReason),
 	}
 	if ss.EndError != nil {
 		streamInfo["end_error"] = ss.EndError.Error()
@@ -170,6 +176,8 @@ func appendStreamStatus(relayInfo *relaycommon.RelayInfo, other map[string]inter
 	}
 	other["stream_status"] = streamInfo
 }
+
+
 
 func appendBillingInfo(relayInfo *relaycommon.RelayInfo, other map[string]interface{}) {
 	if relayInfo == nil || other == nil {
