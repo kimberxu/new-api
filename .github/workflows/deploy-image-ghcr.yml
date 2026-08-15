@@ -97,11 +97,14 @@ jobs:
           # 每次构建在 GHCR 产生 1 个带 tag 的主 digest + 2 个无 tag 的平台辅助 digest。
           # 只有带 deploy* tag 的 version 才是可回滚版本；无 tag 辅助 digest 不占名额。
           # 带 tag 版本独立编号，按创建时间倒序保留最近 KEEP 个（deploy 滚动 tag holder 恒为最新，
-          # 必在被保留之列；仍显式保护以防异常）；无 tag 辅助 digest 一律删除。
+          # 必在被保留之列；仍显式保护以防异常）。
+          # 注意：无 tag 平台辅助 digest 是被带 tag index 引用的子 manifest（amd64 平台 manifest、
+          # attestation manifest）。删除它们会让 index 悬空，docker pull 报 manifest unknown
+          # （2026-08-15 事故根因，见 docs/request-debug-customization-manifest.md「GHCR 镜像自动清理」）。
+          # 因此一律跳过，只清理带 tag 版本；孤儿 manifest 仅数 KB，可忽略。
           jq -r '
             sort_by(.created_at) | reverse
             | [.[] | select((.metadata.container.tags // []) | any(startswith("deploy")))] as $tagged
-            | [.[] | select(((.metadata.container.tags // []) | any(startswith("deploy"))) | not)] as $untagged
             | ($tagged | to_entries | map(
                 .value as $v
                 | ($v.metadata.container.tags // []) as $tags
@@ -109,20 +112,15 @@ jobs:
                    then "KEEP" else "DELETE" end) as $a
                 | "\($a)|\($v.id)|\($tags | join(","))|\($v.created_at)"
               ))
-              + ($untagged | map(
-                . as $v
-                | ($v.metadata.container.tags // []) as $tags
-                | "DELETE|\($v.id)|\($tags | join(","))|\($v.created_at)"
-              ))
             | .[]
           ' /tmp/versions.json > /tmp/prune_plan.tsv 2>/tmp/prune_jq_err.txt || {
             echo "::warning::解析版本列表失败 ($(cat /tmp/prune_jq_err.txt))，跳过清理"
             exit 0
           }
           total=$(wc -l < /tmp/prune_plan.tsv)
-          echo "发现 ${total} 个镜像版本（含无 tag 辅助 digest）"
+          echo "发现 ${total} 个带 deploy tag 的镜像版本"
           echo "### Prune old image versions (keep newest ${KEEP} tagged)" >> "$SUMMARY"
-          echo "共 ${total} 个镜像版本（按创建时间倒序）" >> "$SUMMARY"
+          echo "共 ${total} 个带 tag 镜像版本（按创建时间倒序）" >> "$SUMMARY"
           echo '```' >> "$SUMMARY"
           cat /tmp/prune_plan.tsv >> "$SUMMARY"
           deleted=0
