@@ -1,8 +1,8 @@
 # 定制功能清单（deploy 分支）
 
-> 对应分支：`deploy` @ `ae34ad6a`（2026-08-14 更新）
+> 对应分支：`deploy` @ `d8378ee7`（2026-08-15 更新）
 > 以下功能均为 `deploy` 相对 `upstream/main` 的定制（可用 `git diff upstream/main...deploy` 核对）。
-> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）
+> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）
 
 ## 功能总览
 
@@ -16,6 +16,7 @@
 | 渠道请求频率限制（RPM/TPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） |
 | 渠道测试请求文案定制 | `d0fdb047` | 低（`controller/channel-test.go`） |
 | 加权模型映射（1 对多） | `9a20e660`、`c6c4bcf8`、`83329f48` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） |
+| 额度显示模式切换修复 | `d8378ee7` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） |
 
 > **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`，`deploy` 与上游文件一致。
 
@@ -210,3 +211,19 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - 前端：`model-mapping-editor.tsx`、`channel-form.ts`、`model-mapping-validation.ts`、`channel-mutate-drawer.tsx`
 - 测试：`relay/helper/model_mapped_test.go`、`controller/channel_upstream_update_test.go`
 - 前端测试：`web/src/features/channels/lib/__tests__/model-mapping-validation.test.ts`（`findExposedTargetModels` 排除 source key、加权数组展开、无效输入）
+
+---
+
+## 额度显示模式切换修复
+
+### 功能概述
+
+上游 `pricing-section.tsx` 存在「鸡生蛋」逻辑：`Tokens Only` 下拉选项仅在当前已是 TOKENS 模式时渲染（`showTokensOnlyOption = displayType === 'TOKENS'`），导致站点处于 USD/CNY 等货币显示模式时，管理后台 UI **无法切换到 token 显示**——只能靠直接改库或 API 绕过。本次去掉该条件，Display Mode 下拉四项（USD / CNY / Custom Currency / Tokens Only）始终可选。
+
+### 背景
+
+个人用户往往不关心金额，更关注 token 用量/请求数；该修复让「系统设置 → 计费 → Currency & Display → Display Mode」可直接切换到 `Tokens Only`，全站额度以 token 数值显示（overview 卡片、日志统计等）。
+
+### 文件清单
+
+- `web/src/features/system-settings/general/pricing-section.tsx` - 删除 `showTokensOnlyOption` 条件，TOKENS 选项无条件渲染
