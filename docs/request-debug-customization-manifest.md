@@ -1,8 +1,8 @@
 # 定制功能清单（deploy 分支）
 
-> 对应分支：`deploy` @ `626aafe4`（2026-08-15 更新）
+> 对应分支：`deploy` @ `c200b473`（2026-08-15 更新）
 > 以下功能均为 `deploy` 相对 `upstream/main` 的定制（可用 `git diff upstream/main...deploy` 核对）。
-> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）
+> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ 当前工作树（504/524 超时重试开关 + 超时自动禁用，待提交）
 
 ## 功能总览
 
@@ -11,6 +11,7 @@
 | 请求调试日志 | `bfa99ad6` | 中（`controller/relay.go`、`relay/common/relay_info.go`） |
 | 日志自动清理 | `bfa99ad6` | 低 |
 | 同优先级渠道重试 | `bfa99ad6` | 中（`controller/relay.go`） |
+| 504/524 超时重试开关与自动禁用 | 当前工作树（待提交） | 中（`controller/relay.go`、`setting/operation_setting/status_code_ranges.go`、系统设置前端） |
 | GHCR 部署镜像构建 | `bfa99ad6` | 低 |
 | GHCR 镜像自动清理 | `ae34ad6a` | 低（`.github/workflows/deploy-image-ghcr.yml`） |
 | 渠道请求频率限制（RPM/TPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） |
@@ -23,7 +24,27 @@
 
 ---
 
-## 请求调试日志
+## 504/524 超时重试开关与自动禁用
+
+### 功能概述
+
+系统设置 → 模型设置 → Routing Reliability → Request retry 增加 `Retry 504/524 timeouts` 开关。关闭时保留默认安全行为：504/524 即使包含在自动重试状态码范围内也不重试。开启后，504/524 遵循 `AutomaticRetryStatusCodes` 配置，并可切换到其它可用渠道。
+
+### 风险与渠道处理
+
+504/524 可能表示请求已经到达上游并开始处理。开启重试可能造成重复计费、重复生成和请求放大，因此开关默认关闭。若同时启用了自动禁用渠道，504/524 会进入现有自动禁用判定，使开启自动禁用的失败渠道退出候选池，避免持续命中同一超时渠道。
+
+### 文件清单
+
+- `common/constants.go` / `model/option.go` - 持久化与运行时加载 `AutomaticRetryTimeoutEnabled`
+- `setting/operation_setting/status_code_ranges.go` - 504/524 重试门控与自动禁用判定
+- `controller/relay.go` - 普通请求与任务请求重试路径接入开关
+- `web/src/features/system-settings/models/routing-reliability-section.tsx` - 系统设置开关
+- `web/src/i18n/locales/*.json` - 七语言文案
+- `setting/operation_setting/status_code_ranges_test.go` - 默认关闭/开启行为回归测试
+
+---
+
 
 ### 环境变量
 

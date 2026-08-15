@@ -679,9 +679,8 @@ func shouldRetryTaskRelay(c *gin.Context, channelId int, taskErr *taskdto.TaskEr
 		return true
 	}
 	if taskErr.StatusCode/100 == 5 {
-		// 超时不重试
 		if operation_setting.IsAlwaysSkipRetryStatusCode(taskErr.StatusCode) {
-			return false
+			return operation_setting.ShouldRetryByStatusCode(taskErr.StatusCode)
 		}
 		return true
 	}
