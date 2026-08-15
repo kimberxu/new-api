@@ -138,7 +138,6 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
 
   const displayType = form.watch('general_setting.quota_display_type') ?? 'USD'
   const displayInCurrencyEnabled = form.watch('DisplayInCurrencyEnabled')
-  const showTokensOnlyOption = displayType === 'TOKENS'
   const showQuotaPerUnit =
     displayType === 'TOKENS' ||
     defaultValues.QuotaPerUnit !== DEFAULT_CURRENCY_CONFIG.quotaPerUnit
@@ -213,11 +212,9 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
                         <SelectItem value='CUSTOM'>
                           {t('Custom Currency')}
                         </SelectItem>
-                        {showTokensOnlyOption && (
-                          <SelectItem value='TOKENS'>
-                            {t('Tokens Only')}
-                          </SelectItem>
-                        )}
+                        <SelectItem value='TOKENS'>
+                          {t('Tokens Only')}
+                        </SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
