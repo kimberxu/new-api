@@ -273,9 +273,16 @@ function formatNumberWithSuffix(
   abbreviate: boolean
 ): string {
   const abs = Math.abs(value)
-  if (abbreviate && abs >= 1000) {
-    const result = value / 1000
-    return `${removeTrailingZeros(result.toFixed(1))}k`
+  if (abbreviate) {
+    if (abs >= 1_000_000_000) {
+      return `${removeTrailingZeros((value / 1_000_000_000).toFixed(1))}B`
+    }
+    if (abs >= 1_000_000) {
+      return `${removeTrailingZeros((value / 1_000_000).toFixed(1))}M`
+    }
+    if (abs >= 1000) {
+      return `${removeTrailingZeros((value / 1000).toFixed(1))}k`
+    }
   }
 
   const digits = getFractionDigits(value, digitsLarge, digitsSmall)
