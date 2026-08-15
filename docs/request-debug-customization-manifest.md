@@ -17,6 +17,7 @@
 | 渠道测试请求文案定制 | `d0fdb047` | 低（`controller/channel-test.go`） |
 | 加权模型映射（1 对多） | `9a20e660`、`c6c4bcf8`、`83329f48` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） |
 | 额度显示模式切换修复 | `d8378ee7` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） |
+| token 大数 K/M/B 分级显示 | `ea91ebf1` | 低（`web/src/lib/currency.ts`） |
 
 > **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`，`deploy` 与上游文件一致。
 
@@ -228,3 +229,21 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 ### 文件清单
 
 - `web/src/features/system-settings/general/pricing-section.tsx` - 删除 `showTokensOnlyOption` 条件，TOKENS 选项无条件渲染
+
+---
+
+## token 大数 K/M/B 分级显示
+
+### 功能概述
+
+上游 `formatNumberWithSuffix`（`web/src/lib/currency.ts`）对缩写路径只支持 `k` 后缀（÷1000 + 1 位小数）。额度显示切到 `Tokens Only` 后，百万/亿级 token 数显示为 `950003.7k` 这类难以直读的格式。本次增加 M/B 分级：
+
+- `32,153,700` → `32.2M`
+- `950,003,700` → `950M`
+- `50,158,280,000` → `50.2B`
+
+仅影响 `abbreviate` 缩写路径（overview 摘要卡片、统计徽章等）；日志页等 `abbreviate: false` 的完整数字显示不受影响；货币（USD/CNY）分支走 Intl 格式化，不经此函数。
+
+### 文件清单
+
+- `web/src/lib/currency.ts` - `formatNumberWithSuffix` 增加 `M`/`B` 分级
