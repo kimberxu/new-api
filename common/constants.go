@@ -135,6 +135,7 @@ var QuotaForInvitee = 0
 var ChannelDisableThreshold = 5.0
 var AutomaticDisableChannelEnabled = false
 var AutomaticEnableChannelEnabled = false
+var AutomaticRetryTimeoutEnabled = false // 强制重试 504/524 超时状态码（默认关闭，避免高并发下重复计费/雪崩）
 var QuotaRemindThreshold = 1000
 var PreConsumedQuota = 500
 
