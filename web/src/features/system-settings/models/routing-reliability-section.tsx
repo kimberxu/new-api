@@ -80,6 +80,7 @@ const createRoutingReliabilitySchema = (
       ChannelDisableThreshold: numericString,
       AutomaticDisableChannelEnabled: z.boolean(),
       AutomaticEnableChannelEnabled: z.boolean(),
+      AutomaticRetryTimeoutEnabled: z.boolean(),
       AutomaticDisableKeywords: z.string(),
       AutomaticDisableStatusCodes: z.string(),
       AutomaticRetryStatusCodes: z.string(),
@@ -140,6 +141,7 @@ type RoutingReliabilitySectionProps = {
     ChannelDisableThreshold: string
     AutomaticDisableChannelEnabled: boolean
     AutomaticEnableChannelEnabled: boolean
+    AutomaticRetryTimeoutEnabled: boolean
     AutomaticDisableKeywords: string
     AutomaticDisableStatusCodes: string
     AutomaticRetryStatusCodes: string
@@ -159,6 +161,7 @@ type NormalizedRoutingReliabilityValues = {
   ChannelDisableThreshold: string
   AutomaticDisableChannelEnabled: boolean
   AutomaticEnableChannelEnabled: boolean
+  AutomaticRetryTimeoutEnabled: boolean
   AutomaticDisableKeywords: string
   AutomaticDisableStatusCodes: string
   AutomaticRetryStatusCodes: string
@@ -182,6 +185,7 @@ const buildFormDefaults = (
   ChannelDisableThreshold: defaults.ChannelDisableThreshold ?? '',
   AutomaticDisableChannelEnabled: defaults.AutomaticDisableChannelEnabled,
   AutomaticEnableChannelEnabled: defaults.AutomaticEnableChannelEnabled,
+  AutomaticRetryTimeoutEnabled: defaults.AutomaticRetryTimeoutEnabled,
   AutomaticDisableKeywords: normalizeLineEndings(
     defaults.AutomaticDisableKeywords ?? ''
   ),
@@ -207,6 +211,7 @@ const normalizeDefaults = (
   ChannelDisableThreshold: (defaults.ChannelDisableThreshold ?? '').trim(),
   AutomaticDisableChannelEnabled: defaults.AutomaticDisableChannelEnabled,
   AutomaticEnableChannelEnabled: defaults.AutomaticEnableChannelEnabled,
+  AutomaticRetryTimeoutEnabled: defaults.AutomaticRetryTimeoutEnabled,
   AutomaticDisableKeywords: normalizeLineEndings(
     defaults.AutomaticDisableKeywords ?? ''
   ),
@@ -234,6 +239,7 @@ const normalizeFormValues = (
   ChannelDisableThreshold: values.ChannelDisableThreshold.trim(),
   AutomaticDisableChannelEnabled: values.AutomaticDisableChannelEnabled,
   AutomaticEnableChannelEnabled: values.AutomaticEnableChannelEnabled,
+  AutomaticRetryTimeoutEnabled: values.AutomaticRetryTimeoutEnabled,
   AutomaticDisableKeywords: normalizeLineEndings(
     values.AutomaticDisableKeywords
   ),
@@ -395,6 +401,29 @@ export function RoutingReliabilitySection({
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name='AutomaticRetryTimeoutEnabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Retry 504/524 timeouts')}</FormLabel>
+                    <FormDescription>
+                      {t(
+                        'Allow 504/524 to follow the configured retry status codes. If automatic channel disabling is enabled, the failed channel is disabled. This can cause duplicate upstream billing and request amplification.'
+                      )}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
           </div>
 
           <Separator />

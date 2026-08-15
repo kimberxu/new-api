@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/relaykit/types"
 )
 
@@ -51,6 +52,11 @@ func AutomaticDisableStatusCodesFromString(s string) error {
 }
 
 func ShouldDisableByStatusCode(code int) bool {
+	// A 504/524 timeout means this channel should not receive the next request
+	// when automatic channel disabling is enabled, regardless of retry policy.
+	if IsAlwaysSkipRetryStatusCode(code) {
+		return true
+	}
 	return shouldMatchStatusCodeRanges(AutomaticDisableStatusCodeRanges, code)
 }
 
@@ -78,7 +84,9 @@ func IsAlwaysSkipRetryCode(errorCode types.ErrorCode) bool {
 }
 
 func ShouldRetryByStatusCode(code int) bool {
-	if IsAlwaysSkipRetryStatusCode(code) {
+	// 504/524 超时状态码默认不重试（防止对"可能已处理"的请求重复计费/雪崩）。
+	// 当管理员显式开启 AutomaticRetryTimeoutEnabled 后，才放行到用户配置的重试范围。
+	if IsAlwaysSkipRetryStatusCode(code) && !common.AutomaticRetryTimeoutEnabled {
 		return false
 	}
 	return shouldMatchStatusCodeRanges(AutomaticRetryStatusCodeRanges, code)
