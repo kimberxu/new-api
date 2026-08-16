@@ -76,53 +76,78 @@ export function InflightTable() {
   const total = data?.total ?? 0
 
   const columns: ColumnDef<InflightRequest>[] = [
-    {
-      accessorKey: 'request_id',
-      header: () => t('Request ID'),
-      cell: ({ row }) => (
-        <span className='font-mono text-xs'>
-          {row.original.request_id}
-        </span>
-      ),
-      size: 200,
-    },
-    {
-      accessorKey: 'channel_id',
-      header: () => t('Channel'),
-      cell: ({ row }) => (
-        <span className='font-mono'>#{row.original.channel_id}</span>
-      ),
-      size: 100,
-    },
+  {
+  accessorKey: 'request_id',
+  header: () => t('Request ID'),
+  cell: ({ row }) => (
+  <span className='font-mono text-xs' title={row.original.request_id}>
+    {row.original.request_id?.slice(0, 8)}
+  </span>
+  ),
+  size: 180,
+  },
+  {
+  accessorKey: 'channel_name',
+  header: () => t('Channel Name'),
+  cell: ({ row }) => (
+  <span className='font-mono'>
+    {row.original.channel_name || row.original.channel_id}
+  </span>
+  ),
+  size: 140,
+  },
+  {
+  accessorKey: 'channel_id',
+  header: () => t('Channel ID'),
+  cell: ({ row }) => (
+  <span className='font-mono'>#{row.original.channel_id}</span>
+  ),
+  size: 100,
+  },
     {
       accessorKey: 'model_name',
       header: () => t('Model'),
       cell: ({ row }) => row.original.model_name || '-',
       size: 200,
     },
-    {
-      accessorKey: 'request_path',
-      header: () => t('Request Path'),
-      cell: ({ row }) => (
-        <span className='font-mono text-xs'>
-          {row.original.request_path}
-        </span>
-      ),
-      size: 250,
-    },
-    {
-      id: 'elapsed',
-      header: () => t('Elapsed'),
-      cell: ({ row }) => {
-        const elapsed = now - row.original.start_time
-        return (
-          <span className='font-mono tabular-nums'>
-            {formatDuration(elapsed)}
-          </span>
-        )
-      },
-      size: 120,
-    },
+  {
+  accessorKey: 'request_path',
+  header: () => t('Request Path'),
+  cell: ({ row }) => (
+  <span className='font-mono text-xs'>
+  {row.original.request_path}
+  </span>
+  ),
+  size: 250,
+  },
+  {
+  accessorKey: 'client_ip',
+  header: () => t('Client IP'),
+  cell: ({ row }) => row.original.client_ip || '-',
+  size: 140,
+  },
+  {
+  accessorKey: 'key_name',
+  header: () => t('Key Name'),
+  cell: ({ row }) => row.original.key_name || '-',
+  size: 180,
+  },
+  {
+  id: 'elapsed',
+  header: () => t('Elapsed'),
+  cell: ({ row }) => {
+  const finished = row.original.finished;
+  const endTime = row.original.end_time;
+  const elapsed = finished && endTime ? endTime - row.original.start_time : now - row.original.start_time;
+  return (
+  <span className='font-mono tabular-nums'>
+    {formatDuration(elapsed)}
+    {finished && <span className='ml-1 text-green-500'>(✓)</span>}
+  </span>
+  )
+  },
+  size: 140,
+  },
     {
       accessorKey: 'start_time',
       header: () => t('Started At'),
