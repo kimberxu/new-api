@@ -21,9 +21,14 @@ import { api } from '@/lib/api'
 export interface InflightRequest {
   request_id: string
   channel_id: number
+  channel_name?: string
   model_name: string
   start_time: number
+  end_time?: number
+  finished?: boolean
   request_path: string
+  client_ip?: string
+  key_name?: string
 }
 
 export interface InflightResponse {

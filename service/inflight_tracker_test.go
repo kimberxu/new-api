@@ -65,15 +65,18 @@ func TestStartFinishList(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), n)
 
-	// Finish removes the entry.
-	Finish(requestID)
-	n, err = Count()
-	require.NoError(t, err)
-	assert.Equal(t, int64(0), n)
+  // Finish marks the entry as finished (kept for UI).
+  Finish(requestID)
+  // Verify entry still present with finished flag.
+  n, err = Count()
+  require.NoError(t, err)
+  assert.Equal(t, int64(1), n)
 
-	items, err = List(1, 20)
-	require.NoError(t, err)
-	assert.Empty(t, items)
+  items, err = List(1, 20)
+  require.NoError(t, err)
+  assert.Len(t, items, 1)
+  assert.True(t, items[0].Finished)
+  assert.NotZero(t, items[0].EndTime)
 }
 
 func TestListEmptyWhenRedisDisabled(t *testing.T) {
