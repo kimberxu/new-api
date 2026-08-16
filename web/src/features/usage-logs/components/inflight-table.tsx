@@ -87,35 +87,31 @@ export function InflightTable() {
   size: 120,
   },
   {
-  accessorKey: 'channel_name',
-  header: () => t('Channel Name'),
-  cell: ({ row }) => (
-  <span className='font-mono'>
-    {row.original.channel_name || row.original.channel_id}
-  </span>
-  ),
-  size: 140,
+    accessorKey: 'channel_name',
+    header: () => t('Channel'),
+    cell: ({ row }) => (
+      <span className='font-mono'>
+        #{row.original.channel_id}
+        {row.original.channel_name ? `: ${row.original.channel_name}` : ''}
+      </span>
+    ),
+    size: 180,
   },
   {
-  accessorKey: 'channel_id',
-  header: () => t('Channel ID'),
-  cell: ({ row }) => (
-  <span className='font-mono'>#{row.original.channel_id}</span>
-  ),
-  size: 100,
+    accessorKey: 'model_name',
+    header: () => t('Model'),
+    cell: ({ row }) => (
+      <div className='flex flex-col gap-0.5'>
+        <span className='text-xs text-muted-foreground'>
+          {t('Downstream')}: {row.original.model_name || '-'}
+        </span>
+        <span className='text-xs text-muted-foreground'>
+          {t('Upstream')}: {row.original.upstream_model || row.original.model_name || '-'}
+        </span>
+      </div>
+    ),
+    size: 220,
   },
-    {
-      accessorKey: 'model_name',
-      header: () => t('Model (Requested)'),
-      cell: ({ row }) => row.original.model_name || '-',
-      size: 200,
-    },
-    {
-      accessorKey: 'upstream_model',
-      header: () => t('Model (Upstream)'),
-      cell: ({ row }) => row.original.upstream_model || row.original.model_name || '-',
-      size: 200,
-    },
   {
   accessorKey: 'request_path',
   header: () => t('Request Path'),
