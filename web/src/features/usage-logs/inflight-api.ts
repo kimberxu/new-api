@@ -23,6 +23,7 @@ export interface InflightRequest {
   channel_id: number
   channel_name?: string
   model_name: string
+  upstream_model?: string
   start_time: number
   end_time?: number
   finished?: boolean

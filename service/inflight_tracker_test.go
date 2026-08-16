@@ -115,6 +115,29 @@ func TestUpdateChannel(t *testing.T) {
 	assert.Equal(t, "42", val)
 }
 
+func TestUpdateUpstreamModel(t *testing.T) {
+	useInflightMiniRedis(t)
+	ctx := context.Background()
+	requestID := "req-upstream"
+
+	require.NoError(t, common.RDB.HSet(ctx, inflightKeyPrefix+requestID,
+		"request_id", requestID,
+		"channel_id", "1",
+		"model_name", "ds-v4",
+		"start_time", "100",
+		"request_path", "/v1/chat/completions",
+	).Err())
+	common.RDB.ZAdd(ctx, inflightSortedKey, &redis.Z{Score: 100, Member: requestID})
+
+	UpdateUpstreamModel(requestID, "deepseek-v4-flash")
+
+	items, err := List(1, 20)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "ds-v4", items[0].ModelName)
+	assert.Equal(t, "deepseek-v4-flash", items[0].UpstreamModelName)
+}
+
 func TestStartNoopWithoutRedis(t *testing.T) {
 	prev := common.RedisEnabled
 	common.RDB = nil

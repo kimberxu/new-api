@@ -15,16 +15,17 @@ import (
 
 // InflightInfo is the data stored for each ongoing request.
 type InflightInfo struct {
-  RequestID   string `json:"request_id"`
-  ChannelID   int    `json:"channel_id"`
-  ChannelName string `json:"channel_name,omitempty"`
-  ModelName   string `json:"model_name"`
-  StartTime   int64  `json:"start_time"`
-  EndTime     int64  `json:"end_time,omitempty"`
-  Finished    bool   `json:"finished,omitempty"`
-  RequestPath string `json:"request_path"`
-  ClientIP    string `json:"client_ip,omitempty"`
-  KeyName     string `json:"key_name,omitempty"`
+	RequestID        string `json:"request_id"`
+	ChannelID        int    `json:"channel_id"`
+	ChannelName      string `json:"channel_name,omitempty"`
+	ModelName        string `json:"model_name"`
+	UpstreamModelName string `json:"upstream_model,omitempty"`
+	StartTime        int64  `json:"start_time"`
+	EndTime          int64  `json:"end_time,omitempty"`
+	Finished         bool   `json:"finished,omitempty"`
+	RequestPath      string `json:"request_path"`
+	ClientIP         string `json:"client_ip,omitempty"`
+	KeyName          string `json:"key_name,omitempty"`
 }
 
 const (
@@ -45,21 +46,15 @@ func Start(requestID string, c *gin.Context, info *relaycommon.RelayInfo) {
 		return
 	}
 	startTs := time.Now().Unix()
-  // Resolve channel name for UI display.
-  var channelName string
-  if ch, err := model.GetChannelById(info.GetChannelID(), false); err == nil && ch != nil {
-    channelName = ch.GetTag() // fallback to tag; could also use other field.
-  }
-  fields := map[string]interface{}{
-    "request_id": requestID,
-    "channel_id": strconv.Itoa(info.GetChannelID()),
-    "channel_name": channelName,
-    "model_name": info.GetOriginModelName(),
-    "start_time": strconv.FormatInt(startTs, 10),
-    "request_path": c.Request.URL.Path,
-    "client_ip": c.ClientIP(),
-    "key_name": info.TokenKey,
-  }
+	fields := map[string]interface{}{
+		"request_id":   requestID,
+		"channel_id":   strconv.Itoa(info.GetChannelID()),
+		"model_name":   info.GetOriginModelName(),
+		"start_time":   strconv.FormatInt(startTs, 10),
+		"request_path": c.Request.URL.Path,
+		"client_ip":    c.ClientIP(),
+		"key_name":     info.TokenKey,
+	}
 	ctx := context.Background()
 	hashKey := inflightKeyPrefix + requestID
 	ttl := time.Duration(inflightTTLSeconds) * time.Second
@@ -99,8 +94,25 @@ func UpdateChannel(requestID string, channelID int) {
 	if requestID == "" || !inflightEnabled() {
 		return
 	}
+	fields := map[string]interface{}{
+		"channel_id": strconv.Itoa(channelID),
+	}
+	if ch, err := model.CacheGetChannel(channelID); err == nil && ch != nil {
+		fields["channel_name"] = ch.Name
+	}
 	ctx := context.Background()
-	common.RDB.HSet(ctx, inflightKeyPrefix+requestID, "channel_id", strconv.Itoa(channelID))
+	common.RDB.HSet(ctx, inflightKeyPrefix+requestID, fields)
+}
+
+// UpdateUpstreamModel updates the upstream (model-mapped) model name once the
+// relay handler has resolved it. Called after the handler runs, before the
+// entry is finished, so the UI can show both the downstream and upstream model.
+func UpdateUpstreamModel(requestID string, upstreamModel string) {
+	if requestID == "" || !inflightEnabled() {
+		return
+	}
+	ctx := context.Background()
+	common.RDB.HSet(ctx, inflightKeyPrefix+requestID, "upstream_model", upstreamModel)
 }
 
 // List returns a page of in-flight entries ordered newest-first.
@@ -135,6 +147,7 @@ func List(page, size int) ([]InflightInfo, error) {
       ChannelID:   chanID,
       ChannelName: m["channel_name"],
       ModelName:   m["model_name"],
+      UpstreamModelName: m["upstream_model"],
       StartTime:   startTs,
       EndTime: func() int64 { et,_:=strconv.ParseInt(m["end_time"],10,64); return et }(),
       Finished:   m["finished"] == "1",
