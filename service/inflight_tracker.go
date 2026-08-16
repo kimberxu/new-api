@@ -46,6 +46,9 @@ func Start(requestID string, c *gin.Context, info *relaycommon.RelayInfo) {
 		return
 	}
 	startTs := time.Now().Unix()
+	// token_name is the API key's display name (set by middleware/auth.go);
+	// TokenKey is the raw key itself and must not be exposed.
+	tokenName := c.GetString("token_name")
 	fields := map[string]interface{}{
 		"request_id":   requestID,
 		"channel_id":   strconv.Itoa(info.GetChannelID()),
@@ -53,7 +56,7 @@ func Start(requestID string, c *gin.Context, info *relaycommon.RelayInfo) {
 		"start_time":   strconv.FormatInt(startTs, 10),
 		"request_path": c.Request.URL.Path,
 		"client_ip":    c.ClientIP(),
-		"key_name":     info.TokenKey,
+		"key_name":     tokenName,
 	}
 	ctx := context.Background()
 	hashKey := inflightKeyPrefix + requestID
