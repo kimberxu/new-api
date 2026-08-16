@@ -16,8 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import assert from 'node:assert/strict'
-import { describe, test } from 'node:test'
+import { describe, expect, test } from 'vitest'
 
 import { findExposedTargetModels } from '../model-mapping-validation'
 
@@ -30,7 +29,7 @@ describe('findExposedTargetModels', () => {
       'deepseek-v4-flash-0731',
     ])
 
-    assert.deepEqual(exposed, ['deepseek-v4-flash-0731'])
+    expect(exposed).toEqual(['deepseek-v4-flash-0731'])
   })
 
   test('does not report a model that is both source key and target', () => {
@@ -38,7 +37,7 @@ describe('findExposedTargetModels', () => {
 
     const exposed = findExposedTargetModels(mapping, ['deepseek-v4-flash'])
 
-    assert.deepEqual(exposed, [])
+    expect(exposed).toEqual([])
   })
 
   test('weighted array: keeps source key, reports other listed targets', () => {
@@ -54,7 +53,7 @@ describe('findExposedTargetModels', () => {
       'deepseek-v4-flash-0731',
     ])
 
-    assert.deepEqual(exposed, ['deepseek-v4-flash-0731'])
+    expect(exposed).toEqual(['deepseek-v4-flash-0731'])
   })
 
   test('reports multiple exposed targets in mapping order', () => {
@@ -70,7 +69,7 @@ describe('findExposedTargetModels', () => {
       'deepseek-reasoner',
     ])
 
-    assert.deepEqual(exposed, ['deepseek-v4-flash-0731', 'deepseek-reasoner'])
+    expect(exposed).toEqual(['deepseek-v4-flash-0731', 'deepseek-reasoner'])
   })
 
   test('ignores targets that are not in Models', () => {
@@ -78,7 +77,7 @@ describe('findExposedTargetModels', () => {
 
     const exposed = findExposedTargetModels(mapping, ['ds-v4'])
 
-    assert.deepEqual(exposed, [])
+    expect(exposed).toEqual([])
   })
 
   test('trims whitespace in source keys and target names', () => {
@@ -89,7 +88,7 @@ describe('findExposedTargetModels', () => {
       'deepseek-v4-flash-0731',
     ])
 
-    assert.deepEqual(exposed, ['deepseek-v4-flash-0731'])
+    expect(exposed).toEqual(['deepseek-v4-flash-0731'])
   })
 
   test('trims whitespace so a key-equal target is excluded', () => {
@@ -99,25 +98,23 @@ describe('findExposedTargetModels', () => {
 
     const exposed = findExposedTargetModels(mapping, ['deepseek-v4-flash'])
 
-    assert.deepEqual(exposed, [])
+    expect(exposed).toEqual([])
   })
 
   test('returns empty for empty mapping', () => {
-    assert.deepEqual(findExposedTargetModels('', ['deepseek-v4-flash']), [])
-    assert.deepEqual(findExposedTargetModels('{}', ['deepseek-v4-flash']), [])
+    expect(findExposedTargetModels('', ['deepseek-v4-flash'])).toEqual([])
+    expect(findExposedTargetModels('{}', ['deepseek-v4-flash'])).toEqual([])
   })
 
   test('returns empty for invalid JSON', () => {
-    assert.deepEqual(
-      findExposedTargetModels('not-json', ['deepseek-v4-flash']),
-      []
-    )
+    expect(
+      findExposedTargetModels('not-json', ['deepseek-v4-flash'])
+    ).toEqual([])
   })
 
   test('returns empty when mapping is not an object', () => {
-    assert.deepEqual(
-      findExposedTargetModels('[1, 2]', ['deepseek-v4-flash']),
-      []
-    )
+    expect(
+      findExposedTargetModels('[1, 2]', ['deepseek-v4-flash'])
+    ).toEqual([])
   })
 })

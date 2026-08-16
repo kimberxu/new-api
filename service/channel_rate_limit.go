@@ -100,21 +100,92 @@ func CheckChannelRateLimit(channelID int) bool {
 	return true
 }
 
+// channelRateLimitLuaScript atomically increments the counter and sets TTL on
+// the first request, avoiding the race where a crash between INCR and EXPIRE
+// leaves a key without a TTL (permanent rate-limit lockout).
+const channelRateLimitLuaScript = `
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+`
+
+var channelRateLimitLuaSha string
+
+func getChannelRateLimitLuaSha() string {
+	if channelRateLimitLuaSha != "" {
+		return channelRateLimitLuaSha
+	}
+	ctx := context.Background()
+	sha, err := common.RDB.ScriptLoad(ctx, channelRateLimitLuaScript).Result()
+	if err != nil {
+		// Fallback: return empty so callers use Eval directly.
+		return ""
+	}
+	channelRateLimitLuaSha = sha
+	return sha
+}
+
 func channelRateLimitRedisTake(channelID int, metric string, limit int, windowSec int64) bool {
 	ctx := context.Background()
 	key := channelRateLimitRedisKey(channelID, metric)
 
-	count, err := common.RDB.Incr(ctx, key).Result()
+	var count int64
+	var err error
+	sha := getChannelRateLimitLuaSha()
+	if sha != "" {
+		count, err = common.RDB.EvalSha(ctx, sha, []string{key}, windowSec).Int64()
+	} else {
+		count, err = common.RDB.Eval(ctx, channelRateLimitLuaScript, []string{key}, windowSec).Int64()
+	}
 	if err != nil {
 		return true // allow on error
-	}
-	if count == 1 {
-		common.RDB.Expire(ctx, key, time.Duration(windowSec)*time.Second)
 	}
 	if count > int64(limit) {
 		return false
 	}
 	return true
+}
+
+// IsChannelRateLimited reports whether a channel is currently rate-limited
+// without consuming a slot. Use this for read-only checks (e.g. computing
+// Retry-After for a 429 response) where the caller must NOT increment the
+// counter.
+func IsChannelRateLimited(channelID int) bool {
+	if channelID <= 0 {
+		return false
+	}
+	globalSetting := operation_setting.GetChannelRateLimitSetting()
+	if globalSetting == nil || !globalSetting.Enabled {
+		return false
+	}
+	channel, err := model.CacheGetChannel(channelID)
+	if err != nil || channel == nil {
+		return false
+	}
+	otherSettings := channel.GetOtherSettings()
+	if !otherSettings.RateLimitEnabled {
+		return false
+	}
+	rpm := otherSettings.RateLimitRPM
+	if rpm <= 0 {
+		rpm = globalSetting.DefaultRPM
+	}
+	limit, _ := rpmToLimitWindow(rpm)
+
+	if common.RedisEnabled && common.RDB != nil {
+		ctx := context.Background()
+		key := channelRateLimitRedisKey(channelID, "rpm")
+		count, err := common.RDB.Get(ctx, key).Int64()
+		if err != nil {
+			return false // not rate-limited on error
+		}
+		return count > int64(limit)
+	}
+	// In-memory limiter does not expose a read-only peek; conservatively
+	// report not-limited so the 429 path is driven by actual CheckChannelRateLimit.
+	return false
 }
 
 // GetChannelRPM returns the RPM configured for a channel, considering both
@@ -168,7 +239,7 @@ func HasRateLimitedChannelsForModel(group string, modelName string) (bool, int64
 			continue
 		}
 
-		if !CheckChannelRateLimit(cid) {
+		if IsChannelRateLimited(cid) {
 			rateLimitHit = true
 			_, window := rpmToLimitWindow(rpm)
 			if minRetryAfter == 0 || window < minRetryAfter {

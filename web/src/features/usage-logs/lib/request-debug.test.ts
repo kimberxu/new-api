@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict'
-import { describe, test } from 'node:test'
+import { describe, expect, test } from 'vitest'
 
 import { formatRequestDebugBody } from './request-debug'
 
@@ -8,8 +7,7 @@ describe('request debug body formatting', () => {
     const body =
       '{"model":"gpt-test","messages":[{"role":"user","content":"hello"}]}'
 
-    assert.equal(
-      formatRequestDebugBody(body),
+    expect(formatRequestDebugBody(body)).toBe(
       [
         '{',
         '  "model": "gpt-test",',
@@ -27,6 +25,6 @@ describe('request debug body formatting', () => {
   test('keeps non-json request bodies unchanged', () => {
     const body = 'plain text body'
 
-    assert.equal(formatRequestDebugBody(body), body)
+    expect(formatRequestDebugBody(body)).toBe(body)
   })
 })

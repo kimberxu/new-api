@@ -1,37 +1,37 @@
 package service
 
 import (
-  "context"
-  "fmt"
-  "strconv"
-  "time"
+	"context"
+	"fmt"
+	"strconv"
+	"time"
 
-  "github.com/QuantumNous/new-api/common"
-  "github.com/QuantumNous/new-api/model"
-  "github.com/gin-gonic/gin"
-  relaycommon "github.com/QuantumNous/new-api/relay/common"
-  "github.com/go-redis/redis/v8"
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 )
 
 // InflightInfo is the data stored for each ongoing request.
 type InflightInfo struct {
-	RequestID        string `json:"request_id"`
-	ChannelID        int    `json:"channel_id"`
-	ChannelName      string `json:"channel_name,omitempty"`
-	ModelName        string `json:"model_name"`
+	RequestID         string `json:"request_id"`
+	ChannelID         int    `json:"channel_id"`
+	ChannelName       string `json:"channel_name,omitempty"`
+	ModelName         string `json:"model_name"`
 	UpstreamModelName string `json:"upstream_model,omitempty"`
-	StartTime        int64  `json:"start_time"`
-	EndTime          int64  `json:"end_time,omitempty"`
-	Finished         bool   `json:"finished,omitempty"`
-	RequestPath      string `json:"request_path"`
-	ClientIP         string `json:"client_ip,omitempty"`
-	KeyName          string `json:"key_name,omitempty"`
+	StartTime         int64  `json:"start_time"`
+	EndTime           int64  `json:"end_time,omitempty"`
+	Finished          bool   `json:"finished,omitempty"`
+	RequestPath       string `json:"request_path"`
+	ClientIP          string `json:"client_ip,omitempty"`
+	KeyName           string `json:"key_name,omitempty"`
 }
 
 const (
-	inflightKeyPrefix  = "inflight:"        // per-request hash key
-	inflightSortedKey  = "inflight:sorted"  // ZSET ordered by start timestamp
-	inflightTTLSeconds = 600                // 10-minute safety window
+	inflightKeyPrefix  = "inflight:"       // per-request hash key
+	inflightSortedKey  = "inflight:sorted" // ZSET ordered by start timestamp
+	inflightTTLSeconds = 600               // 10-minute safety window
 )
 
 // inflightEnabled reports whether Redis is available for tracking.
@@ -76,19 +76,19 @@ func Start(requestID string, c *gin.Context, info *relaycommon.RelayInfo) {
 // Finish removes the in-flight entry.
 // Errors are ignored intentionally — cleanup must not block the response.
 func Finish(requestID string) {
-  if requestID == "" || !inflightEnabled() {
-    return
-  }
-  ctx := context.Background()
-  // Mark as finished, retain for UI visibility.
-  now := time.Now().Unix()
-  // Update hash fields.
-  common.RDB.HSet(ctx, inflightKeyPrefix+requestID, map[string]interface{}{
-    "finished": "1",
-    "end_time": strconv.FormatInt(now, 10),
-  })
-  // Keep sorted set entry for ordering; optionally could keep or remove.
-  // No deletion to preserve entry for UI.
+	if requestID == "" || !inflightEnabled() {
+		return
+	}
+	ctx := context.Background()
+	// Mark as finished, retain for UI visibility.
+	now := time.Now().Unix()
+	// Update hash fields.
+	common.RDB.HSet(ctx, inflightKeyPrefix+requestID, map[string]interface{}{
+		"finished": "1",
+		"end_time": strconv.FormatInt(now, 10),
+	})
+	// Keep sorted set entry for ordering; optionally could keep or remove.
+	// No deletion to preserve entry for UI.
 }
 
 // UpdateChannel updates the channel for an existing in-flight entry.
@@ -145,43 +145,32 @@ func List(page, size int) ([]InflightInfo, error) {
 		}
 		chanID, _ := strconv.Atoi(m["channel_id"])
 		startTs, _ := strconv.ParseInt(m["start_time"], 10, 64)
-    infos = append(infos, InflightInfo{
-      RequestID:   m["request_id"],
-      ChannelID:   chanID,
-      ChannelName: m["channel_name"],
-      ModelName:   m["model_name"],
-      UpstreamModelName: m["upstream_model"],
-      StartTime:   startTs,
-      EndTime: func() int64 { et,_:=strconv.ParseInt(m["end_time"],10,64); return et }(),
-      Finished:   m["finished"] == "1",
-      RequestPath: m["request_path"],
-      ClientIP:    m["client_ip"],
-      KeyName:     m["key_name"],
-    })
+		infos = append(infos, InflightInfo{
+			RequestID:         m["request_id"],
+			ChannelID:         chanID,
+			ChannelName:       m["channel_name"],
+			ModelName:         m["model_name"],
+			UpstreamModelName: m["upstream_model"],
+			StartTime:         startTs,
+			EndTime:           func() int64 { et, _ := strconv.ParseInt(m["end_time"], 10, 64); return et }(),
+			Finished:          m["finished"] == "1",
+			RequestPath:       m["request_path"],
+			ClientIP:          m["client_ip"],
+			KeyName:           m["key_name"],
+		})
 	}
 	return infos, nil
 }
 
 // Count returns the total number of in-flight entries.
 func Count() (int64, error) {
-  if !inflightEnabled() {
-    return 0, nil
-  }
-  ctx := context.Background()
-  n, err := common.RDB.ZCard(ctx, inflightSortedKey).Result()
-  if err != nil {
-    return 0, fmt.Errorf("inflight tracker: ZCard: %w", err)
-  }
-  if n == 0 {
-    // fallback: count keys with prefix inflightKeyPrefix* excluding sorted key
-    keys, _ := common.RDB.Keys(ctx, inflightKeyPrefix+"*").Result()
-    count := int64(0)
-    for _, k := range keys {
-      if k != inflightSortedKey {
-        count++
-      }
-    }
-    return count, nil
-  }
-  return n, nil
+	if !inflightEnabled() {
+		return 0, nil
+	}
+	ctx := context.Background()
+	n, err := common.RDB.ZCard(ctx, inflightSortedKey).Result()
+	if err != nil {
+		return 0, fmt.Errorf("inflight tracker: ZCard: %w", err)
+	}
+	return n, nil
 }
