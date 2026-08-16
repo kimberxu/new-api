@@ -2691,6 +2691,8 @@
     "Mode": "模式",
     "model": "模型",
     "Model": "模型",
+    "Model (Requested)": "模型（下游请求）",
+    "Model (Upstream)": "模型（上游实际）",
     "Model {{model}}": "模型 {{model}}",
     "Model Access": "模型访问",
     "Model Analytics": "模型数据分析",

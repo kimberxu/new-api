@@ -243,6 +243,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			newAPIError = relayHandler(c, relayInfo)
 		}
 
+		// After the handler runs, the upstream (model-mapped) name is resolved.
+		service.UpdateUpstreamModel(requestId, relayInfo.GetUpstreamModelName())
+
 		if newAPIError == nil {
 			relayInfo.LastError = nil
 			return
@@ -608,6 +611,8 @@ func RelayTask(c *gin.Context) {
 		c.Request.Body = io.NopCloser(bodyStorage)
 
 		result, taskErr = relay.RelayTaskSubmit(c, relayInfo)
+		// After the handler runs, the upstream (model-mapped) name is resolved.
+		service.UpdateUpstreamModel(requestId, relayInfo.GetUpstreamModelName())
 		if taskErr == nil {
 			break
 		}

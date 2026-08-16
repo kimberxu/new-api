@@ -2691,6 +2691,8 @@
     "Mode": "Mode",
     "model": "model",
     "Model": "Model",
+    "Model (Requested)": "Model (Requested)",
+    "Model (Upstream)": "Model (Upstream)",
     "Model {{model}}": "Model {{model}}",
     "Model Access": "Model Access",
     "Model Analytics": "Model Analytics",
