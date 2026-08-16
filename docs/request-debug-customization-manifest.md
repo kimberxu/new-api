@@ -1,8 +1,15 @@
 # 定制功能清单（deploy 分支）
 
-> 对应分支：`deploy` @ `4ce5615c`（2026-08-15 更新）
+> 对应分支：`deploy` @ `62830da3`（2026-08-16 更新）
 > 以下功能均为 `deploy` 相对 `upstream/main` 的定制（可用 `git diff upstream/main...deploy` 核对）。
-> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ 当前工作树（流式结束原因分类与中断流语义，待提交）
+> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ `62830da3`（流式结束原因分类与中断流语义）→ 当前工作树（实时连接追踪，待提交）
+
+## 魔改开发约定（合并上游友好）
+
+- **改动最小化是硬约束**：新增魔改功能时，独立逻辑优先用新增文件承载（新 service/controller/middleware/组件/API 客户端），避免改动既有文件。
+- 必须改动既有文件时，限制为最小必要 diff——只做纯追加/局部插入，不修改、不删除、不重排已有代码，能不改就不改。
+- 每次新增魔改前按此顺序审查：先问「这个文件能不能不动」，再问「改动能不能再小」；改动文件越少、越偏向新增文件，后续合并 `upstream/main` 冲突越少。
+- 例外：`docs/` 文档与 `AGENTS.md` 登记类改动属于分支约定本身，不受最小化约束。
 
 ## 功能总览
 
@@ -12,7 +19,8 @@
 | 日志自动清理 | `bfa99ad6` | 低 |
 | 同优先级渠道重试 | `bfa99ad6` | 中（`controller/relay.go`） |
 | 504/524 超时重试开关与自动禁用 | `ff2462de` | 中（`controller/relay.go`、`setting/operation_setting/status_code_ranges.go`、系统设置前端） |
-| 流式结束原因分类与中断流语义 | 当前工作树（待提交） | 中（`relay/common/stream_status.go`、`relay/channel/openai/relay-openai.go`、`service/log_info_generate.go`） |
+| 流式结束原因分类与中断流语义 | `62830da3` | 中（`relay/common/stream_status.go`、`relay/channel/openai/relay-openai.go`、`service/log_info_generate.go`） |
+| 实时连接追踪 | 当前工作树（待提交） | 中（`controller/relay.go`、`router/api-router.go`、`service/inflight_tracker.go`） |
 | GHCR 部署镜像构建 | `bfa99ad6` | 低 |
 | GHCR 镜像自动清理 | `ae34ad6a` | 低（`.github/workflows/deploy-image-ghcr.yml`） |
 | 渠道请求频率限制（RPM/TPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） |
@@ -302,3 +310,43 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 ### 文件清单
 
 - `web/src/lib/currency.ts` - `formatNumberWithSuffix` 增加 `M`/`B` 分级
+
+---
+
+## 实时连接追踪（In-Flight Request Tracking）
+
+### 功能概述
+
+在日志页面新增「实时连接」分页，管理员可实时查看当前正在进行中（尚未成功或失败）的中转请求。每个条目显示请求 ID、所选渠道、模型名、请求路径、发起时间与已耗时。列表每 3 秒自动刷新，已耗时列每秒计时。
+
+### 机制
+
+- 请求进入 `Relay` / `RelayTask` / `RelayMidjourney` 后调用 `service.Start`，在 Redis 中以 Hash 记录请求元信息（`inflight:<request_id>`），并在 ZSET（`inflight:sorted`）按时间戳排序以支持分页
+- 渠道选择/重试时通过 `service.UpdateChannel` 更新渠道 ID
+- 请求结束时（`defer service.Finish`）从 Redis 删除条目
+- TTL 10 分钟兜底，防止进程崩溃产生残留
+- Redis 不可用时全部操作降级为 no-op，不影响请求正常处理
+- 管理员 API `GET /api/inflight` 返回分页列表（AdminAuth）
+
+### 安全
+
+- 仅管理员可访问（`AdminAuth` 中间件）
+- 不记录请求体内容，仅记录路由级元信息（请求 ID、渠道、模型、路径、时间）
+- Redis 不可用时静默降级，不暴露错误给下游
+
+### 文件清单
+
+**后端：**
+- `service/inflight_tracker.go` - 核心模块（`Start`、`Finish`、`UpdateChannel`、`List`、`Count`）
+- `controller/inflight.go` - Admin API `GetInflightRequests`
+- `controller/relay.go` - `Relay` / `RelayTask` / `RelayMidjourney` 接入 `Start` + `Finish`；`addUsedChannel` 接入 `UpdateChannel`
+- `router/api-router.go` - 路由注册 `GET /api/inflight`
+- `service/inflight_tracker_test.go` - 单元测试
+
+**前端：**
+- `web/src/features/usage-logs/inflight-api.ts` - API 客户端
+- `web/src/features/usage-logs/components/inflight-table.tsx` - 实时连接表格组件
+- `web/src/features/usage-logs/section-registry.tsx` - 新增 `inflight` section
+- `web/src/features/usage-logs/index.tsx` - 渲染分发
+- `web/src/hooks/use-sidebar-data.ts` - 侧边栏导航项（不新增 `use-sidebar-config.ts` 映射：URL 不在映射表时默认可见，少改一个文件）
+- `web/src/i18n/locales/*.json` - 七语言文案
