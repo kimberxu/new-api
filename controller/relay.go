@@ -217,6 +217,13 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			continue
 		}
 
+		// Pre-resolve the upstream model name so the in-flight tracker shows
+		// the mapped model immediately, not just the downstream model name.
+		// The handler will re-resolve via InitChannelMeta + ModelMappedHelper;
+		// UpdateUpstreamModel after the handler overwrites this with the final value.
+		helper.ModelMappedHelper(c, relayInfo, nil)
+		service.UpdateUpstreamModel(requestId, relayInfo.GetUpstreamModelName())
+
 		addUsedChannel(c, channel.Id)
 		bodyStorage, bodyErr := common.GetBodyStorage(c)
 		if bodyErr != nil {
@@ -700,6 +707,12 @@ func executeTaskSubmissionWith(
 		diagnostics.attempt(retryParam.GetRetry()+1, channel, relayInfo.LockedChannel != nil)
 
 		addUsedChannel(c, channel.Id)
+		// Pre-resolve the upstream model name so the in-flight tracker shows
+		// the mapped model immediately, not just the downstream model name.
+		// The handler will re-resolve via InitChannelMeta + ModelMappedHelper;
+		// UpdateUpstreamModel after the handler overwrites this with the final value.
+		helper.ModelMappedHelper(c, relayInfo, nil)
+		service.UpdateUpstreamModel(requestId, relayInfo.GetUpstreamModelName())
 		bodyStorage, bodyErr := common.GetBodyStorage(c)
 		if bodyErr != nil {
 			stage = "read_body"
