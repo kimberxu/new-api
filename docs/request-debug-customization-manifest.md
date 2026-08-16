@@ -41,7 +41,9 @@
 
 ### 风险与渠道处理
 
-504/524 可能表示请求已经到达上游并开始处理。开启重试可能造成重复计费、重复生成和请求放大，因此开关默认关闭。若同时启用了自动禁用渠道，504/524 会进入现有自动禁用判定，使开启自动禁用的失败渠道退出候选池，避免持续命中同一超时渠道。
+504/524 可能表示请求已经到达上游并开始处理。开启重试可能造成重复计费、重复生成和请求放大，因此开关默认关闭。
+
+**自动禁用行为变更（2026-08-16）**：此前 504/524 被 `ShouldDisableByStatusCode` 硬编码为无条件强制禁用（`IsAlwaysSkipRetryStatusCode` 直接 return true），一次超时即禁用渠道，对瞬时网络抖动过于激进。现已改为遵循用户配置的 `AutomaticDisableStatusCodeRanges`：默认范围（仅 401）不包含 504/524，因此默认不再因超时禁用渠道。管理员如需 504/524 自动禁用，在系统设置「自动禁用状态码」中显式添加即可。
 
 ### 文件清单
 
@@ -323,6 +325,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 - 请求进入 `Relay` / `RelayTask` / `RelayMidjourney` 后调用 `service.Start`，在 Redis 中以 Hash 记录请求元信息（`inflight:<request_id>`），并在 ZSET（`inflight:sorted`）按时间戳排序以支持分页
 - 渠道选择/重试时通过 `service.UpdateChannel` 更新渠道 ID
+- **上游模型预解析**：渠道选择后（`addUsedChannel`）、handler 执行前，调用 `helper.ModelMappedHelper(c, relayInfo, nil)` 预解析 `model_mapping` 并通过 `service.UpdateUpstreamModel` 写入 Redis。handler 内部会通过 `InitChannelMeta` + `ModelMappedHelper` 重新解析（创建全新 `ChannelMeta`），handler 执行后的 `UpdateUpstreamModel` 用最终值覆盖。这样请求从开始就显示映射后的上游模型名，而非在整个 handler 执行期间显示空/fallback 到下游模型名。对 1:1 映射完全准确；对加权映射，预解析显示一个可能的 target，handler 后用实际选中值覆盖
 - 请求结束时（`defer service.Finish`）从 Redis 删除条目
 - TTL 10 分钟兜底，防止进程崩溃产生残留
 - Redis 不可用时全部操作降级为 no-op，不影响请求正常处理

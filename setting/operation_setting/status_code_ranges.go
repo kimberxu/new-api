@@ -52,11 +52,11 @@ func AutomaticDisableStatusCodesFromString(s string) error {
 }
 
 func ShouldDisableByStatusCode(code int) bool {
-	// A 504/524 timeout means this channel should not receive the next request
-	// when automatic channel disabling is enabled, regardless of retry policy.
-	if IsAlwaysSkipRetryStatusCode(code) {
-		return true
-	}
+	// 504/524 timeouts are transient by nature (network jitter, upstream slow).
+	// They should NOT unconditionally disable a channel — that was too aggressive.
+	// Instead, 504/524 follow the same user-configured AutomaticDisableStatusCodeRanges
+	// as any other status code. If the admin wants 504/524 to auto-disable, they add
+	// them to the disable range in system settings.
 	return shouldMatchStatusCodeRanges(AutomaticDisableStatusCodeRanges, code)
 }
 
