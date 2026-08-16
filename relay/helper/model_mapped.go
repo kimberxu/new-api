@@ -1,12 +1,12 @@
 package helper
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/gin-gonic/gin"
@@ -68,9 +68,9 @@ func pickWeightedModel(items []relaycommon.WeightedModelItem) string {
 	}
 	if totalWeight <= 0 {
 		// 等概率回退
-		return items[rand.Intn(len(items))].Model
+		return items[rand.IntN(len(items))].Model
 	}
-	r := rand.Intn(totalWeight)
+	r := rand.IntN(totalWeight)
 	for _, item := range items {
 		r -= item.Weight
 		if r < 0 {
@@ -99,7 +99,7 @@ func ModelMappedHelper(c *gin.Context, info *relaycommon.RelayInfo, request dto.
 	}
 
 	modelMap := make(map[string]any)
-	if err := json.Unmarshal([]byte(modelMapping), &modelMap); err != nil {
+	if err := common.UnmarshalJsonStr(modelMapping, &modelMap); err != nil {
 		return fmt.Errorf("unmarshal_model_mapping_failed")
 	}
 
