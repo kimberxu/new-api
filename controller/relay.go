@@ -127,6 +127,10 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
+	// Track this request as in-flight for the admin "real-time connections" view.
+	service.Start(requestId, c, relayInfo)
+	defer service.Finish(requestId)
+
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	needCountToken := constant.CountToken
 	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.
@@ -295,6 +299,11 @@ func addUsedChannel(c *gin.Context, channelId int) {
 	useChannel := c.GetStringSlice("use_channel")
 	useChannel = append(useChannel, fmt.Sprintf("%d", channelId))
 	c.Set("use_channel", useChannel)
+	// Update the in-flight tracker with the selected channel.
+	requestId := c.GetString(common.RequestIdKey)
+	if requestId != "" {
+		service.UpdateChannel(requestId, channelId)
+	}
 }
 
 func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
@@ -455,6 +464,10 @@ func RelayMidjourney(c *gin.Context) {
 		return
 	}
 
+	requestId := c.GetString(common.RequestIdKey)
+	service.Start(requestId, c, relayInfo)
+	defer service.Finish(requestId)
+
 	var mjErr *taskdto.MidjourneyResponse
 	switch relayInfo.RelayMode {
 	case relayconstant.RelayModeMidjourneyNotify:
@@ -535,6 +548,10 @@ func RelayTask(c *gin.Context) {
 		})
 		return
 	}
+
+	requestId := c.GetString(common.RequestIdKey)
+	service.Start(requestId, c, relayInfo)
+	defer service.Finish(requestId)
 
 	if taskErr := relay.ResolveOriginTask(c, relayInfo); taskErr != nil {
 		respondTaskError(c, taskErr)

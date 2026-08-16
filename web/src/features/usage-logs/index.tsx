@@ -27,6 +27,7 @@ import { CacheStatsDialog } from '@/features/system-settings/general/channel-aff
 import { useSidebarConfig } from '@/hooks/use-sidebar-config'
 
 import { UserInfoDialog } from './components/dialogs/user-info-dialog'
+import { InflightTable } from './components/inflight-table'
 import {
   type LogsViewScope,
   UsageLogsProvider,
@@ -52,6 +53,9 @@ const SECTION_META: Record<UsageLogsSectionId, { titleKey: string }> = {
   },
   task: {
     titleKey: 'Task Logs',
+  },
+  inflight: {
+    titleKey: 'Real-Time Connections',
   },
 }
 
@@ -117,10 +121,11 @@ function UsageLogsContent() {
     [setViewScope]
   )
 
-  const pageMeta =
-    activeCategory === 'common' ? SECTION_META.common : SECTION_META.task
+  const pageMeta = SECTION_META[activeCategory] ?? SECTION_META.common
   const showTaskSwitcher =
-    activeCategory !== 'common' && visibleSections.length > 1
+    activeCategory !== 'common' &&
+    activeCategory !== 'inflight' &&
+    visibleSections.length > 1
 
   return (
     <>
@@ -128,7 +133,7 @@ function UsageLogsContent() {
         <SectionPageLayout.Title>
           {t(pageMeta.titleKey)}
         </SectionPageLayout.Title>
-        {canManageScope && (
+        {canManageScope && activeCategory !== 'inflight' && (
           <SectionPageLayout.Actions>
             <Tabs value={viewScope} onValueChange={handleViewScopeChange}>
               <TabsList>
@@ -152,7 +157,11 @@ function UsageLogsContent() {
               </Tabs>
             )}
             <div className='min-h-0 flex-1'>
-              <UsageLogsTable logCategory={activeCategory} />
+              {activeCategory === 'inflight' ? (
+                <InflightTable />
+              ) : (
+                <UsageLogsTable logCategory={activeCategory} />
+              )}
             </div>
           </div>
         </SectionPageLayout.Content>
