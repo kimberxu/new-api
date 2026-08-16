@@ -163,6 +163,11 @@ export function useSidebarData(): SidebarData {
             activeUrls: ['/system-settings'],
             icon: Settings,
           },
+          {
+            title: t('Real-Time Connections'),
+            url: '/usage-logs/inflight',
+            icon: Activity,
+          },
         ],
       },
     ],
