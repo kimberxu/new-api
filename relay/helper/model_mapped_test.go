@@ -1,7 +1,6 @@
 package helper
 
 import (
-	"math/rand"
 	"net/http/httptest"
 	"testing"
 
@@ -297,21 +296,4 @@ func TestResolveModelMappingValue_WeightedArrayEmpty(t *testing.T) {
 	raw := []any{}
 	_, err := resolveModelMappingValue(raw)
 	require.Error(t, err)
-}
-
-// 验证 pickWeightedModel 使用固定的随机种子可复现
-func TestPickWeightedModel_DeterministicSeed(t *testing.T) {
-	items := []relaycommon.WeightedModelItem{
-		{Model: "a", Weight: 1},
-		{Model: "b", Weight: 1},
-	}
-	// 使用固定 seed 验证结果
-	seed := rand.Int63()
-	rng := rand.New(rand.NewSource(seed))
-	_ = rng
-	// 注：pickWeightedModel 使用全局 rand，无法直接注入 seed。
-	// 此处仅验证结果在预期集合内。
-	for i := 0; i < 20; i++ {
-		assert.Contains(t, []string{"a", "b"}, pickWeightedModel(items))
-	}
 }

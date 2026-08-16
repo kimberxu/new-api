@@ -488,6 +488,7 @@ function RequestDebugBodyBlock(props: {
   copiedText: string | null
   copyToClipboard: (text: string) => Promise<boolean>
 }) {
+  const { t } = useTranslation()
   const displayBody = formatRequestDebugBody(props.body.body)
 
   return (
@@ -499,8 +500,8 @@ function RequestDebugBodyBlock(props: {
           size='sm'
           className='h-6 px-2 text-xs'
           onClick={() => props.copyToClipboard(props.body.body)}
-          title='复制请求体'
-          aria-label='复制请求体'
+          title={t('Copy Request Body')}
+          aria-label={t('Copy Request Body')}
         >
           {props.copiedText === props.body.body ? (
             <Check className='size-3 text-green-600' />
@@ -510,11 +511,11 @@ function RequestDebugBodyBlock(props: {
         </Button>
       </div>
       <div className='space-y-1'>
-        <DetailRow label='大小' value={String(props.body.size)} mono />
+        <DetailRow label={t('Size')} value={String(props.body.size)} mono />
         <DetailRow label='SHA-256' value={props.body.sha256} mono />
         <DetailRow
-          label='是否截断'
-          value={props.body.truncated ? '是' : '否'}
+          label={t('Truncated')}
+          value={props.body.truncated ? t('Yes') : t('No')}
           mono
         />
       </div>
@@ -530,6 +531,7 @@ function RequestDebugSection(props: {
   copiedText: string | null
   copyToClipboard: (text: string) => Promise<boolean>
 }) {
+  const { t } = useTranslation()
   const hasMeta =
     props.snapshot.mode ||
     props.snapshot.request_path ||
@@ -540,7 +542,7 @@ function RequestDebugSection(props: {
     <Collapsible className='bg-muted/30 min-w-0 overflow-hidden rounded-md border p-2.5 max-sm:p-2'>
       <CollapsibleTrigger className='group flex w-full cursor-pointer items-center justify-between gap-2 text-left'>
         <Label className='cursor-pointer text-xs font-semibold'>
-          请求调试快照
+          {t('Request Debug Snapshot')}
         </Label>
         <ChevronDown
           className='text-muted-foreground size-4 shrink-0 transition-transform group-data-[panel-open]:rotate-180'
@@ -552,13 +554,13 @@ function RequestDebugSection(props: {
           {hasMeta && (
             <div className='space-y-1'>
               {props.snapshot.mode && (
-                <DetailRow label='模式' value={props.snapshot.mode} mono />
+                <DetailRow label={t('Mode')} value={props.snapshot.mode} mono />
               )}
               {props.snapshot.request_path && (
-                <DetailRow label='路径' value={props.snapshot.request_path} mono />
+                <DetailRow label={t('Path')} value={props.snapshot.request_path} mono />
               )}
               {props.snapshot.relay_mode != null && (
-                <DetailRow label='Relay 模式' value={String(props.snapshot.relay_mode)} mono />
+                <DetailRow label={t('Relay Mode')} value={String(props.snapshot.relay_mode)} mono />
               )}
               {props.snapshot.content_type && (
                 <DetailRow label='Content-Type' value={props.snapshot.content_type} mono />
@@ -572,7 +574,7 @@ function RequestDebugSection(props: {
           )}
           {props.snapshot.downstream && (
             <RequestDebugBodyBlock
-              title='下游请求体'
+              title={t('Downstream Request Body')}
               body={props.snapshot.downstream}
               copiedText={props.copiedText}
               copyToClipboard={props.copyToClipboard}
@@ -580,7 +582,7 @@ function RequestDebugSection(props: {
           )}
           {props.snapshot.upstream && (
             <RequestDebugBodyBlock
-              title='上游请求体'
+              title={t('Upstream Request Body')}
               body={props.snapshot.upstream}
               copiedText={props.copiedText}
               copyToClipboard={props.copyToClipboard}
