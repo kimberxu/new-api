@@ -118,9 +118,9 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 		other.SetPublic("is_system_prompt_overwritten", true)
 	}
 
-AppendRelayLogAdminInfo(ctx, relayInfo, other)
+	AppendRelayLogAdminInfo(ctx, relayInfo, other)
 	if relayInfo != nil && relayInfo.RequestDebugSnapshot != nil {
-// error_only must treat interrupted/aborted streams as failures too;
+		// error_only must treat interrupted/aborted streams as failures too;
 		// the consume handler returns success for them, so base the decision
 		// on the actual stream outcome instead of the handler error result.
 		success := relayInfo.StreamSucceeded()
