@@ -44,14 +44,29 @@ func TestShouldDisableByStatusCode(t *testing.T) {
 		common.AutomaticRetryTimeoutEnabled = origFlag
 	})
 
+	// Default ranges: only 401 auto-disables. 504/524 are NOT in the default
+	// disable range, so they should NOT trigger auto-disable.
 	AutomaticDisableStatusCodeRanges = []StatusCodeRange{
-		{Start: 401, End: 403},
-		{Start: 500, End: 503},
-		{Start: 505, End: 523},
-		{Start: 525, End: 599},
+		{Start: 401, End: 401},
 	}
 
 	common.AutomaticRetryTimeoutEnabled = false
+	require.True(t, ShouldDisableByStatusCode(401))
+	require.False(t, ShouldDisableByStatusCode(403))
+	require.False(t, ShouldDisableByStatusCode(404))
+	require.False(t, ShouldDisableByStatusCode(500))
+	require.False(t, ShouldDisableByStatusCode(504))
+	require.False(t, ShouldDisableByStatusCode(524))
+	require.False(t, ShouldDisableByStatusCode(200))
+
+	// When the admin explicitly adds 504/524 to the disable range, they SHOULD
+	// trigger auto-disable — the decision is fully user-configured now.
+	AutomaticDisableStatusCodeRanges = []StatusCodeRange{
+		{Start: 401, End: 403},
+		{Start: 500, End: 503},
+		{Start: 504, End: 524},
+		{Start: 525, End: 599},
+	}
 	require.True(t, ShouldDisableByStatusCode(401))
 	require.True(t, ShouldDisableByStatusCode(403))
 	require.False(t, ShouldDisableByStatusCode(404))
@@ -60,6 +75,8 @@ func TestShouldDisableByStatusCode(t *testing.T) {
 	require.True(t, ShouldDisableByStatusCode(524))
 	require.False(t, ShouldDisableByStatusCode(200))
 
+	// AutomaticRetryTimeoutEnabled (retry switch) must NOT affect disable logic.
+	// Disabling is governed solely by AutomaticDisableStatusCodeRanges.
 	common.AutomaticRetryTimeoutEnabled = true
 	require.True(t, ShouldDisableByStatusCode(504))
 	require.True(t, ShouldDisableByStatusCode(524))
