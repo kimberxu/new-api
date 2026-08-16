@@ -81,10 +81,10 @@ export function InflightTable() {
   header: () => t('Request ID'),
   cell: ({ row }) => (
   <span className='font-mono text-xs' title={row.original.request_id}>
-    {row.original.request_id?.slice(0, 8)}
+    {row.original.request_id?.slice(-8)}
   </span>
   ),
-  size: 180,
+  size: 120,
   },
   {
   accessorKey: 'channel_name',
@@ -106,8 +106,14 @@ export function InflightTable() {
   },
     {
       accessorKey: 'model_name',
-      header: () => t('Model'),
+      header: () => t('Model (Requested)'),
       cell: ({ row }) => row.original.model_name || '-',
+      size: 200,
+    },
+    {
+      accessorKey: 'upstream_model',
+      header: () => t('Model (Upstream)'),
+      cell: ({ row }) => row.original.upstream_model || row.original.model_name || '-',
       size: 200,
     },
   {

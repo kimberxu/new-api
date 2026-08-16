@@ -2815,6 +2815,8 @@
     "Mode": "Режим",
     "model": "модель",
     "Model": "Модель",
+    "Model (Requested)": "Модель (запрошено)",
+    "Model (Upstream)": "Модель (вышестоящая)",
     "Model {{model}}": "Модель {{model}}",
     "Model Access": "Доступ к моделям",
     "Model Analytics": "Аналитика моделей",

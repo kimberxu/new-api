@@ -2815,6 +2815,8 @@
     "Mode": "Chế độ",
     "model": "mô hình",
     "Model": "Mô hình",
+    "Model (Requested)": "Mô hình (yêu cầu)",
+    "Model (Upstream)": "Mô hình (thượng nguồn)",
     "Model {{model}}": "Mô hình {{model}}",
     "Model Access": "Truy cập mô hình",
     "Model Analytics": "Phân tích mô hình",

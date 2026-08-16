@@ -241,6 +241,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			newAPIError = relayHandler(c, relayInfo)
 		}
 
+		// After the handler runs, the upstream (model-mapped) name is resolved.
+		service.UpdateUpstreamModel(requestId, relayInfo.GetUpstreamModelName())
+
 		if newAPIError == nil {
 			relayInfo.LastError = nil
 			return
@@ -710,7 +713,9 @@ func executeTaskSubmissionWith(
 		c.Request.Body = io.NopCloser(bodyStorage)
 
 		stage = "submit"
-		result, taskErr = submit(c, relayInfo)
+		result, taskErr = relay.RelayTaskSubmit(c, relayInfo)
+		// After the handler runs, the upstream (model-mapped) name is resolved.
+		service.UpdateUpstreamModel(requestId, relayInfo.GetUpstreamModelName())
 		if requestErr := c.Request.Context().Err(); requestErr != nil {
 			diagnostics.cancelled("after_submit", retryParam.GetRetry()+1)
 			taskErr = service.TaskErrorWrapperLocal(requestErr, "request_cancelled", http.StatusRequestTimeout)
