@@ -2818,6 +2818,8 @@
     "Mode": "モード",
     "model": "モデル",
     "Model": "モデル",
+    "Model (Requested)": "モデル（リクエスト）",
+    "Model (Upstream)": "モデル（上流）",
     "Model {{model}}": "モデル {{model}}",
     "Model Access": "モデルアクセス",
     "Model Analytics": "モデル分析",
