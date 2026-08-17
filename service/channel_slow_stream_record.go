@@ -8,9 +8,8 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
 
-// RecordFromRelayInfo 从请求结束的 RelayInfo 采样一次流速率。
-// 只统计成功流式请求；失败流式、非流式、无 channel、无有效 generation 时长、
-// 输出 token 低于 MinOutputTokens 的请求一律跳过。
+// RecordFromRelayInfo 从请求结束的 RelayInfo 采样生成速率与首字延迟。
+// 只统计成功流式请求；失败流式、非流式、无 channel 一律跳过。
 func RecordFromRelayInfo(info *relaycommon.RelayInfo, outputTokens int64) {
 	if info == nil || !info.IsStream || !info.StreamSucceeded() {
 		return
@@ -20,6 +19,19 @@ func RecordFromRelayInfo(info *relaycommon.RelayInfo, outputTokens int64) {
 		return
 	}
 	setting := operation_setting.GetChannelSlowStreamSetting()
+	if !setting.Enabled && !setting.TtftEnabled {
+		return
+	}
+	model := info.OriginModelName
+
+	// 首字延迟（TTFT）采样：frt = FirstResponseTime - StartTime（毫秒）
+	if setting.TtftEnabled {
+		frtMs := info.FirstResponseTime.Sub(info.StartTime).Milliseconds()
+		if frtMs > 0 {
+			channelslowstream.RecordSlowTtft(channelId, model, frtMs)
+		}
+	}
+
 	if !setting.Enabled {
 		return
 	}
@@ -31,5 +43,5 @@ func RecordFromRelayInfo(info *relaycommon.RelayInfo, outputTokens int64) {
 		return
 	}
 	tps := float64(outputTokens) / float64(genMs) * 1000.0
-	channelslowstream.RecordSlowStream(channelId, info.OriginModelName, tps)
+	channelslowstream.RecordSlowStream(channelId, model, tps)
 }

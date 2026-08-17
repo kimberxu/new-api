@@ -106,6 +106,14 @@ const MODELS_SECTIONS = [
             settings['channel_slow_stream_setting.demoted_priority'],
           'channel_slow_stream_setting.exclude_channel_ids':
             settings['channel_slow_stream_setting.exclude_channel_ids'],
+          'channel_slow_stream_setting.ttft_enabled':
+            settings['channel_slow_stream_setting.ttft_enabled'],
+          'channel_slow_stream_setting.max_ttft_ms':
+            settings['channel_slow_stream_setting.max_ttft_ms'],
+          'channel_slow_stream_setting.ttft_window_seconds':
+            settings['channel_slow_stream_setting.ttft_window_seconds'],
+          'channel_slow_stream_setting.ttft_threshold':
+            settings['channel_slow_stream_setting.ttft_threshold'],
         }}
       />
     ),

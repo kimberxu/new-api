@@ -93,6 +93,10 @@ const defaultModelSettings: ModelSettings = {
   'channel_slow_stream_setting.demote_duration_sec': 600,
   'channel_slow_stream_setting.demoted_priority': 0,
   'channel_slow_stream_setting.exclude_channel_ids': '',
+  'channel_slow_stream_setting.ttft_enabled': true,
+  'channel_slow_stream_setting.max_ttft_ms': 5000,
+  'channel_slow_stream_setting.ttft_window_seconds': 300,
+  'channel_slow_stream_setting.ttft_threshold': 1,
   'model_deployment.ionet.api_key': '',
   'model_deployment.ionet.enabled': false,
 }
