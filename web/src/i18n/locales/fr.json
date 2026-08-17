@@ -5592,6 +5592,17 @@
     "Zero retention": "Aucune rétention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Channel IDs excluded from slow stream and first-token latency demotion, comma-separated. Empty means no channels are excluded.": "Identifiants des canaux exclus du déclassement des flux lents et de la latence du premier token, séparés par des virgules. Vide signifie qu'aucun canal n'est exclu.",
+    "Enable first-token latency demotion": "Activer le déclassement par latence du premier token",
+    "First-token latency above this value counts as a slow event. Long prompts may increase first-token latency.": "Une latence du premier token supérieure à cette valeur compte comme un événement lent. Les prompts longs peuvent augmenter la latence du premier token.",
+    "First-token latency demotion": "Déclassement par latence du premier token",
+    "First-token latency event window (seconds)": "Fenêtre d'événement de latence du premier token (secondes)",
+    "First-token latency events are counted as consecutive only when they occur within this window.": "Les événements de latence du premier token ne sont comptés comme consécutifs que s'ils surviennent dans cette fenêtre.",
+    "First-token latency events to trigger demotion": "Événements de latence du premier token déclenchant le déclassement",
+    "How many first-token latency events within the window trigger demotion.": "Nombre d'événements de latence du premier token dans la fenêtre déclenchant le déclassement.",
+    "Maximum first-token latency (ms)": "Latence maximale du premier token (ms)",
+    "Overnight range": "Plage nocturne",
+    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "Abaisse temporairement la priorité de sélection des canaux dont la latence du premier token reste au-dessus du seuil. Récupération automatique."
   }
 }

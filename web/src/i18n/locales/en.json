@@ -5592,6 +5592,17 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Channel IDs excluded from slow stream and first-token latency demotion, comma-separated. Empty means no channels are excluded.": "Channel IDs excluded from slow stream and first-token latency demotion, comma-separated. Empty means no channels are excluded.",
+    "Enable first-token latency demotion": "Enable first-token latency demotion",
+    "First-token latency above this value counts as a slow event. Long prompts may increase first-token latency.": "First-token latency above this value counts as a slow event. Long prompts may increase first-token latency.",
+    "First-token latency demotion": "First-token latency demotion",
+    "First-token latency event window (seconds)": "First-token latency event window (seconds)",
+    "First-token latency events are counted as consecutive only when they occur within this window.": "First-token latency events are counted as consecutive only when they occur within this window.",
+    "First-token latency events to trigger demotion": "First-token latency events to trigger demotion",
+    "How many first-token latency events within the window trigger demotion.": "How many first-token latency events within the window trigger demotion.",
+    "Maximum first-token latency (ms)": "Maximum first-token latency (ms)",
+    "Overnight range": "Overnight range",
+    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically."
   }
 }

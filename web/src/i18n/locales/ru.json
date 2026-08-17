@@ -5592,6 +5592,17 @@
     "Zero retention": "Без хранения данных",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Channel IDs excluded from slow stream and first-token latency demotion, comma-separated. Empty means no channels are excluded.": "ID каналов, исключённых из понижения медленных потоков и задержки первого токена, через запятую. Пусто — ни один канал не исключён.",
+    "Enable first-token latency demotion": "Включить понижение по задержке первого токена",
+    "First-token latency above this value counts as a slow event. Long prompts may increase first-token latency.": "Задержка первого токена выше этого значения считается медленным событием. Длинные промпты могут увеличивать задержку первого токена.",
+    "First-token latency demotion": "Понижение по задержке первого токена",
+    "First-token latency event window (seconds)": "Окно событий задержки первого токена (секунды)",
+    "First-token latency events are counted as consecutive only when they occur within this window.": "События задержки первого токена считаются последовательными, только если они происходят в этом окне.",
+    "First-token latency events to trigger demotion": "Число событий задержки первого токена для понижения",
+    "How many first-token latency events within the window trigger demotion.": "Сколько событий задержки первого токена в окне вызывает понижение.",
+    "Maximum first-token latency (ms)": "Максимальная задержка первого токена (мс)",
+    "Overnight range": "Диапазон через полночь",
+    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "Временно понижает приоритет выбора каналов, задержка первого токена которых остаётся выше порога. Восстановление автоматическое."
   }
 }
