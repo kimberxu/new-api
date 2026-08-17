@@ -13,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
+	channelslowstream "github.com/QuantumNous/new-api/pkg/channel_slowstream"
 	kitdto "github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 )
@@ -183,6 +184,10 @@ func GetRandomSatisfiedChannel(
 			return nil, fmt.Errorf("数据库一致性错误,渠道# %d 不存在,请联系管理员修复", channelId)
 		}
 		priority := channel.GetPriority()
+		// [deploy 分支定制] 慢速渠道降级：priority 拍平
+		if demoted, p := channelslowstream.GetDemotedPriority(channelId, model, priority); demoted {
+			priority = p
+		}
 		if first || priority > highestPriority {
 			highestPriority = priority
 			first = false
@@ -194,7 +199,12 @@ func GetRandomSatisfiedChannel(
 	var targetChannels []*Channel
 	for _, channelId := range channels {
 		if channel, ok := channelsIDM[channelId]; ok {
-			if channel.GetPriority() == highestPriority {
+			priority := channel.GetPriority()
+			// [deploy 分支定制] 慢速渠道降级：priority 拍平
+			if demoted, p := channelslowstream.GetDemotedPriority(channelId, model, priority); demoted {
+				priority = p
+			}
+			if priority == highestPriority {
 				sumWeight += channel.GetWeight()
 				targetChannels = append(targetChannels, channel)
 			}
