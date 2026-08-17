@@ -429,13 +429,13 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 **2026-08-17 增强（配置 UI + 排除渠道）**：默认开启（`enabled=true`），`min_tps` 默认调至 `8.0`、`threshold` 默认调至 `1`；新增 `exclude_channel_ids` 排除列表，填入的渠道编号不参与采样与降级（含历史降级记录即时失效）；全部参数在「系统设置 → 模型与路由 → Routing Reliability → Slow stream demotion」可视化配置，不再需要 API 手工下发。
 
-**2026-08-17 增强（首字延迟 TTFT 降级）**：新增第二降级源——首字延迟（`FirstResponseTime - StartTime`）超过 `max_ttft_ms`（默认 5000ms）计为慢事件，独立滑动窗口（`ttft_window_seconds`/`ttft_threshold`）计数，独立开关 `ttft_enabled`（默认开启）。与生成速率降级互不干扰：两源各自维护计数与降级标记，任一触发即降级（`GetDemotedPriority` 合并两源取 `min`）；排除渠道、降级时长（`demote_duration_sec`）与降级优先级（`demoted_priority`）两源共用。注意：长 prompt 的 prefill 会线性拉高首字延迟，健康渠道可能因此被降级——这是绝对时长阈值的设计取舍。
+**2026-08-17 增强（首字延迟 TTFT 降级）**：新增第二降级源——首字延迟（`FirstResponseTime - StartTime`）超过 `max_ttft_ms`（默认 5000ms）计为慢事件，独立滑动窗口（`ttft_window_seconds`/`ttft_threshold`）计数，独立开关 `ttft_enabled`（默认开启）。与生成速率降级互不干扰：两源各自维护计数与降级标记，任一触发即降级（`GetDemotedPriority` 合并两源取 `min`）；排除渠道、降级时长（`demote_duration_sec`）与降级优先级（`demoted_priority`）两源共用。TTFT 采样设 `min_input_tokens` 门槛（默认 0），仅对输入足够长的请求采样首字延迟，过滤短请求噪声（短输入的 frt 基本不受 prefill 影响）。注意：长 prompt 的 prefill 会线性拉高首字延迟，健康渠道可能因此被降级——这是绝对时长阈值的设计取舍，可通过 `min_input_tokens` 与调高 `max_ttft_ms` 缓解。
 
 ### 判定与降级语义
 
 - **样本**：仅成功流式请求（`IsStream && StreamSucceeded()`）；失败流式不参与（已有滑动窗口自动禁用机制），非流式无 `FirstResponseTime` 无法计算 generation TPS / TTFT，不参与
 - **阈值**：绝对 TPS 下限 `min_tps`；窗口（`window_seconds`）内连续慢速次数达到 `threshold` 触发降级；`min_output_tokens` 过滤短请求噪声
-- **首字延迟（TTFT）**：`frt = FirstResponseTime - StartTime`（毫秒）超过 `max_ttft_ms` 计为慢事件，窗口（`ttft_window_seconds`）内连续次数达 `ttft_threshold` 触发降级；与生成速率降级独立计数、独立降级标记，任一生效即降级
+- **首字延迟（TTFT）**：`frt = FirstResponseTime - StartTime`（毫秒）超过 `max_ttft_ms` 计为慢事件，窗口（`ttft_window_seconds`）内连续次数达 `ttft_threshold` 触发降级；与生成速率降级独立计数、独立降级标记，任一生效即降级；`min_input_tokens` 过滤短输入请求噪声（短输入 frt 不受 prefill 影响）
 - **排除渠道**：`exclude_channel_ids` 中的渠道在 `RecordSlowStream` / `RecordSlowTtft` / `GetDemotedPriority` 处均直接放行——不计数、不触发降级，且已存在的降级记录即时失效（改配置即可立即解除）
 - **只降 priority，不动 weight**：降级渠道跌出原优先级层，同组更高层渠道存在时不被选中；重试链路上更高层渠道全部被排除后，降级渠道回到候选按原 weight 参与加权随机——不会永久饿死（单渠道场景仍照常选中）
 - **只有一档，无阶梯**：已降级时再次慢速仅续期 `demoted_until`，不叠加、不进一步降；恢复后再次连续慢才触发新一轮降级
@@ -452,7 +452,8 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 | `min_tps` | `8.0` | TPS 下限（tokens/s）；仅统计生成阶段，不含首字延迟 |
 | `window_seconds` | `300` | 滑动窗口秒数 |
 | `threshold` | `1` | 窗口内连续慢速次数触发降级 |
-| `min_output_tokens` | `50` | 最小输出 token 数门槛 |
+| `min_output_tokens` | `50` | 生成速率最小输出 token 数门槛 |
+| `min_input_tokens` | `0` | TTFT 采样最小输入 token 数门槛（0=采样全部） |
 | `demote_duration_sec` | `600` | 降级持续时间秒 |
 | `demoted_priority` | `0` | 降级后优先级（拍平到此值；对原本 priority=0 的渠道无位置变化，如需更低可配负值） |
 | `exclude_channel_ids` | 空 | 排除渠道编号列表（逗号分隔），不参与采样与降级（含生成速率与首字延迟两源） |

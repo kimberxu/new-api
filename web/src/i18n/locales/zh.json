@@ -5603,6 +5603,8 @@
     "How many first-token latency events within the window trigger demotion.": "窗口内首字延迟事件达到该次数即触发降级。",
     "Maximum first-token latency (ms)": "首字延迟上限（毫秒）",
     "Overnight range": "跨日范围",
-    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "将首字延迟持续高于阈值的渠道临时降低选择优先级，到期自动恢复。"
+    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "将首字延迟持续高于阈值的渠道临时降低选择优先级，到期自动恢复。",
+    "First-token latency is only sampled when input tokens reach this threshold, filtering short-request noise. Set to 0 to sample all requests.": "仅当输入 token 达到该门槛时才采样首字延迟，过滤短请求噪声。设为 0 表示采样所有请求。",
+    "Minimum input tokens to sample TTFT": "TTFT 采样最小输入 token 数"
   }
 }

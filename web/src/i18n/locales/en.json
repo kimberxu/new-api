@@ -5603,6 +5603,8 @@
     "How many first-token latency events within the window trigger demotion.": "How many first-token latency events within the window trigger demotion.",
     "Maximum first-token latency (ms)": "Maximum first-token latency (ms)",
     "Overnight range": "Overnight range",
-    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically."
+    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.",
+    "First-token latency is only sampled when input tokens reach this threshold, filtering short-request noise. Set to 0 to sample all requests.": "First-token latency is only sampled when input tokens reach this threshold, filtering short-request noise. Set to 0 to sample all requests.",
+    "Minimum input tokens to sample TTFT": "Minimum input tokens to sample TTFT"
   }
 }
