@@ -192,7 +192,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 ### 每渠道配置
 
-在渠道编辑页面的「API 访问设置」→「Rate Limit」区域配置：
+在渠道编辑页面的「高级设置」→「Routing & Overrides」→「Rate Limit」区域配置（2026-08-17 起，此前位于「API 访问设置」；纯前端布局迁移，表单字段、`settings` JSON 存储结构与后端逻辑均不变）：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -207,7 +207,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - 单渠道超限：跳过该渠道并排除出重试候选，继续尝试同优先级其他渠道
 - 全渠道均被限流：HTTP 429 + `Retry-After: 60`，错误码 `channel:rate_limited`，客户端可据此退避
 - 回退行为：Redis 不可用时自动切到内存模式；Redis 或内存均出错时放行
-- 演进：`26271295` 引入基础 RPM/TPM；`e09babdf` 改为上下文感知（仅对当前请求生效）+ RPM 支持小数；`102747fd` 前端 RPM 输入框加 `step='any'`
+- 演进：`26271295` 引入基础 RPM/TPM；`e09babdf` 改为上下文感知（仅对当前请求生效）+ RPM 支持小数；`102747fd` 前端 RPM 输入框加 `step='any'`；2026-08-17 前端 UI 迁移：限流配置从「API 访问设置」移入「高级设置」→「Routing & Overrides」子节（新增 nav 跳转项、已配置状态高亮与自动展开）
 
 ### 文件清单
 
@@ -226,7 +226,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 **前端 (web/src/features/channels/):**
 - `types.ts` - `ChannelOtherSettings` 接口新增字段
 - `lib/channel-form.ts` - Schema、默认值、transform、buildSettingsJSON
-- `components/drawers/channel-mutate-drawer.tsx` - 限流开关 + RPM/TPM 输入框 UI
+- `components/drawers/channel-mutate-drawer.tsx` - 限流开关 + RPM/TPM 输入框 UI（位于「高级设置」→「Routing & Overrides」子节，nav 可跳转、已配置自动展开）
 
 ---
 
