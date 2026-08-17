@@ -66,12 +66,25 @@ func getSlowStreamLuaSha() string {
 	return sha
 }
 
+// isExcludedChannel 判断渠道是否在慢流式降级的排除列表中。
+func isExcludedChannel(channelId int, setting *operation_setting.ChannelSlowStreamSetting) bool {
+	for _, id := range setting.ExcludeChannelIDs {
+		if id == channelId {
+			return true
+		}
+	}
+	return false
+}
+
 // RecordSlowStream 记录一次慢速流式请求事件，返回 true 表示本次触发降级。
 // 已处于降级态时不重复降级，仅续期 demotedUntil。
-// 配置未启用、tps 未低于阈值、Redis 出错时均返回 false（fail-open）。
+// 配置未启用、渠道在排除列表、tps 未低于阈值、Redis 出错时均返回 false（fail-open）。
 func RecordSlowStream(channelId int, model string, tps float64) bool {
 	setting := operation_setting.GetChannelSlowStreamSetting()
 	if !setting.Enabled || setting.Threshold <= 0 {
+		return false
+	}
+	if isExcludedChannel(channelId, &setting) {
 		return false
 	}
 	if tps >= setting.MinTps {
@@ -179,6 +192,10 @@ func redisRecordSlow(channelId int, model string, setting *operation_setting.Cha
 func GetDemotedPriority(channelId int, model string, originalPriority int64) (bool, int64) {
 	setting := operation_setting.GetChannelSlowStreamSetting()
 	if !setting.Enabled {
+		return false, originalPriority
+	}
+	if isExcludedChannel(channelId, &setting) {
+		// 排除渠道不参与降级：即使有历史降级记录也直接返回原优先级
 		return false, originalPriority
 	}
 	now := time.Now().Unix()

@@ -252,6 +252,14 @@ export type ModelSettings = {
   'channel_affinity_setting.max_entries': number
   'channel_affinity_setting.default_ttl_seconds': number
   'channel_affinity_setting.rules': string
+  'channel_slow_stream_setting.enabled': boolean
+  'channel_slow_stream_setting.min_tps': number
+  'channel_slow_stream_setting.window_seconds': number
+  'channel_slow_stream_setting.threshold': number
+  'channel_slow_stream_setting.min_output_tokens': number
+  'channel_slow_stream_setting.demote_duration_sec': number
+  'channel_slow_stream_setting.demoted_priority': number
+  'channel_slow_stream_setting.exclude_channel_ids': string
   'model_deployment.ionet.api_key': string
   'model_deployment.ionet.enabled': boolean
 }
