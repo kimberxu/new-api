@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
@@ -175,6 +176,21 @@ func appendStreamStatus(relayInfo *relaycommon.RelayInfo, other map[string]inter
 		streamInfo["errors"] = messages
 	}
 	other["stream_status"] = streamInfo
+}
+
+// consumeLogTypeForStream 返回该请求消费日志应使用的日志类型。默认 LogTypeConsume；
+// 流被上游中断且已输出部分内容（partial_failure / failed 非 cancelled）时返回
+// LogTypeError，使异常请求在日志列表中直接显示为错误。cancelled（客户端主动放弃）
+// 保持消耗类型——前端已通过 stream_status.outcome 以预警色徽章单独标识。
+func consumeLogTypeForStream(relayInfo *relaycommon.RelayInfo) int {
+	if relayInfo == nil || !relayInfo.IsStream || relayInfo.StreamStatus == nil {
+		return model.LogTypeConsume
+	}
+	outcome := relayInfo.StreamStatus.Outcome(relayInfo.ReceivedResponseCount)
+	if outcome == relaycommon.StreamOutcomePartialFailure || outcome == relaycommon.StreamOutcomeFailed {
+		return model.LogTypeError
+	}
+	return model.LogTypeConsume
 }
 
 
