@@ -163,7 +163,8 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	// 流结束语义分派：根据结束原因与已消费数据量决定下游行为。
 	// - cancelled（client_gone / ping_fail）：客户端已放弃，不再写入任何终结内容；
 	// - failed 且零输出（scanner_error / timeout）：上游在输出前中断，转为可重试渠道错误；
-	// - failed / partial_failure 且已输出部分内容：发送明确错误事件，不伪装 [DONE]；
+	// - failed / partial_failure 且已输出部分内容：以 finish_reason=length 的终止块正常收尾，
+	//   让客户端感知「输出不完整」而非硬错误中断；不发送 error event、也不伪装 [DONE] 为完整成功；
 	// - 其余：正常发送最后一块、usage 与 [DONE]。
 	aborted := false
 	sendErrorEvent := false
@@ -241,12 +242,14 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 
 	if aborted {
 		if sendErrorEvent && info.StreamStatus != nil {
-			// 已输出部分内容：补发最后一块，并以明确错误事件终止，
-			// 避免客户端把截断的流当作完整结果。
+			// 已输出部分内容：补发最后一块，并以 finish_reason=length 的终止块 + [DONE] 收尾。
+			// - 不发送 error event：SDK/编程工具遇到 error event 会直接中断整个任务；
+			// - 不伪装成完整成功：length 是标准枚举，客户端会标记「输出截断」并正常收尾。
+			// 截断详情（outcome/failure_domain/end_reason/end_error）仍写入消费日志 other.stream_status。
 			if shouldSendLastResp {
 				_ = sendStreamData(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent)
 			}
-			sendStreamErrorEvent(c, info.StreamStatus)
+			terminateInterruptedStream(c, info, info.StreamStatus, responseId, createAt, model, systemFingerprint, usage, containStreamUsage)
 		}
 		// cancelled：不向客户端输出任何终结内容
 		return usage, nil
@@ -257,7 +260,28 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	return usage, nil
 }
 
+// terminateInterruptedStream 以 finish_reason=length 的终止块 + [DONE] 正常收尾被上游
+// 中断的流，避免 SSE error event 导致下游 SDK/编程工具中断整个任务。
+// 仅对 OpenAI 格式生效（下游按 OpenAI SSE 解析）；Claude/Gemini 转换场景没有等价的
+// 「截断」终止枚举，保持原有错误事件行为。
+func terminateInterruptedStream(c *gin.Context, info *relaycommon.RelayInfo, ss *relaycommon.StreamStatus, responseId string, createAt int64, model string, systemFingerprint string, usage *dto.Usage, containStreamUsage bool) {
+	if c == nil || info == nil || info.RelayFormat != types.RelayFormatOpenAI {
+		sendStreamErrorEvent(c, ss)
+		return
+	}
+	stopResp := helper.GenerateStopResponse(responseId, createAt, model, constant.FinishReasonLength)
+	stopResp.SetSystemFingerprint(systemFingerprint)
+	_ = helper.ObjectData(c, stopResp)
+	if info.ShouldIncludeUsage && !containStreamUsage {
+		usageResp := helper.GenerateFinalUsageResponse(responseId, createAt, model, *usage)
+		usageResp.SetSystemFingerprint(systemFingerprint)
+		_ = helper.ObjectData(c, usageResp)
+	}
+	helper.Done(c)
+}
+
 // sendStreamErrorEvent 向客户端发送一条明确的 SSE 错误终止事件（不发送 [DONE]）。
+// 仅作为 Claude/Gemini 转换场景下无标准「截断」终止枚举时的兜底。
 func sendStreamErrorEvent(c *gin.Context, ss *relaycommon.StreamStatus) {
 	if c == nil || ss == nil {
 		return

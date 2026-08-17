@@ -322,7 +322,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 }
 
 type RecordConsumeLogParams struct {
-	ChannelId        int       `json:"channel_id"`
+ChannelId        int       `json:"channel_id"`
 	PromptTokens     int       `json:"prompt_tokens"`
 	CompletionTokens int       `json:"completion_tokens"`
 	ModelName        string    `json:"model_name"`
@@ -334,6 +334,9 @@ type RecordConsumeLogParams struct {
 	IsStream         bool      `json:"is_stream"`
 	Group            string    `json:"group"`
 	Other            *LogOther `json:"other"`
+	// LogType 覆盖日志类型；0 表示 LogTypeConsume（默认）。调用方可在流被上游中断
+	// （partial_failure）时传 LogTypeError，使异常请求在日志列表中显示为错误。
+	LogType int `json:"log_type"`
 }
 
 func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams) {
@@ -353,11 +356,15 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 			needRecordIp = true
 		}
 	}
+	logType := params.LogType
+	if logType == 0 {
+		logType = LogTypeConsume
+	}
 	log := &Log{
 		UserId:           userId,
 		Username:         username,
 		CreatedAt:        createdAt,
-		Type:             LogTypeConsume,
+		Type:             logType,
 		Content:          params.Content,
 		PromptTokens:     params.PromptTokens,
 		CompletionTokens: params.CompletionTokens,
