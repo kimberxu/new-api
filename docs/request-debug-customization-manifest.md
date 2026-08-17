@@ -2,7 +2,7 @@
 
 > 对应分支：`deploy` @ `021771ae`（2026-08-17 更新）
 > 以下功能均为 `deploy` 相对 `upstream/main` 的定制（可用 `git diff upstream/main...deploy` 核对）。
-> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ `62830da3`（流式结束原因分类与中断流语义）→ `3a1279f1`（实时连接追踪）→ `8119f0ac`（manifest 登记实时连接追踪）→ `e024c98c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `977d2d5a`（实时连接表格优化）→ `15e56fb6`（尾部随机请求 ID + 下游/上游双模型列）→ `fe1cc018`（三文档头部标记刷新至 629d15cf）→ `5704e700`（滑动窗口渠道自动禁用）→ `4f52c010`（partial_failure length 收尾 + 异常流记错误日志）→ `d03a4c73`（实时连接侧边栏入口迁至 general 组）→ `021771ae`（渠道流速率降级）
+> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ `62830da3`（流式结束原因分类与中断流语义）→ `3a1279f1`（实时连接追踪）→ `8119f0ac`（manifest 登记实时连接追踪）→ `e024c98c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `977d2d5a`（实时连接表格优化）→ `15e56fb6`（尾部随机请求 ID + 下游/上游双模型列）→ `fe1cc018`（三文档头部标记刷新至 629d15cf）→ `5704e700`（滑动窗口渠道自动禁用）→ `4f52c010`（partial_failure length 收尾 + 异常流记错误日志）→ `d03a4c73`（实时连接侧边栏入口迁至 general 组）→ `e4da650b`（日志 t/s 计算排除 TTFT）→ `021771ae`（渠道流速率降级）
 
 ## 魔改开发约定（合并上游友好）
 
@@ -29,6 +29,7 @@
 | 额度显示模式切换修复 | `d8378ee7` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） |
 | token 大数 K/M/B 分级显示 | `ea91ebf1`、`4ce5615c` | 低（`web/src/lib/currency.ts`） |
 | 滑动窗口渠道自动禁用 | `5704e700` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） |
+| 日志 t/s 计算排除 TTFT | `e4da650b` | 低（`web/src/features/usage-logs/`） |
 | 渠道流速率降级 | `021771ae` | 中（`model/channel_cache.go`、`service/quota.go`、`service/text_quota.go`） |
 
 > **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`，`deploy` 与上游文件一致。
@@ -404,6 +405,19 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - `web/src/features/system-settings/models/index.tsx` / `section-registry.tsx` / `types.ts` - 默认值与字段透传
 - `web/src/i18n/locales/*.json` - 七语言文案
 - `service/channel_disable_window_test.go` - 单元测试
+
+---
+
+## 日志 t/s 计算排除 TTFT
+
+### 功能概述
+
+日志列表的 t/s（每秒 token 数）列原先按 `completion_tokens / use_time`（总耗时秒）计算，把首字延迟（TTFT/prefill）计入分母，系统性低估真实生成速度。本次改为 `completion_tokens / (use_time - frt_seconds)`，其中 `frt`（First Response Time，毫秒）已存在于日志 `other.frt`；`frt` 缺失（非流式或数据缺失）时回退原行为。
+
+### 文件清单
+
+- `web/src/features/usage-logs/components/columns/common-logs-columns.tsx` - 桌面端日志列 t/s 计算
+- `web/src/features/usage-logs/components/usage-logs-mobile-card.tsx` - 移动端日志卡片 t/s 计算
 
 ---
 
