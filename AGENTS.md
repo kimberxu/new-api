@@ -15,6 +15,7 @@ DO NOT send optional commentary
 
 deploy 分支作业约定：
 
+- **核心设计目标**：deploy 分支面向将众多免费/公益站上游整合到 new-api 的场景，上游不稳定是可预见的常态。所有魔改功能的设计标准之一是：通过 new-api 的重试、渠道选择、限流、滑动窗口禁用等机制，消减上游不稳定性，为下游提供尽可能稳定的访问。
 - **改动最小化（合并上游的硬约束）**：新增魔改功能时，独立逻辑**优先用新增文件承载**（新 service/controller/middleware/组件/API 客户端），避免改动既有文件；必须改动既有文件时，限制为**最小必要 diff**——只做纯追加/局部插入，不修改、不删除、不重排已有代码，能不改就不改。改动文件越少、越偏向新增文件，后续合并 `upstream/main` 冲突越少、越轻松。任何改动方案先按此原则审查：先问「这个文件能不能不动」，再问「改动能不能再小」。
 - 魔改功能**必须**登记进 `docs/request-debug-customization-manifest.md`（功能总览表 + 详情章节），并更新其头部 `对应分支` commit 标记与魔改提交序列；`docs/local-github-workflow.md`、`docs/request-debug-logging-guide.md` 头部 commit 标记同步刷新。
 - 涉及 `controller/relay.go`、`relay/common/relay_info.go`、`web/src/features/usage-logs/components/dialogs/details-dialog.tsx` 等已知高风险冲突文件时，遵循 `docs/local-github-workflow.md` 的冲突处理原则（保留魔改 + 采纳上游语义）。

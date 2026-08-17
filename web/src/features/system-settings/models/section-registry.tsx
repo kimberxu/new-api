@@ -80,6 +80,10 @@ const MODELS_SECTIONS = [
           AutomaticDisableKeywords: settings.AutomaticDisableKeywords,
           AutomaticDisableStatusCodes: settings.AutomaticDisableStatusCodes,
           AutomaticRetryStatusCodes: settings.AutomaticRetryStatusCodes,
+          ConfiguredDisableWindowSeconds: settings.ConfiguredDisableWindowSeconds,
+          ConfiguredDisableThreshold: settings.ConfiguredDisableThreshold,
+          UnconfiguredDisableWindowSeconds: settings.UnconfiguredDisableWindowSeconds,
+          UnconfiguredDisableThreshold: settings.UnconfiguredDisableThreshold,
           'monitor_setting.auto_test_channel_enabled':
             settings['monitor_setting.auto_test_channel_enabled'],
           'monitor_setting.auto_test_channel_minutes':
