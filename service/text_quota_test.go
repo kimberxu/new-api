@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"math"
 	"net/http/httptest"
 	"testing"
@@ -1225,4 +1226,35 @@ func TestAppendToolSurchargeLogInfoWritesOnlyStructuredFields(t *testing.T) {
 	assert.NotContains(t, fields, "file_search")
 	assert.NotContains(t, fields, "image_generation_call")
 	assert.NotContains(t, fields, "image_generation_call_price")
+}
+
+func TestConsumeLogTypeForStream(t *testing.T) {
+	base := &relaycommon.RelayInfo{IsStream: true}
+
+	// 非流式请求 → 消耗类型
+	assert.Equal(t, 2, consumeLogTypeForStream(&relaycommon.RelayInfo{IsStream: false}))
+	// 流式但无 StreamStatus（未跟踪）→ 消耗类型
+	assert.Equal(t, 2, consumeLogTypeForStream(base))
+	// 正常完成 → 消耗类型
+	ok := &relaycommon.RelayInfo{IsStream: true, ReceivedResponseCount: 5, StreamStatus: &relaycommon.StreamStatus{EndReason: relaycommon.StreamEndReasonDone}}
+	assert.Equal(t, 2, consumeLogTypeForStream(ok))
+
+	// 已输出部分内容后上游中断 → 错误类型
+	partial := &relaycommon.RelayInfo{IsStream: true, ReceivedResponseCount: 5, StreamStatus: &relaycommon.StreamStatus{
+		EndReason: relaycommon.StreamEndReasonScannerErr,
+		EndError:  errors.New("boom"),
+	}}
+	assert.Equal(t, 5, consumeLogTypeForStream(partial))
+
+	// 零输入流但已失败（panic 等非可重试）→ 错误类型
+	panicked := &relaycommon.RelayInfo{IsStream: true, ReceivedResponseCount: 2, StreamStatus: &relaycommon.StreamStatus{
+		EndReason: relaycommon.StreamEndReasonPanic,
+	}}
+	assert.Equal(t, 5, consumeLogTypeForStream(panicked))
+
+	// 客户端主动放弃 → 保持消耗类型（前端用 warning 徽章标识）
+	cancelled := &relaycommon.RelayInfo{IsStream: true, ReceivedResponseCount: 3, StreamStatus: &relaycommon.StreamStatus{
+		EndReason: relaycommon.StreamEndReasonClientGone,
+	}}
+	assert.Equal(t, 2, consumeLogTypeForStream(cancelled))
 }
