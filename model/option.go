@@ -50,6 +50,10 @@ func InitOptionMap() {
 	common.OptionMap["AutomaticDisableChannelEnabled"] = strconv.FormatBool(common.AutomaticDisableChannelEnabled)
 	common.OptionMap["AutomaticEnableChannelEnabled"] = strconv.FormatBool(common.AutomaticEnableChannelEnabled)
 	common.OptionMap["AutomaticRetryTimeoutEnabled"] = strconv.FormatBool(common.AutomaticRetryTimeoutEnabled)
+	common.OptionMap["ConfiguredDisableWindowSeconds"] = strconv.FormatInt(common.ConfiguredDisableWindowSeconds, 10)
+	common.OptionMap["ConfiguredDisableThreshold"] = strconv.Itoa(common.ConfiguredDisableThreshold)
+	common.OptionMap["UnconfiguredDisableWindowSeconds"] = strconv.FormatInt(common.UnconfiguredDisableWindowSeconds, 10)
+	common.OptionMap["UnconfiguredDisableThreshold"] = strconv.Itoa(common.UnconfiguredDisableThreshold)
 	common.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(common.LogConsumeEnabled)
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
@@ -347,6 +351,14 @@ func updateOptionMap(key string, value string) (err error) {
 			common.AutomaticEnableChannelEnabled = boolValue
 		case "AutomaticRetryTimeoutEnabled":
 			common.AutomaticRetryTimeoutEnabled = boolValue
+		case "ConfiguredDisableWindowSeconds":
+			common.ConfiguredDisableWindowSeconds, _ = strconv.ParseInt(value, 10, 64)
+		case "ConfiguredDisableThreshold":
+			common.ConfiguredDisableThreshold, _ = strconv.Atoi(value)
+		case "UnconfiguredDisableWindowSeconds":
+			common.UnconfiguredDisableWindowSeconds, _ = strconv.ParseInt(value, 10, 64)
+		case "UnconfiguredDisableThreshold":
+			common.UnconfiguredDisableThreshold, _ = strconv.Atoi(value)
 		case "LogConsumeEnabled":
 			common.LogConsumeEnabled = boolValue
 		case "DisplayInCurrencyEnabled":
