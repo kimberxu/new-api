@@ -91,6 +91,12 @@ export function useSidebarData(): SidebarData {
             icon: FileText,
           },
           {
+            title: t('Real-Time Connections'),
+            url: '/usage-logs/inflight',
+            icon: Activity,
+            requiredRole: ROLE.ADMIN,
+          },
+          {
             title: t('Task Logs'),
             url: '/usage-logs/task',
             activeUrls: ['/usage-logs/drawing'],
@@ -155,11 +161,6 @@ export function useSidebarData(): SidebarData {
             url: '/system-settings/site',
             activeUrls: ['/system-settings'],
             icon: Settings,
-          },
-          {
-            title: t('Real-Time Connections'),
-            url: '/usage-logs/inflight',
-            icon: Activity,
           },
         ],
       },
