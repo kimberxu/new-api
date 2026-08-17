@@ -23,6 +23,7 @@ import (
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/oauth"
+	channelslowstream "github.com/QuantumNous/new-api/pkg/channel_slowstream"
 	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
 	"github.com/QuantumNous/new-api/relay"
 	kitutil "github.com/QuantumNous/new-api/relaykit/relayconvert/kitutil"
@@ -340,6 +341,7 @@ func InitResources() error {
 	}
 
 	perfmetrics.Init()
+	channelslowstream.Init()
 
 	// 启动系统监控
 	common.StartSystemMonitor()
