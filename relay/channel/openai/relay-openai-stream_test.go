@@ -80,8 +80,9 @@ func TestOaiStreamHandlerZeroOutputScannerErrorIsRetryable(t *testing.T) {
 	assert.Equal(t, relaycommon.StreamOutcomeFailed, info.StreamStatus.Outcome(info.ReceivedResponseCount))
 }
 
-// 已输出部分内容后上游中断 → 明确错误事件终止，不伪装 [DONE]。
-func TestOaiStreamHandlerPartialOutputSendsErrorEventWithoutDone(t *testing.T) {
+// 已输出部分内容后上游中断 → finish_reason=length 终止块 + [DONE] 正常收尾，
+// 不发送 error event（避免下游 SDK/编程工具中断），也不伪装成完整成功。
+func TestOaiStreamHandlerPartialOutputTerminatesWithLength(t *testing.T) {
 	chunk := `{"id":"chatcmpl-1","object":"chat.completion.chunk","created":1710000000,"model":"gpt-test","choices":[{"index":0,"delta":{"content":"hi"},"finish_reason":null}]}`
 	body := io.MultiReader(
 		strings.NewReader("data: "+chunk+"\n"),
@@ -97,8 +98,10 @@ func TestOaiStreamHandlerPartialOutputSendsErrorEventWithoutDone(t *testing.T) {
 
 	got := recorder.Body.String()
 	assert.Contains(t, got, `"content":"hi"`, "already-received chunk should still be delivered")
-	assert.Contains(t, got, `"upstream_stream_error"`, "client must see an explicit error termination")
-	assert.NotContains(t, got, `[DONE]`, "interrupted stream must not be faked as complete")
+	assert.Contains(t, got, `"finish_reason":"length"`, "interrupted stream must terminate with a non-stop finish reason")
+	assert.Contains(t, got, `[DONE]`, "interrupted stream must still be terminated cleanly for SDKs")
+	assert.NotContains(t, got, `"upstream_stream_error"`, "error event would abort the client task")
+	assert.NotContains(t, got, `"finish_reason":"stop"`, "must not fake a complete success")
 	assert.Equal(t, relaycommon.StreamEndReasonScannerErr, info.StreamStatus.EndReason)
 	assert.Equal(t, relaycommon.StreamOutcomePartialFailure, info.StreamStatus.Outcome(info.ReceivedResponseCount))
 }
