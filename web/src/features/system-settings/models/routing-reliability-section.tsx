@@ -99,6 +99,7 @@ const routingReliabilitySchema = z
       window_seconds: z.coerce.number().int().min(1),
       threshold: z.coerce.number().int().min(1),
       min_output_tokens: z.coerce.number().int().min(1),
+      min_input_tokens: z.coerce.number().int().min(0),
       demote_duration_sec: z.coerce.number().int().min(1),
       demoted_priority: z.coerce.number().int(),
       exclude_channel_ids: z.string(),
@@ -161,6 +162,7 @@ type RoutingReliabilitySectionProps = {
     'channel_slow_stream_setting.window_seconds': number
     'channel_slow_stream_setting.threshold': number
     'channel_slow_stream_setting.min_output_tokens': number
+    'channel_slow_stream_setting.min_input_tokens': number
     'channel_slow_stream_setting.demote_duration_sec': number
     'channel_slow_stream_setting.demoted_priority': number
     'channel_slow_stream_setting.exclude_channel_ids': string
@@ -196,6 +198,7 @@ type NormalizedRoutingReliabilityValues = {
   'channel_slow_stream_setting.window_seconds': number
   'channel_slow_stream_setting.threshold': number
   'channel_slow_stream_setting.min_output_tokens': number
+  'channel_slow_stream_setting.min_input_tokens': number
   'channel_slow_stream_setting.demote_duration_sec': number
   'channel_slow_stream_setting.demoted_priority': number
   'channel_slow_stream_setting.exclude_channel_ids': string
@@ -245,6 +248,8 @@ const buildFormDefaults = (
     threshold: defaults['channel_slow_stream_setting.threshold'],
     min_output_tokens:
       defaults['channel_slow_stream_setting.min_output_tokens'],
+    min_input_tokens:
+      defaults['channel_slow_stream_setting.min_input_tokens'],
     demote_duration_sec:
       defaults['channel_slow_stream_setting.demote_duration_sec'],
     demoted_priority: defaults['channel_slow_stream_setting.demoted_priority'],
@@ -297,6 +302,8 @@ const normalizeDefaults = (
     defaults['channel_slow_stream_setting.threshold'],
   'channel_slow_stream_setting.min_output_tokens':
     defaults['channel_slow_stream_setting.min_output_tokens'],
+  'channel_slow_stream_setting.min_input_tokens':
+    defaults['channel_slow_stream_setting.min_input_tokens'],
   'channel_slow_stream_setting.demote_duration_sec':
     defaults['channel_slow_stream_setting.demote_duration_sec'],
   'channel_slow_stream_setting.demoted_priority':
@@ -350,6 +357,8 @@ const normalizeFormValues = (
     values.channel_slow_stream_setting.threshold,
   'channel_slow_stream_setting.min_output_tokens':
     values.channel_slow_stream_setting.min_output_tokens,
+  'channel_slow_stream_setting.min_input_tokens':
+    values.channel_slow_stream_setting.min_input_tokens,
   'channel_slow_stream_setting.demote_duration_sec':
     values.channel_slow_stream_setting.demote_duration_sec,
   'channel_slow_stream_setting.demoted_priority':
@@ -1122,6 +1131,32 @@ export function RoutingReliabilitySection({
                       />
                     </FormControl>
                   </SettingsSwitchItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.min_input_tokens'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {t('Minimum input tokens to sample TTFT')}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={0}
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'First-token latency is only sampled when input tokens reach this threshold, filtering short-request noise. Set to 0 to sample all requests.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
                 )}
               />
 

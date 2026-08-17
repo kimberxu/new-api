@@ -10,7 +10,8 @@ type ChannelSlowStreamSetting struct {
 	MinTps            float64 `json:"min_tps"`             // 生成 TPS 下限 tokens/s，默认 8.0
 	WindowSeconds     int64   `json:"window_seconds"`      // 生成慢速滑动窗口秒数，默认 300
 	Threshold         int     `json:"threshold"`           // 窗口内连续慢速次数触发降级，默认 1
-	MinOutputTokens   int64   `json:"min_output_tokens"`   // 最小输出 token 数门槛，避免短请求噪声，默认 50
+	MinOutputTokens   int64   `json:"min_output_tokens"`   // 生成速率最小输出 token 数门槛，避免短请求噪声，默认 50
+	MinInputTokens    int64   `json:"min_input_tokens"`    // TTFT 采样最小输入 token 数门槛，过滤短请求噪声，默认 0（不启用）
 	DemoteDurationSec int64   `json:"demote_duration_sec"` // 降级持续时间秒，默认 600
 	DemotedPriority   int64   `json:"demoted_priority"`    // 降级后优先级（拍平到此值），默认 0
 	ExcludeChannelIDs []int   `json:"exclude_channel_ids"` // 排除渠道编号列表，不参与慢流式/首字延迟降级
