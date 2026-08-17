@@ -135,6 +135,13 @@ var ChannelDisableThreshold = 5.0
 var AutomaticDisableChannelEnabled = false
 var AutomaticEnableChannelEnabled = false
 var AutomaticRetryTimeoutEnabled = false // 强制重试 504/524 超时状态码（默认关闭，避免高并发下重复计费/雪崩）
+
+// 滑动窗口渠道自动禁用参数
+var ConfiguredDisableWindowSeconds int64 = 600  // 已配置错误窗口（秒），默认 10 分钟
+var ConfiguredDisableThreshold int = 2          // 已配置错误触发禁用次数
+var UnconfiguredDisableWindowSeconds int64 = 300 // 未配置错误窗口（秒），默认 5 分钟
+var UnconfiguredDisableThreshold int = 3         // 未配置错误触发禁用次数
+
 var QuotaRemindThreshold = 1000
 var PreConsumedQuota = 500
 

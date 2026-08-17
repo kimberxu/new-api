@@ -945,7 +945,7 @@ func performChannelTests(ctx context.Context, channels []*model.Channel, testUse
 		newAPIError := result.newAPIError
 		// request error disables the channel
 		if newAPIError != nil {
-			shouldBanChannel = service.ShouldDisableChannel(result.newAPIError)
+			shouldBanChannel = service.ShouldDisableChannelWithDecision(channel.Id, result.newAPIError).ShouldDisable
 		}
 
 		// 当错误检查通过，才检查响应时间

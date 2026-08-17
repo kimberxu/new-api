@@ -28,6 +28,7 @@
 | 加权模型映射（1 对多） | `9a20e660`、`c6c4bcf8`、`83329f48` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） |
 | 额度显示模式切换修复 | `d8378ee7` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） |
 | token 大数 K/M/B 分级显示 | `ea91ebf1`、`4ce5615c` | 低（`web/src/lib/currency.ts`） |
+| 滑动窗口渠道自动禁用 | 待登记 | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） |
 
 > **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`，`deploy` 与上游文件一致。
 
@@ -353,3 +354,47 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - `web/src/features/usage-logs/index.tsx` - 渲染分发
 - `web/src/hooks/use-sidebar-data.ts` - 侧边栏导航项（不新增 `use-sidebar-config.ts` 映射：URL 不在映射表时默认可见，少改一个文件）
 - `web/src/i18n/locales/*.json` - 七语言文案
+
+---
+
+## 滑动窗口渠道自动禁用
+
+### 功能概述
+
+将渠道自动禁用机制从「一次命中即禁用」改为滑动窗口计数：同一渠道在时间窗口内出现同一错误达到阈值次数才执行禁用。两层策略：
+
+- **已配置错误**（状态码在 `AutomaticDisableStatusCodeRanges` 内，或错误消息匹配 `AutomaticDisableKeywords`）：严格窗口，默认 10 分钟内 2 次即禁用。
+- **未配置错误**（不在上述配置范围内，但 statusCode 在 1xx-5xx 合理范围内）：宽容窗口，默认 5 分钟内 3 次才禁用。
+
+错误标识 key = `渠道ID + StatusCode`，不使用 errorCode（上游错误几乎都是 `bad_response_status_code`，区分度不够）或错误消息（含 request id、时间戳等，计数碎片化）。
+
+### 配置
+
+系统设置 → 模型设置 → Routing Reliability → Auto-disable rules 区域新增 4 个配置项：
+
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `ConfiguredDisableWindowSeconds` | `600` | 已配置错误窗口（秒） |
+| `ConfiguredDisableThreshold` | `2` | 已配置错误触发禁用次数 |
+| `UnconfiguredDisableWindowSeconds` | `300` | 未配置错误窗口（秒） |
+| `UnconfiguredDisableThreshold` | `3` | 未配置错误触发禁用次数 |
+
+阈值设为 1 等同于「一次即禁用」，与改造前行为一致。
+
+### 实现细节
+
+- Redis 模式：Lua 脚本 `LPUSH key now; LTRIM key 0 threshold-1; EXPIRE key window; LLEN key`，返回 count >= threshold 则触发禁用。key 格式 `channelDisableWindow:{channelID}:{statusCode}:{tier}`，tier 为 `configured` 或 `unconfigured`。
+- 内存模式：复用 `common.InMemoryRateLimiter`（滑动窗口），传 `threshold-1` 作为 maxRequestNum（因为 `Request` 允许 maxRequestNum 次后返回 false）。threshold=1 时直接返回 true（一次即禁用）。
+- Redis 不可用时自动切到内存模式；Redis 或内存均出错时 fail-open（不触发禁用）。
+
+### 文件清单
+
+- `service/channel_disable_window.go` - 滑动窗口核心（Redis Lua + 内存兜底，新文件）
+- `service/channel.go` - `DisableDecision` 结构体 + `ShouldDisableChannelWithDecision`（原 `ShouldDisableChannel` 改为 wrapper）
+- `controller/relay.go` - `processChannelError` 调用 `ShouldDisableChannelWithDecision`
+- `controller/channel-test.go` - `shouldBanChannel` 调用 `ShouldDisableChannelWithDecision`
+- `common/constants.go` / `model/option.go` - 4 个配置变量持久化
+- `web/src/features/system-settings/models/routing-reliability-section.tsx` - 4 个输入框 UI
+- `web/src/features/system-settings/models/index.tsx` / `section-registry.tsx` / `types.ts` - 默认值与字段透传
+- `web/src/i18n/locales/*.json` - 七语言文案
+- `service/channel_disable_window_test.go` - 单元测试

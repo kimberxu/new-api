@@ -80,6 +80,10 @@ const routingReliabilitySchema = z
     AutomaticDisableKeywords: z.string(),
     AutomaticDisableStatusCodes: z.string(),
     AutomaticRetryStatusCodes: z.string(),
+    ConfiguredDisableWindowSeconds: z.coerce.number().int().min(1).max(3600),
+    ConfiguredDisableThreshold: z.coerce.number().int().min(1).max(100),
+    UnconfiguredDisableWindowSeconds: z.coerce.number().int().min(1).max(3600),
+    UnconfiguredDisableThreshold: z.coerce.number().int().min(1).max(100),
     monitor_setting: z.object({
       auto_test_channel_enabled: z.boolean(),
       auto_test_channel_minutes: z.coerce
@@ -130,6 +134,10 @@ type RoutingReliabilitySectionProps = {
     AutomaticDisableKeywords: string
     AutomaticDisableStatusCodes: string
     AutomaticRetryStatusCodes: string
+    ConfiguredDisableWindowSeconds: number
+    ConfiguredDisableThreshold: number
+    UnconfiguredDisableWindowSeconds: number
+    UnconfiguredDisableThreshold: number
     'monitor_setting.auto_test_channel_enabled': boolean
     'monitor_setting.auto_test_channel_minutes': number
     'monitor_setting.channel_test_mode': ChannelTestMode
@@ -149,6 +157,10 @@ type NormalizedRoutingReliabilityValues = {
   AutomaticDisableKeywords: string
   AutomaticDisableStatusCodes: string
   AutomaticRetryStatusCodes: string
+  ConfiguredDisableWindowSeconds: number
+  ConfiguredDisableThreshold: number
+  UnconfiguredDisableWindowSeconds: number
+  UnconfiguredDisableThreshold: number
   'monitor_setting.auto_test_channel_enabled': boolean
   'monitor_setting.auto_test_channel_minutes': number
   'monitor_setting.channel_test_mode': ChannelTestMode
@@ -174,6 +186,10 @@ const buildFormDefaults = (
   ),
   AutomaticDisableStatusCodes: defaults.AutomaticDisableStatusCodes ?? '',
   AutomaticRetryStatusCodes: defaults.AutomaticRetryStatusCodes ?? '',
+  ConfiguredDisableWindowSeconds: defaults.ConfiguredDisableWindowSeconds ?? 600,
+  ConfiguredDisableThreshold: defaults.ConfiguredDisableThreshold ?? 2,
+  UnconfiguredDisableWindowSeconds: defaults.UnconfiguredDisableWindowSeconds ?? 300,
+  UnconfiguredDisableThreshold: defaults.UnconfiguredDisableThreshold ?? 3,
   monitor_setting: {
     auto_test_channel_enabled:
       defaults['monitor_setting.auto_test_channel_enabled'],
@@ -202,6 +218,10 @@ const normalizeDefaults = (
   AutomaticRetryStatusCodes: parseHttpStatusCodeRules(
     defaults.AutomaticRetryStatusCodes ?? ''
   ).normalized,
+  ConfiguredDisableWindowSeconds: defaults.ConfiguredDisableWindowSeconds ?? 600,
+  ConfiguredDisableThreshold: defaults.ConfiguredDisableThreshold ?? 2,
+  UnconfiguredDisableWindowSeconds: defaults.UnconfiguredDisableWindowSeconds ?? 300,
+  UnconfiguredDisableThreshold: defaults.UnconfiguredDisableThreshold ?? 3,
   'monitor_setting.auto_test_channel_enabled':
     defaults['monitor_setting.auto_test_channel_enabled'],
   'monitor_setting.auto_test_channel_minutes':
@@ -228,6 +248,10 @@ const normalizeFormValues = (
   AutomaticRetryStatusCodes: parseHttpStatusCodeRules(
     values.AutomaticRetryStatusCodes
   ).normalized,
+  ConfiguredDisableWindowSeconds: values.ConfiguredDisableWindowSeconds,
+  ConfiguredDisableThreshold: values.ConfiguredDisableThreshold,
+  UnconfiguredDisableWindowSeconds: values.UnconfiguredDisableWindowSeconds,
+  UnconfiguredDisableThreshold: values.UnconfiguredDisableThreshold,
   'monitor_setting.auto_test_channel_enabled':
     values.monitor_setting.auto_test_channel_enabled,
   'monitor_setting.auto_test_channel_minutes':
@@ -638,6 +662,120 @@ export function RoutingReliabilitySection({
                     <FormDescription>
                       {t(
                         'If an upstream error contains any of these keywords (case insensitive), the channel will be disabled automatically.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='grid min-w-0 gap-6 lg:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='ConfiguredDisableWindowSeconds'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {t('Configured error window (seconds)')}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        max={3600}
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Time window for counting configured errors (status codes or keywords). Channel is disabled when the threshold is reached within this window.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='ConfiguredDisableThreshold'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {t(
+                        'Number of configured error occurrences to trigger disable'
+                      )}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        max={100}
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'How many configured errors within the window before the channel is disabled.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='UnconfiguredDisableWindowSeconds'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {t('Unconfigured error window (seconds)')}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        max={3600}
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Time window for counting unconfigured errors (not matching status codes or keywords).'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='UnconfiguredDisableThreshold'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {t(
+                        'Number of unconfigured error occurrences to trigger disable'
+                      )}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        max={100}
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'How many unconfigured errors within the window before the channel is disabled.'
                       )}
                     </FormDescription>
                     <FormMessage />

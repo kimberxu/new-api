@@ -42,26 +42,69 @@ func EnableChannel(channelId int, usingKey string, channelName string) {
 	}
 }
 
-func ShouldDisableChannel(err *types.NewAPIError) bool {
+// DisableDecision carries the result of channel disable evaluation, including
+// whether the sliding window threshold was reached and a human-readable reason.
+type DisableDecision struct {
+	ShouldDisable bool   // true if the channel should be disabled
+	Reason        string // human-readable disable reason
+}
+
+// ShouldDisableChannelWithDecision evaluates whether a channel should be
+// disabled based on the error, applying sliding-window counting. The
+// channelID is used as the error identity key so that different channels are
+// counted independently.
+func ShouldDisableChannelWithDecision(channelID int, err *types.NewAPIError) DisableDecision {
 	if !common.AutomaticDisableChannelEnabled {
-		return false
+		return DisableDecision{}
 	}
 	if err == nil {
-		return false
-	}
-	if types.IsChannelError(err) {
-		return true
-	}
-	if types.IsSkipRetryError(err) {
-		return false
-	}
-	if operation_setting.ShouldDisableByStatusCode(err.StatusCode) {
-		return true
+		return DisableDecision{}
 	}
 
-	lowerMessage := strings.ToLower(err.Error())
-	search, _ := AcSearch(lowerMessage, operation_setting.AutomaticDisableKeywords, true)
-	return search
+	isConfigured := false
+	reason := ""
+
+	if types.IsChannelError(err) {
+		isConfigured = true
+		reason = err.ErrorWithStatusCode()
+	} else if types.IsSkipRetryError(err) {
+		return DisableDecision{}
+	} else if operation_setting.ShouldDisableByStatusCode(err.StatusCode) {
+		isConfigured = true
+		reason = err.ErrorWithStatusCode()
+	} else {
+		lowerMessage := strings.ToLower(err.Error())
+		matched, _ := AcSearch(lowerMessage, operation_setting.AutomaticDisableKeywords, true)
+		if matched {
+			isConfigured = true
+			reason = err.ErrorWithStatusCode()
+		}
+	}
+
+	if isConfigured {
+		if CheckAndRecordDisable(channelID, err.StatusCode, true) {
+			return DisableDecision{ShouldDisable: true, Reason: reason}
+		}
+		return DisableDecision{}
+	}
+
+	// Unconfigured errors: only count valid HTTP status codes (1xx-5xx).
+	if err.StatusCode < 100 || err.StatusCode > 599 {
+		return DisableDecision{}
+	}
+	if CheckAndRecordDisable(channelID, err.StatusCode, false) {
+		return DisableDecision{
+			ShouldDisable: true,
+			Reason:        fmt.Sprintf("status_code=%d repeated failures within window", err.StatusCode),
+		}
+	}
+	return DisableDecision{}
+}
+
+// ShouldDisableChannel is a backwards-compatible wrapper that returns only
+// the boolean decision. New callers should use ShouldDisableChannelWithDecision.
+func ShouldDisableChannel(channelID int, err *types.NewAPIError) bool {
+	return ShouldDisableChannelWithDecision(channelID, err).ShouldDisable
 }
 
 func ShouldEnableChannel(newAPIError *types.NewAPIError, status int) bool {
