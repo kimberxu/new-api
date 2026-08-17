@@ -43,6 +43,32 @@ export function normalizeJsonString(value: string) {
   }
 }
 
+// parseExcludeChannelIds 将后端存储的 JSON 数组字符串（或 "null"）转为逗号分隔的显示文本。
+export function parseExcludeChannelIds(value?: string): string {
+  const raw = (value ?? '').trim()
+  if (!raw || raw === 'null' || raw === '[]' || raw === '""') return ''
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      return parsed.join(', ')
+    }
+    return raw
+  } catch {
+    return raw
+  }
+}
+
+// serializeExcludeChannelIds 将逗号分隔的显示文本转为后端存储的 JSON 数组字符串。
+export function serializeExcludeChannelIds(value: string): string {
+  const ids = value
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part !== '')
+    .map(Number)
+    .filter((id) => Number.isInteger(id) && id > 0)
+  return JSON.stringify(ids)
+}
+
 type JsonValidationOptions = {
   allowEmpty?: boolean
   predicate?: (value: unknown) => boolean
@@ -72,7 +98,7 @@ function extractErrorPosition(
     const lines = jsonString.substring(0, position).split('\n')
     return {
       line: lines.length,
-      column: lines[lines.length - 1].length + 1,
+      column: (lines.at(-1) ?? '').length + 1,
       position,
     }
   }

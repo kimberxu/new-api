@@ -427,10 +427,13 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 利用成功流式请求的 generation TPS（`outputTokens / generationMs * 1000`），按 `(channel_id, model)` 维度统计连续慢速事件，达到阈值后临时将该渠道在对应模型上的优先级拍平到 `DemotedPriority`（默认 0），定时到期自动恢复。目标：慢渠道跌出最高优先级层、少承担流量，避免直接禁用导致容量骤减。
 
+**2026-08-17 增强（配置 UI + 排除渠道）**：默认开启（`enabled=true`），`min_tps` 默认调至 `8.0`、`threshold` 默认调至 `1`；新增 `exclude_channel_ids` 排除列表，填入的渠道编号不参与采样与降级（含历史降级记录即时失效）；全部参数在「系统设置 → 模型与路由 → Routing Reliability → Slow stream demotion」可视化配置，不再需要 API 手工下发。
+
 ### 判定与降级语义
 
 - **样本**：仅成功流式请求（`IsStream && StreamSucceeded()`）；失败流式不参与（已有滑动窗口自动禁用机制），非流式无 `FirstResponseTime` 无法计算 generation TPS，不参与
 - **阈值**：绝对 TPS 下限 `min_tps`；窗口（`window_seconds`）内连续慢速次数达到 `threshold` 触发降级；`min_output_tokens` 过滤短请求噪声
+- **排除渠道**：`exclude_channel_ids` 中的渠道在 `RecordSlowStream` 与 `GetDemotedPriority` 两处均直接放行——不计数、不触发降级，且已存在的降级记录即时失效（改配置即可立即解除）
 - **只降 priority，不动 weight**：降级渠道跌出原优先级层，同组更高层渠道存在时不被选中；重试链路上更高层渠道全部被排除后，降级渠道回到候选按原 weight 参与加权随机——不会永久饿死（单渠道场景仍照常选中）
 - **只有一档，无阶梯**：已降级时再次慢速仅续期 `demoted_until`，不叠加、不进一步降；恢复后再次连续慢才触发新一轮降级
 - **快请求不取消降级**：`tps >= min_tps` 时只重置窗口计数，不清除进行中的降级标记；降级到期由惰性检查（`GetDemotedPriority`）与后台清理（`CleanupExpiredDemotions`）恢复
@@ -438,17 +441,18 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 ### 配置
 
-系统设置 → `channel_slow_stream_setting`：
+系统设置 → 模型与路由 → Routing Reliability → Slow stream demotion（即 `channel_slow_stream_setting`）：
 
 | 字段 | 默认值 | 说明 |
 |------|--------|------|
-| `enabled` | `false` | 全局开关 |
-| `min_tps` | `5.0` | TPS 下限（tokens/s） |
+| `enabled` | `true` | 全局开关 |
+| `min_tps` | `8.0` | TPS 下限（tokens/s）；仅统计生成阶段，不含首字延迟 |
 | `window_seconds` | `300` | 滑动窗口秒数 |
-| `threshold` | `3` | 窗口内连续慢速次数触发降级 |
+| `threshold` | `1` | 窗口内连续慢速次数触发降级 |
 | `min_output_tokens` | `50` | 最小输出 token 数门槛 |
 | `demote_duration_sec` | `600` | 降级持续时间秒 |
 | `demoted_priority` | `0` | 降级后优先级（拍平到此值；对原本 priority=0 的渠道无位置变化，如需更低可配负值） |
+| `exclude_channel_ids` | 空 | 排除渠道编号列表（逗号分隔），不参与采样与降级 |
 
 ### 实现细节
 
@@ -465,4 +469,8 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - `model/channel_cache.go` - `GetRandomSatisfiedChannel` 两段降级覆盖（import `pkg/channel_slowstream`）
 - `service/quota.go` / `service/text_quota.go` - 采样点各追加一行 `RecordFromRelayInfo` 调用
 - `main.go` - `channelslowstream.Init()` 后台恢复 goroutine 入口
-- 测试：`pkg/channel_slowstream/tracker_test.go`（未启用/阈值触发/快请求重置/窗口过期/续期/到期恢复/清理/快请求不取消降级）、`model/channel_slow_stream_selection_test.go`（降级渠道跌出最高层 + 高层耗尽后级联）
+- `web/src/features/system-settings/models/routing-reliability-section.tsx` - Routing Reliability 下新增 Slow stream demotion 表单块（开关 + 7 参数 + 排除渠道输入）
+- `web/src/features/system-settings/models/utils.ts` - 排除渠道显示/提交格式转换（`parseExcludeChannelIds` / `serializeExcludeChannelIds`）
+- `web/src/features/system-settings/models/index.tsx` / `section-registry.tsx` / `types.ts` - 默认值（默认开启、min_tps 8.0、threshold 1）与字段透传
+- `web/src/i18n/locales/*.json` - 七语言文案
+- 测试：`pkg/channel_slowstream/tracker_test.go`（未启用/阈值触发/快请求重置/窗口过期/续期/到期恢复/清理/快请求不取消降级/排除渠道不计数不降级/排除后历史降级即时失效）、`model/channel_slow_stream_selection_test.go`（降级渠道跌出最高层 + 高层耗尽后级联）、`web/src/features/system-settings/models/__tests__/exclude-channel-ids.test.ts`（排除渠道格式转换）

@@ -136,6 +136,36 @@ func TestRecordSlowStream_FastSampleDoesNotCancelDemotion(t *testing.T) {
 	assert.False(t, RecordSlowStream(1, "gpt-4o", 1.0))
 }
 
+func TestRecordSlowStream_ExcludedChannel_ReturnsFalse(t *testing.T) {
+	cfg := setupTest(t, true)
+	cfg.Threshold = 1
+	cfg.ExcludeChannelIDs = []int{7}
+	// 排除渠道：即使 TPS 远低于阈值也不计数、不降级
+	assert.False(t, RecordSlowStream(7, "gpt-4o", 0.1))
+	assert.False(t, RecordSlowStream(7, "gpt-4o", 0.1))
+	assert.Nil(t, loadState(t, 7, "gpt-4o"))
+	demoted, p := GetDemotedPriority(7, "gpt-4o", 5)
+	assert.False(t, demoted)
+	assert.Equal(t, int64(5), p)
+	// 非排除渠道不受影响
+	assert.True(t, RecordSlowStream(8, "gpt-4o", 0.1))
+}
+
+func TestGetDemotedPriority_ExcludedChannel_ReturnsOriginal(t *testing.T) {
+	cfg := setupTest(t, true)
+	cfg.Threshold = 1
+	// 先让渠道 9 触发降级
+	assert.True(t, RecordSlowStream(9, "gpt-4o", 0.1))
+	demoted, p := GetDemotedPriority(9, "gpt-4o", 5)
+	assert.True(t, demoted)
+	assert.Equal(t, int64(0), p)
+	// 将渠道 9 加入排除列表后，历史降级记录不再生效
+	cfg.ExcludeChannelIDs = []int{9}
+	demoted, p = GetDemotedPriority(9, "gpt-4o", 5)
+	assert.False(t, demoted)
+	assert.Equal(t, int64(5), p)
+}
+
 func TestGetDemotedPriority_NotDemoted_ReturnsOriginal(t *testing.T) {
 	setupTest(t, true)
 	demoted, p := GetDemotedPriority(1, "gpt-4o", 5)
