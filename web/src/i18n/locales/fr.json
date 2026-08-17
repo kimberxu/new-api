@@ -5603,6 +5603,8 @@
     "How many first-token latency events within the window trigger demotion.": "Nombre d'événements de latence du premier token dans la fenêtre déclenchant le déclassement.",
     "Maximum first-token latency (ms)": "Latence maximale du premier token (ms)",
     "Overnight range": "Plage nocturne",
-    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "Abaisse temporairement la priorité de sélection des canaux dont la latence du premier token reste au-dessus du seuil. Récupération automatique."
+    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "Abaisse temporairement la priorité de sélection des canaux dont la latence du premier token reste au-dessus du seuil. Récupération automatique.",
+    "First-token latency is only sampled when input tokens reach this threshold, filtering short-request noise. Set to 0 to sample all requests.": "La latence du premier token n'est échantillonnée que lorsque les tokens d'entrée atteignent ce seuil, filtrant le bruit des requêtes courtes. Mettre 0 pour échantillonner toutes les requêtes.",
+    "Minimum input tokens to sample TTFT": "Tokens d'entrée minimum pour l'échantillonnage TTFT"
   }
 }

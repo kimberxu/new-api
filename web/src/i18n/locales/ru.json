@@ -5603,6 +5603,8 @@
     "How many first-token latency events within the window trigger demotion.": "Сколько событий задержки первого токена в окне вызывает понижение.",
     "Maximum first-token latency (ms)": "Максимальная задержка первого токена (мс)",
     "Overnight range": "Диапазон через полночь",
-    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "Временно понижает приоритет выбора каналов, задержка первого токена которых остаётся выше порога. Восстановление автоматическое."
+    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "Временно понижает приоритет выбора каналов, задержка первого токена которых остаётся выше порога. Восстановление автоматическое.",
+    "First-token latency is only sampled when input tokens reach this threshold, filtering short-request noise. Set to 0 to sample all requests.": "Задержка первого токена выбирается только при достижении входными токенами этого порога, фильтруя шум коротких запросов. Установите 0 для выборки всех запросов.",
+    "Minimum input tokens to sample TTFT": "Минимальное число входных токенов для выборки TTFT"
   }
 }

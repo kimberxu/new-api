@@ -5603,6 +5603,8 @@
     "How many first-token latency events within the window trigger demotion.": "Số sự kiện độ trễ token đầu tiên trong cửa sổ đạt ngưỡng này sẽ kích hoạt hạ cấp.",
     "Maximum first-token latency (ms)": "Độ trễ token đầu tiên tối đa (ms)",
     "Overnight range": "Khoảng qua nửa đêm",
-    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "Tạm thời hạ thấp ưu tiên chọn của kênh có độ trễ token đầu tiên vượt ngưỡng. Tự động phục hồi."
+    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "Tạm thời hạ thấp ưu tiên chọn của kênh có độ trễ token đầu tiên vượt ngưỡng. Tự động phục hồi.",
+    "First-token latency is only sampled when input tokens reach this threshold, filtering short-request noise. Set to 0 to sample all requests.": "Độ trễ token đầu tiên chỉ được lấy mẫu khi token đầu vào đạt ngưỡng này, lọc nhiễu từ yêu cầu ngắn. Đặt 0 để lấy mẫu tất cả yêu cầu.",
+    "Minimum input tokens to sample TTFT": "Số token đầu vào tối thiểu để lấy mẫu TTFT"
   }
 }
