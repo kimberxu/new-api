@@ -5592,6 +5592,17 @@
     "Zero retention": "Không lưu dữ liệu",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Channel IDs excluded from slow stream and first-token latency demotion, comma-separated. Empty means no channels are excluded.": "ID kênh bị loại khỏi hạ cấp luồng chậm và độ trễ token đầu tiên, phân cách bằng dấu phẩy. Để trống nghĩa là không loại trừ kênh nào.",
+    "Enable first-token latency demotion": "Bật hạ cấp độ trễ token đầu tiên",
+    "First-token latency above this value counts as a slow event. Long prompts may increase first-token latency.": "Độ trễ token đầu tiên vượt giá trị này được tính là sự kiện chậm. Prompt dài có thể làm tăng độ trễ token đầu tiên.",
+    "First-token latency demotion": "Hạ cấp độ trễ token đầu tiên",
+    "First-token latency event window (seconds)": "Cửa sổ sự kiện độ trễ token đầu tiên (giây)",
+    "First-token latency events are counted as consecutive only when they occur within this window.": "Sự kiện độ trễ token đầu tiên chỉ được tính là liên tiếp khi xảy ra trong cửa sổ này.",
+    "First-token latency events to trigger demotion": "Số sự kiện độ trễ token đầu tiên để kích hoạt hạ cấp",
+    "How many first-token latency events within the window trigger demotion.": "Số sự kiện độ trễ token đầu tiên trong cửa sổ đạt ngưỡng này sẽ kích hoạt hạ cấp.",
+    "Maximum first-token latency (ms)": "Độ trễ token đầu tiên tối đa (ms)",
+    "Overnight range": "Khoảng qua nửa đêm",
+    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "Tạm thời hạ thấp ưu tiên chọn của kênh có độ trễ token đầu tiên vượt ngưỡng. Tự động phục hồi."
   }
 }

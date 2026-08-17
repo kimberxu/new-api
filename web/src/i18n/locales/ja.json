@@ -5592,6 +5592,17 @@
     "Zero retention": "データ保持なし",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Channel IDs excluded from slow stream and first-token latency demotion, comma-separated. Empty means no channels are excluded.": "低速ストリーム降格と初回トークン遅延降格から除外するチャネル ID（カンマ区切り）。空欄は除外なし。",
+    "Enable first-token latency demotion": "初回トークン遅延降格を有効にする",
+    "First-token latency above this value counts as a slow event. Long prompts may increase first-token latency.": "この値を超える初回トークン遅延は遅延イベントとして計上されます。長いプロンプトは初回トークン遅延を増やす可能性があります。",
+    "First-token latency demotion": "初回トークン遅延降格",
+    "First-token latency event window (seconds)": "初回トークン遅延イベント窓（秒）",
+    "First-token latency events are counted as consecutive only when they occur within this window.": "初回トークン遅延イベントはこの窓の範囲内に発生した場合のみ連続として数えられます。",
+    "First-token latency events to trigger demotion": "降格をトリガーする初回トークン遅延イベント数",
+    "How many first-token latency events within the window trigger demotion.": "ウィンドウ内の初回トークン遅延イベント数がこの回数に達すると降格します。",
+    "Maximum first-token latency (ms)": "初回トークン遅延の上限（ミリ秒）",
+    "Overnight range": "日跨ぎ範囲",
+    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "初回トークン遅延がしきい値を超えるチャネルの選択優先度を一時的に下げ、自動的に回復します。"
   }
 }

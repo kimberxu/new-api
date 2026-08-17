@@ -30,7 +30,7 @@
 | token 大数 K/M/B 分级显示 | `ea91ebf1`、`4ce5615c` | 低（`web/src/lib/currency.ts`） |
 | 滑动窗口渠道自动禁用 | `5704e700` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） |
 | 日志 t/s 计算排除 TTFT | `e4da650b` | 低（`web/src/features/usage-logs/`） |
-| 渠道流速率降级 | `021771ae`、`4dc6823b` | 中（`model/channel_cache.go`、`service/quota.go`、`service/text_quota.go`、`web/src/features/system-settings/models/routing-reliability-section.tsx`） |
+| 渠道流速率降级（含首字延迟 TTFT 降级） | `021771ae`、`4dc6823b` | 中（`model/channel_cache.go`、`service/quota.go`、`service/text_quota.go`、`web/src/features/system-settings/models/routing-reliability-section.tsx`） |
 
 > **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`，`deploy` 与上游文件一致。
 
@@ -429,11 +429,14 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 **2026-08-17 增强（配置 UI + 排除渠道）**：默认开启（`enabled=true`），`min_tps` 默认调至 `8.0`、`threshold` 默认调至 `1`；新增 `exclude_channel_ids` 排除列表，填入的渠道编号不参与采样与降级（含历史降级记录即时失效）；全部参数在「系统设置 → 模型与路由 → Routing Reliability → Slow stream demotion」可视化配置，不再需要 API 手工下发。
 
+**2026-08-17 增强（首字延迟 TTFT 降级）**：新增第二降级源——首字延迟（`FirstResponseTime - StartTime`）超过 `max_ttft_ms`（默认 5000ms）计为慢事件，独立滑动窗口（`ttft_window_seconds`/`ttft_threshold`）计数，独立开关 `ttft_enabled`（默认开启）。与生成速率降级互不干扰：两源各自维护计数与降级标记，任一触发即降级（`GetDemotedPriority` 合并两源取 `min`）；排除渠道、降级时长（`demote_duration_sec`）与降级优先级（`demoted_priority`）两源共用。注意：长 prompt 的 prefill 会线性拉高首字延迟，健康渠道可能因此被降级——这是绝对时长阈值的设计取舍。
+
 ### 判定与降级语义
 
-- **样本**：仅成功流式请求（`IsStream && StreamSucceeded()`）；失败流式不参与（已有滑动窗口自动禁用机制），非流式无 `FirstResponseTime` 无法计算 generation TPS，不参与
+- **样本**：仅成功流式请求（`IsStream && StreamSucceeded()`）；失败流式不参与（已有滑动窗口自动禁用机制），非流式无 `FirstResponseTime` 无法计算 generation TPS / TTFT，不参与
 - **阈值**：绝对 TPS 下限 `min_tps`；窗口（`window_seconds`）内连续慢速次数达到 `threshold` 触发降级；`min_output_tokens` 过滤短请求噪声
-- **排除渠道**：`exclude_channel_ids` 中的渠道在 `RecordSlowStream` 与 `GetDemotedPriority` 两处均直接放行——不计数、不触发降级，且已存在的降级记录即时失效（改配置即可立即解除）
+- **首字延迟（TTFT）**：`frt = FirstResponseTime - StartTime`（毫秒）超过 `max_ttft_ms` 计为慢事件，窗口（`ttft_window_seconds`）内连续次数达 `ttft_threshold` 触发降级；与生成速率降级独立计数、独立降级标记，任一生效即降级
+- **排除渠道**：`exclude_channel_ids` 中的渠道在 `RecordSlowStream` / `RecordSlowTtft` / `GetDemotedPriority` 处均直接放行——不计数、不触发降级，且已存在的降级记录即时失效（改配置即可立即解除）
 - **只降 priority，不动 weight**：降级渠道跌出原优先级层，同组更高层渠道存在时不被选中；重试链路上更高层渠道全部被排除后，降级渠道回到候选按原 weight 参与加权随机——不会永久饿死（单渠道场景仍照常选中）
 - **只有一档，无阶梯**：已降级时再次慢速仅续期 `demoted_until`，不叠加、不进一步降；恢复后再次连续慢才触发新一轮降级
 - **快请求不取消降级**：`tps >= min_tps` 时只重置窗口计数，不清除进行中的降级标记；降级到期由惰性检查（`GetDemotedPriority`）与后台清理（`CleanupExpiredDemotions`）恢复
@@ -452,25 +455,30 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 | `min_output_tokens` | `50` | 最小输出 token 数门槛 |
 | `demote_duration_sec` | `600` | 降级持续时间秒 |
 | `demoted_priority` | `0` | 降级后优先级（拍平到此值；对原本 priority=0 的渠道无位置变化，如需更低可配负值） |
-| `exclude_channel_ids` | 空 | 排除渠道编号列表（逗号分隔），不参与采样与降级 |
+| `exclude_channel_ids` | 空 | 排除渠道编号列表（逗号分隔），不参与采样与降级（含生成速率与首字延迟两源） |
+| `ttft_enabled` | `true` | 首字延迟降级开关 |
+| `max_ttft_ms` | `5000` | 首字延迟上限（毫秒）；长 prompt 的 prefill 会拉高此值 |
+| `ttft_window_seconds` | `300` | 首字延迟慢事件滑动窗口秒数 |
+| `ttft_threshold` | `1` | 窗口内连续首字延迟慢事件次数触发降级 |
 
 ### 实现细节
 
-- 内存模式：`sync.Map`，key = `channelId:model`，value = `demotionState{count, lastSlowAt, demotedUntil}`；快请求清零计数（未降级条目直接移除）
-- Redis 模式：窗口 key `slowStream:{channelId}:{model}` 复用 `LPUSH+LTRIM+EXPIRE` Lua（同 `channelDisableWindowLuaScript` 模式）；降级标记 key `slowStream:demoted:{channelId}:{model}`（SET + EXPIRE，value = demotedUntil 时间戳）
-- 采样入口 `service.RecordFromRelayInfo` 挂在 `PostAudioConsumeQuota` / `PostTextConsumeQuota` 的 `gopool.Go` 中（纯追加一行，与 `RecordRelaySample` 并列）
+- 内存模式：`sync.Map`，key = `channelId:model`，value = `demotionState{count, lastSlowAt, demotedUntil}`；生成速率与首字延迟各一个 map，独立计数；快请求清零计数（未降级条目直接移除）
+- Redis 模式：窗口 key `slowStream:{channelId}:{model}`（生成速率）与 `slowStream:ttftWindow:{channelId}:{model}`（首字延迟）复用 `LPUSH+LTRIM+EXPIRE` Lua（同 `channelDisableWindowLuaScript` 模式）；降级标记 key `slowStream:demoted:{channelId}:{model}` / `slowStream:ttftDemoted:{channelId}:{model}`（SET + EXPIRE，value = demotedUntil 时间戳）
+- 采样入口 `service.RecordFromRelayInfo` 挂在 `PostAudioConsumeQuota` / `PostTextConsumeQuota` 的 `gopool.Go` 中（纯追加一行，与 `RecordRelaySample` 并列）；同一适配器内先采样 TTFT（`frt`）再采样生成 TPS，两源独立调用
+- `GetDemotedPriority` 合并两源：任一降级标记未过期即降级，取 `min(originalPriority, demoted_priority)`
 - 渠道选择 `GetRandomSatisfiedChannel` 的 highestPriority 计算段与 targetChannels 收集段均将 `GetPriority()` 替换为降级感知版本（`GetDemotedPriority`），weight 与加权随机段不动；不修改缓存中的 `*Channel` 对象，降级为运行时计算
 
 ### 文件清单
 
-- `pkg/channel_slowstream/tracker.go` - 滑动窗口 + 降级记录 + 查询 + 后台恢复（新文件，只依赖 `common` / `setting/operation_setting`，避免 `model → service` 与 `relay/common → operation_setting` 循环）
-- `service/channel_slow_stream_record.go` - `RecordFromRelayInfo` 采样适配（过滤 + TPS 计算，新文件）
+- `pkg/channel_slowstream/tracker.go` - 双源滑动窗口（生成速率 + 首字延迟）+ 降级记录 + 查询 + 后台恢复（新文件，只依赖 `common` / `setting/operation_setting`，避免 `model → service` 与 `relay/common → operation_setting` 循环）
+- `service/channel_slow_stream_record.go` - `RecordFromRelayInfo` 采样适配（过滤 + TPS/TTFT 计算，新文件）
 - `setting/operation_setting/channel_slow_stream_setting.go` - 全局配置注册（新文件）
 - `model/channel_cache.go` - `GetRandomSatisfiedChannel` 两段降级覆盖（import `pkg/channel_slowstream`）
 - `service/quota.go` / `service/text_quota.go` - 采样点各追加一行 `RecordFromRelayInfo` 调用
 - `main.go` - `channelslowstream.Init()` 后台恢复 goroutine 入口
-- `web/src/features/system-settings/models/routing-reliability-section.tsx` - Routing Reliability 下新增 Slow stream demotion 表单块（开关 + 7 参数 + 排除渠道输入）
+- `web/src/features/system-settings/models/routing-reliability-section.tsx` - Routing Reliability 下新增 Slow stream demotion 表单块（生成速率 8 项 + 首字延迟 4 项 + 排除渠道输入）
 - `web/src/features/system-settings/models/utils.ts` - 排除渠道显示/提交格式转换（`parseExcludeChannelIds` / `serializeExcludeChannelIds`）
-- `web/src/features/system-settings/models/index.tsx` / `section-registry.tsx` / `types.ts` - 默认值（默认开启、min_tps 8.0、threshold 1）与字段透传
+- `web/src/features/system-settings/models/index.tsx` / `section-registry.tsx` / `types.ts` - 默认值（默认开启、min_tps 8.0、threshold 1、max_ttft_ms 5000）与字段透传
 - `web/src/i18n/locales/*.json` - 七语言文案
-- 测试：`pkg/channel_slowstream/tracker_test.go`（未启用/阈值触发/快请求重置/窗口过期/续期/到期恢复/清理/快请求不取消降级/排除渠道不计数不降级/排除后历史降级即时失效）、`model/channel_slow_stream_selection_test.go`（降级渠道跌出最高层 + 高层耗尽后级联）、`web/src/features/system-settings/models/__tests__/exclude-channel-ids.test.ts`（排除渠道格式转换）
+- 测试：`pkg/channel_slowstream/tracker_test.go`（未启用/阈值触发/快请求重置/窗口过期/续期/到期恢复/清理/快请求不取消降级/排除渠道不计数不降级/排除后历史降级即时失效/首字延迟阈值触发/两源独立计数互不干扰/首字延迟排除渠道）、`model/channel_slow_stream_selection_test.go`（降级渠道跌出最高层 + 高层耗尽后级联）、`web/src/features/system-settings/models/__tests__/exclude-channel-ids.test.ts`（排除渠道格式转换）

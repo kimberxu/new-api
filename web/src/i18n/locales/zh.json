@@ -5592,6 +5592,17 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Channel IDs excluded from slow stream and first-token latency demotion, comma-separated. Empty means no channels are excluded.": "不参与慢速流式与首字延迟降级的渠道编号，逗号分隔。留空表示全部参与。",
+    "Enable first-token latency demotion": "启用首字延迟降级",
+    "First-token latency above this value counts as a slow event. Long prompts may increase first-token latency.": "首字延迟超过该值计为一次慢事件。长 prompt 会拉高首字延迟。",
+    "First-token latency demotion": "首字延迟降级",
+    "First-token latency event window (seconds)": "首字延迟事件窗口（秒）",
+    "First-token latency events are counted as consecutive only when they occur within this window.": "两次首字延迟事件间隔不超过该窗口才计为连续。",
+    "First-token latency events to trigger demotion": "触发降级的首字延迟次数",
+    "How many first-token latency events within the window trigger demotion.": "窗口内首字延迟事件达到该次数即触发降级。",
+    "Maximum first-token latency (ms)": "首字延迟上限（毫秒）",
+    "Overnight range": "跨日范围",
+    "Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.": "将首字延迟持续高于阈值的渠道临时降低选择优先级，到期自动恢复。"
   }
 }
