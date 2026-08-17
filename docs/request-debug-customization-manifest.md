@@ -325,6 +325,8 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 在日志页面新增「实时连接」分页，管理员可实时查看当前正在进行中（尚未成功或失败）的中转请求。每个条目显示请求 ID、所选渠道、模型名、请求路径、发起时间与已耗时。列表每 3 秒自动刷新，已耗时列每秒计时。
 
+**侧边栏入口迁移（2026-08-17）**：入口从 `admin` 组移至 `general` 组，位于「使用日志」下一项，与使用日志同级。`requiredRole: ADMIN` 守卫保持仅管理员可见。
+
 ### 机制
 
 - 请求进入 `Relay` / `RelayTask` / `RelayMidjourney` 后调用 `service.Start`，在 Redis 中以 Hash 记录请求元信息（`inflight:<request_id>`），并在 ZSET（`inflight:sorted`）按时间戳排序以支持分页
@@ -355,7 +357,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - `web/src/features/usage-logs/components/inflight-table.tsx` - 实时连接表格组件
 - `web/src/features/usage-logs/section-registry.tsx` - 新增 `inflight` section
 - `web/src/features/usage-logs/index.tsx` - 渲染分发
-- `web/src/hooks/use-sidebar-data.ts` - 侧边栏导航项（不新增 `use-sidebar-config.ts` 映射：URL 不在映射表时默认可见，少改一个文件）
+- `web/src/hooks/use-sidebar-data.ts` - 侧边栏导航项（位于 `general` 组「使用日志」下一项，`requiredRole: ADMIN` 守卫；不新增 `use-sidebar-config.ts` 映射：URL 不在映射表时默认可见，`requiredRole` 在 `use-sidebar-view.ts` 独立过滤）
 - `web/src/i18n/locales/*.json` - 七语言文案
 
 ---
