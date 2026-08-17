@@ -114,6 +114,10 @@ const createRoutingReliabilitySchema = (
         demote_duration_sec: z.coerce.number().int().min(1),
         demoted_priority: z.coerce.number().int(),
         exclude_channel_ids: z.string(),
+        ttft_enabled: z.boolean(),
+        max_ttft_ms: z.coerce.number().int().min(1),
+        ttft_window_seconds: z.coerce.number().int().min(1),
+        ttft_threshold: z.coerce.number().int().min(1),
       }),
     })
     .superRefine((values, ctx) => {
@@ -176,6 +180,10 @@ type RoutingReliabilitySectionProps = {
     'channel_slow_stream_setting.demote_duration_sec': number
     'channel_slow_stream_setting.demoted_priority': number
     'channel_slow_stream_setting.exclude_channel_ids': string
+    'channel_slow_stream_setting.ttft_enabled': boolean
+    'channel_slow_stream_setting.max_ttft_ms': number
+    'channel_slow_stream_setting.ttft_window_seconds': number
+    'channel_slow_stream_setting.ttft_threshold': number
   }
 }
 
@@ -208,6 +216,10 @@ type NormalizedRoutingReliabilityValues = {
   'channel_slow_stream_setting.demote_duration_sec': number
   'channel_slow_stream_setting.demoted_priority': number
   'channel_slow_stream_setting.exclude_channel_ids': string
+  'channel_slow_stream_setting.ttft_enabled': boolean
+  'channel_slow_stream_setting.max_ttft_ms': number
+  'channel_slow_stream_setting.ttft_window_seconds': number
+  'channel_slow_stream_setting.ttft_threshold': number
 }
 
 function normalizeChannelTestMode(value?: string): ChannelTestMode {
@@ -258,6 +270,11 @@ const buildFormDefaults = (
     exclude_channel_ids: parseExcludeChannelIds(
       defaults['channel_slow_stream_setting.exclude_channel_ids']
     ),
+    ttft_enabled: defaults['channel_slow_stream_setting.ttft_enabled'],
+    max_ttft_ms: defaults['channel_slow_stream_setting.max_ttft_ms'],
+    ttft_window_seconds:
+      defaults['channel_slow_stream_setting.ttft_window_seconds'],
+    ttft_threshold: defaults['channel_slow_stream_setting.ttft_threshold'],
   },
 })
 
@@ -308,6 +325,14 @@ const normalizeDefaults = (
   'channel_slow_stream_setting.exclude_channel_ids': parseExcludeChannelIds(
     defaults['channel_slow_stream_setting.exclude_channel_ids']
   ),
+  'channel_slow_stream_setting.ttft_enabled':
+    defaults['channel_slow_stream_setting.ttft_enabled'],
+  'channel_slow_stream_setting.max_ttft_ms':
+    defaults['channel_slow_stream_setting.max_ttft_ms'],
+  'channel_slow_stream_setting.ttft_window_seconds':
+    defaults['channel_slow_stream_setting.ttft_window_seconds'],
+  'channel_slow_stream_setting.ttft_threshold':
+    defaults['channel_slow_stream_setting.ttft_threshold'],
 })
 
 const normalizeFormValues = (
@@ -356,6 +381,14 @@ const normalizeFormValues = (
     serializeExcludeChannelIds(
       values.channel_slow_stream_setting.exclude_channel_ids
     ),
+  'channel_slow_stream_setting.ttft_enabled':
+    values.channel_slow_stream_setting.ttft_enabled,
+  'channel_slow_stream_setting.max_ttft_ms':
+    values.channel_slow_stream_setting.max_ttft_ms,
+  'channel_slow_stream_setting.ttft_window_seconds':
+    values.channel_slow_stream_setting.ttft_window_seconds,
+  'channel_slow_stream_setting.ttft_threshold':
+    values.channel_slow_stream_setting.ttft_threshold,
 })
 
 export function RoutingReliabilitySection({
@@ -1101,7 +1134,115 @@ export function RoutingReliabilitySection({
                     </FormControl>
                     <FormDescription>
                       {t(
-                        'Channel IDs excluded from slow stream demotion, comma-separated. Empty means no channels are excluded.'
+                        'Channel IDs excluded from slow stream and first-token latency demotion, comma-separated. Empty means no channels are excluded.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='flex flex-col gap-1 pt-2'>
+              <h4 className='text-sm font-medium'>
+                {t('First-token latency demotion')}
+              </h4>
+            </div>
+            <div className='grid min-w-0 gap-6 lg:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.ttft_enabled'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>
+                        {t('Enable first-token latency demotion')}
+                      </FormLabel>
+                      <FormDescription>
+                        {t(
+                          'Temporarily lower selection priority of channels whose first-token latency stays above the threshold. Recovers automatically.'
+                        )}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.max_ttft_ms'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Maximum first-token latency (ms)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        step={100}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'First-token latency above this value counts as a slow event. Long prompts may increase first-token latency.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.ttft_threshold'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {t('First-token latency events to trigger demotion')}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'How many first-token latency events within the window trigger demotion.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.ttft_window_seconds'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {t('First-token latency event window (seconds)')}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'First-token latency events are counted as consecutive only when they occur within this window.'
                       )}
                     </FormDescription>
                     <FormMessage />

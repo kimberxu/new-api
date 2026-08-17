@@ -31,10 +31,15 @@ func setupTest(t *testing.T, enabled bool) *operation_setting.ChannelSlowStreamS
 		MinOutputTokens:   50,
 		DemoteDurationSec: 600,
 		DemotedPriority:   0,
+		TtftEnabled:       enabled,
+		MaxTtftMs:         5000,
+		TtftWindowSeconds: 300,
+		TtftThreshold:     3,
 	}
 	t.Cleanup(func() {
 		*cfg = orig
 		slowStreamMap = sync.Map{}
+		slowStreamTtftMap = sync.Map{}
 	})
 	return cfg
 }
@@ -224,4 +229,52 @@ func TestCleanupExpiredDemotions(t *testing.T) {
 	state := loadState(t, 2, "gpt-4o")
 	require.NotNil(t, state)
 	assert.Equal(t, 2, state.count)
+}
+
+func TestRecordSlowTtft_TriggersDemotionAfterThreshold(t *testing.T) {
+	cfg := setupTest(t, true)
+	cfg.TtftThreshold = 1
+	// 首字 6s（超过 MaxTtftMs=5000）即触发降级
+	assert.True(t, RecordSlowTtft(1, "gpt-4o", 6000))
+	demoted, p := GetDemotedPriority(1, "gpt-4o", 5)
+	assert.True(t, demoted)
+	assert.Equal(t, int64(0), p)
+	// 首字未超阈值：不触发，且重置计数
+	assert.False(t, RecordSlowTtft(1, "gpt-4o", 1000))
+	demoted, p = GetDemotedPriority(1, "gpt-4o", 5)
+	assert.True(t, demoted, "fast ttft must not cancel an active demotion")
+	assert.Equal(t, int64(0), p)
+}
+
+func TestRecordSlowTtft_IndependentFromGenerationRate(t *testing.T) {
+	cfg := setupTest(t, true)
+	cfg.Threshold = 3
+	cfg.TtftThreshold = 1
+	// 仅 TTFT 触发降级（生成速率正常，不参与 TTFT 降级判定）
+	assert.True(t, RecordSlowTtft(2, "gpt-4o", 6000))
+	demoted, p := GetDemotedPriority(2, "gpt-4o", 5)
+	assert.True(t, demoted)
+	assert.Equal(t, int64(0), p)
+	// 生成速率慢未达阈值，不影响 TTFT 降级状态
+	assert.False(t, RecordSlowStream(2, "gpt-4o", 1.0))
+	demoted, _ = GetDemotedPriority(2, "gpt-4o", 5)
+	assert.True(t, demoted)
+}
+
+func TestRecordSlowTtft_ExcludedChannel_ReturnsFalse(t *testing.T) {
+	cfg := setupTest(t, true)
+	cfg.TtftThreshold = 1
+	cfg.ExcludeChannelIDs = []int{7}
+	assert.False(t, RecordSlowTtft(7, "gpt-4o", 6000))
+	demoted, p := GetDemotedPriority(7, "gpt-4o", 5)
+	assert.False(t, demoted)
+	assert.Equal(t, int64(5), p)
+	// 非排除渠道不受影响
+	assert.True(t, RecordSlowTtft(8, "gpt-4o", 6000))
+}
+
+func TestRecordSlowTtft_Disabled_ReturnsFalse(t *testing.T) {
+	setupTest(t, false)
+	assert.False(t, RecordSlowTtft(1, "gpt-4o", 6000))
+	assert.False(t, RecordSlowTtft(1, "gpt-4o", 10000))
 }
