@@ -257,6 +257,7 @@ export type ModelSettings = {
   'channel_slow_stream_setting.window_seconds': number
   'channel_slow_stream_setting.threshold': number
   'channel_slow_stream_setting.min_output_tokens': number
+  'channel_slow_stream_setting.min_input_tokens': number
   'channel_slow_stream_setting.demote_duration_sec': number
   'channel_slow_stream_setting.demoted_priority': number
   'channel_slow_stream_setting.exclude_channel_ids': string

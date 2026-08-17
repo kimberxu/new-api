@@ -102,6 +102,8 @@ const MODELS_SECTIONS = [
             settings['channel_slow_stream_setting.threshold'],
           'channel_slow_stream_setting.min_output_tokens':
             settings['channel_slow_stream_setting.min_output_tokens'],
+          'channel_slow_stream_setting.min_input_tokens':
+            settings['channel_slow_stream_setting.min_input_tokens'],
           'channel_slow_stream_setting.demote_duration_sec':
             settings['channel_slow_stream_setting.demote_duration_sec'],
           'channel_slow_stream_setting.demoted_priority':

@@ -91,6 +91,7 @@ const defaultModelSettings: ModelSettings = {
   'channel_slow_stream_setting.window_seconds': 300,
   'channel_slow_stream_setting.threshold': 1,
   'channel_slow_stream_setting.min_output_tokens': 50,
+  'channel_slow_stream_setting.min_input_tokens': 0,
   'channel_slow_stream_setting.demote_duration_sec': 600,
   'channel_slow_stream_setting.demoted_priority': 0,
   'channel_slow_stream_setting.exclude_channel_ids': '',
