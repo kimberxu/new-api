@@ -55,6 +55,7 @@ import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useResetForm } from '../hooks/use-reset-form'
 import { useUpdateOption } from '../hooks/use-update-option'
+import { parseExcludeChannelIds, serializeExcludeChannelIds } from './utils'
 import { safeNumberFieldProps } from '../utils/numeric-field'
 
 const numericString = z.string().refine((value) => {
@@ -91,6 +92,16 @@ const routingReliabilitySchema = z
         .int()
         .min(1, 'Interval must be at least 1 minute'),
       channel_test_mode: z.enum(channelTestModes),
+    }),
+    channel_slow_stream_setting: z.object({
+      enabled: z.boolean(),
+      min_tps: z.coerce.number().min(0),
+      window_seconds: z.coerce.number().int().min(1),
+      threshold: z.coerce.number().int().min(1),
+      min_output_tokens: z.coerce.number().int().min(1),
+      demote_duration_sec: z.coerce.number().int().min(1),
+      demoted_priority: z.coerce.number().int(),
+      exclude_channel_ids: z.string(),
     }),
   })
   .superRefine((values, ctx) => {
@@ -141,6 +152,14 @@ type RoutingReliabilitySectionProps = {
     'monitor_setting.auto_test_channel_enabled': boolean
     'monitor_setting.auto_test_channel_minutes': number
     'monitor_setting.channel_test_mode': ChannelTestMode
+    'channel_slow_stream_setting.enabled': boolean
+    'channel_slow_stream_setting.min_tps': number
+    'channel_slow_stream_setting.window_seconds': number
+    'channel_slow_stream_setting.threshold': number
+    'channel_slow_stream_setting.min_output_tokens': number
+    'channel_slow_stream_setting.demote_duration_sec': number
+    'channel_slow_stream_setting.demoted_priority': number
+    'channel_slow_stream_setting.exclude_channel_ids': string
   }
 }
 
@@ -164,6 +183,14 @@ type NormalizedRoutingReliabilityValues = {
   'monitor_setting.auto_test_channel_enabled': boolean
   'monitor_setting.auto_test_channel_minutes': number
   'monitor_setting.channel_test_mode': ChannelTestMode
+  'channel_slow_stream_setting.enabled': boolean
+  'channel_slow_stream_setting.min_tps': number
+  'channel_slow_stream_setting.window_seconds': number
+  'channel_slow_stream_setting.threshold': number
+  'channel_slow_stream_setting.min_output_tokens': number
+  'channel_slow_stream_setting.demote_duration_sec': number
+  'channel_slow_stream_setting.demoted_priority': number
+  'channel_slow_stream_setting.exclude_channel_ids': string
 }
 
 function normalizeChannelTestMode(value?: string): ChannelTestMode {
@@ -199,6 +226,20 @@ const buildFormDefaults = (
       defaults['monitor_setting.channel_test_mode']
     ),
   },
+  channel_slow_stream_setting: {
+    enabled: defaults['channel_slow_stream_setting.enabled'],
+    min_tps: defaults['channel_slow_stream_setting.min_tps'],
+    window_seconds: defaults['channel_slow_stream_setting.window_seconds'],
+    threshold: defaults['channel_slow_stream_setting.threshold'],
+    min_output_tokens:
+      defaults['channel_slow_stream_setting.min_output_tokens'],
+    demote_duration_sec:
+      defaults['channel_slow_stream_setting.demote_duration_sec'],
+    demoted_priority: defaults['channel_slow_stream_setting.demoted_priority'],
+    exclude_channel_ids: parseExcludeChannelIds(
+      defaults['channel_slow_stream_setting.exclude_channel_ids']
+    ),
+  },
 })
 
 const normalizeDefaults = (
@@ -229,6 +270,23 @@ const normalizeDefaults = (
   'monitor_setting.channel_test_mode': normalizeChannelTestMode(
     defaults['monitor_setting.channel_test_mode']
   ),
+  'channel_slow_stream_setting.enabled':
+    defaults['channel_slow_stream_setting.enabled'],
+  'channel_slow_stream_setting.min_tps':
+    defaults['channel_slow_stream_setting.min_tps'],
+  'channel_slow_stream_setting.window_seconds':
+    defaults['channel_slow_stream_setting.window_seconds'],
+  'channel_slow_stream_setting.threshold':
+    defaults['channel_slow_stream_setting.threshold'],
+  'channel_slow_stream_setting.min_output_tokens':
+    defaults['channel_slow_stream_setting.min_output_tokens'],
+  'channel_slow_stream_setting.demote_duration_sec':
+    defaults['channel_slow_stream_setting.demote_duration_sec'],
+  'channel_slow_stream_setting.demoted_priority':
+    defaults['channel_slow_stream_setting.demoted_priority'],
+  'channel_slow_stream_setting.exclude_channel_ids': parseExcludeChannelIds(
+    defaults['channel_slow_stream_setting.exclude_channel_ids']
+  ),
 })
 
 const normalizeFormValues = (
@@ -257,6 +315,24 @@ const normalizeFormValues = (
   'monitor_setting.auto_test_channel_minutes':
     values.monitor_setting.auto_test_channel_minutes,
   'monitor_setting.channel_test_mode': values.monitor_setting.channel_test_mode,
+  'channel_slow_stream_setting.enabled':
+    values.channel_slow_stream_setting.enabled,
+  'channel_slow_stream_setting.min_tps':
+    values.channel_slow_stream_setting.min_tps,
+  'channel_slow_stream_setting.window_seconds':
+    values.channel_slow_stream_setting.window_seconds,
+  'channel_slow_stream_setting.threshold':
+    values.channel_slow_stream_setting.threshold,
+  'channel_slow_stream_setting.min_output_tokens':
+    values.channel_slow_stream_setting.min_output_tokens,
+  'channel_slow_stream_setting.demote_duration_sec':
+    values.channel_slow_stream_setting.demote_duration_sec,
+  'channel_slow_stream_setting.demoted_priority':
+    values.channel_slow_stream_setting.demoted_priority,
+  'channel_slow_stream_setting.exclude_channel_ids':
+    serializeExcludeChannelIds(
+      values.channel_slow_stream_setting.exclude_channel_ids
+    ),
 })
 
 export function RoutingReliabilitySection({
@@ -776,6 +852,207 @@ export function RoutingReliabilitySection({
                     <FormDescription>
                       {t(
                         'How many unconfigured errors within the window before the channel is disabled.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+          <Separator />
+
+          <div className='flex min-w-0 flex-col gap-4'>
+            <div className='flex flex-col gap-1'>
+              <h4 className='text-sm font-medium'>
+                {t('Slow stream demotion')}
+              </h4>
+            </div>
+            <div className='grid min-w-0 gap-6 lg:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.enabled'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Enable slow stream demotion')}</FormLabel>
+                      <FormDescription>
+                        {t(
+                          'Temporarily lower selection priority of channels whose streaming generation speed stays below the threshold. Recovers automatically.'
+                        )}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.min_tps'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {t('Minimum generation speed (tokens/s)')}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={0}
+                        step={0.1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Generation speed below this value counts as a slow event. Only the generation phase is measured, excluding first-token latency.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.threshold'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Slow events to trigger demotion')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'How many slow events within the window trigger demotion.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.window_seconds'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Slow event window (seconds)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Slow events are counted as consecutive only when they occur within this window.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.min_output_tokens'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Minimum output tokens to sample')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Requests with fewer output tokens are not sampled, to avoid short-request noise.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.demote_duration_sec'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Demotion duration (seconds)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'How long demotion lasts before the channel recovers automatically.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.demoted_priority'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Demoted priority')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Priority assigned to demoted channels. Lower values mean lower selection priority.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='channel_slow_stream_setting.exclude_channel_ids'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Excluded channel IDs')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('e.g. 3, 7, 12')}
+                        value={field.value}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Channel IDs excluded from slow stream demotion, comma-separated. Empty means no channels are excluded.'
                       )}
                     </FormDescription>
                     <FormMessage />

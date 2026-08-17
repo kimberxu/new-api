@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, test } from 'vitest'
 
-import type { InflightResponse } from '../inflight-api'
+import type { InflightResponse } from '../../inflight-api'
 
 describe('inflight API response parsing', () => {
   test('parses a well-formed inflight response with items', () => {

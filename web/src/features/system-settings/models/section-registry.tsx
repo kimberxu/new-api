@@ -90,6 +90,22 @@ const MODELS_SECTIONS = [
             settings['monitor_setting.auto_test_channel_minutes'],
           'monitor_setting.channel_test_mode':
             settings['monitor_setting.channel_test_mode'],
+          'channel_slow_stream_setting.enabled':
+            settings['channel_slow_stream_setting.enabled'],
+          'channel_slow_stream_setting.min_tps':
+            settings['channel_slow_stream_setting.min_tps'],
+          'channel_slow_stream_setting.window_seconds':
+            settings['channel_slow_stream_setting.window_seconds'],
+          'channel_slow_stream_setting.threshold':
+            settings['channel_slow_stream_setting.threshold'],
+          'channel_slow_stream_setting.min_output_tokens':
+            settings['channel_slow_stream_setting.min_output_tokens'],
+          'channel_slow_stream_setting.demote_duration_sec':
+            settings['channel_slow_stream_setting.demote_duration_sec'],
+          'channel_slow_stream_setting.demoted_priority':
+            settings['channel_slow_stream_setting.demoted_priority'],
+          'channel_slow_stream_setting.exclude_channel_ids':
+            settings['channel_slow_stream_setting.exclude_channel_ids'],
         }}
       />
     ),
