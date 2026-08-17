@@ -1,8 +1,8 @@
 # 定制功能清单（deploy 分支）
 
-> 对应分支：`deploy` @ `629d15cf`（2026-08-16 更新）
+> 对应分支：`deploy` @ `4f52c010`（2026-08-17 更新）
 > 以下功能均为 `deploy` 相对 `upstream/main` 的定制（可用 `git diff upstream/main...deploy` 核对）。
-> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ `62830da3`（流式结束原因分类与中断流语义）→ `3a1279f1`（实时连接追踪）→ `8119f0ac`（manifest 登记实时连接追踪）→ `e024c98c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `977d2d5a`（实时连接表格优化）→ `15e56fb6`（尾部随机请求 ID + 下游/上游双模型列）
+> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ `62830da3`（流式结束原因分类与中断流语义）→ `3a1279f1`（实时连接追踪）→ `8119f0ac`（manifest 登记实时连接追踪）→ `e024c98c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `977d2d5a`（实时连接表格优化）→ `15e56fb6`（尾部随机请求 ID + 下游/上游双模型列）→ `fe1cc018`（三文档头部标记刷新至 629d15cf）→ `5704e700`（滑动窗口渠道自动禁用）→ `4f52c010`（partial_failure length 收尾 + 异常流记错误日志）
 
 ## 魔改开发约定（合并上游友好）
 
@@ -28,7 +28,7 @@
 | 加权模型映射（1 对多） | `9a20e660`、`c6c4bcf8`、`83329f48` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） |
 | 额度显示模式切换修复 | `d8378ee7` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） |
 | token 大数 K/M/B 分级显示 | `ea91ebf1`、`4ce5615c` | 低（`web/src/lib/currency.ts`） |
-| 滑动窗口渠道自动禁用 | 待登记 | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） |
+| 滑动窗口渠道自动禁用 | `5704e700` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） |
 
 > **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`，`deploy` 与上游文件一致。
 
@@ -100,25 +100,28 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - 性能指标（`perfmetrics.RecordRelaySample`）与 `REQUEST_DEBUG_LOGGING=error_only` 快照改按真实流结果判断，不再一律按成功处理
 - OpenAI chat 流处理器按分类落地终止语义：
   - 零输出上游失败（`scanner_error` / `timeout`，尚未向下游写入任何模型数据）→ 转为可重试渠道错误（502），由现有重试循环切换渠道；预扣会话兜底，最终失败全额退还
-  - 已输出部分内容后上游中断 → 补发最后一块并发送明确 SSE 错误事件，**不再伪装 `[DONE]`**
+  - 已输出部分内容后上游中断（`partial_failure`）→ 补发最后一块，以 `finish_reason=length` 的终止块 + `[DONE]` 正常收尾，**不发送 error event**——SDK/终端编程工具遇 error event 会直接中断整个任务；`length` 为标准枚举，客户端标记「输出截断」并正常收尾
   - 客户端放弃（`client_gone` / `ping_fail`）→ 停止向下游输出，按已收内容结算，不归咎上游、不触发重试
+- 消费日志类型按流结果修正：`partial_failure` / `failed`（非 cancelled）的请求记录为**错误类型日志**（`LogTypeError`），日志列表直接可见异常；`cancelled` 保持消耗类型（前端已用 warning 徽章标识）
 
 ### 风险与兼容
 
-- 仅 OpenAI 共享流处理器区分处理；Claude/Gemini/图片等其它 handler 仍沿用原语义（分类与日志字段对其同样生效）
+- 仅 OpenAI 共享流处理器区分处理；Claude/Gemini/图片等其它 handler 仍沿用原语义（分类与日志字段对其同样生效），`partial_failure` 时 Claude/Gemini 转换场景仍发错误事件兜底（无标准「截断」终止枚举）
 - 可重试仅限「零输出 + upstream/gateway 域」（`scanner_error`、`timeout`），避免部分输出后重试造成重复生成与重复上游计费
 - `stream_status.status` 保持 `ok`/`error` 兼容值，前端读取 `outcome` 区分 `cancelled`
-- 与上游冲突风险：`relay/common/stream_status.go`、`relay/channel/openai/relay-openai.go`（`OaiStreamHandler` 尾部语义分派）、`service/log_info_generate.go`（`appendStreamStatus`）
+- 消费日志类型改为 `LogTypeError` 后，该记录不计入「消耗」统计（`SumUsedQuota` 按 `type=2` 过滤），改在错误日志列表展示；计费扣减不受影响
+- 与上游冲突风险：`relay/common/stream_status.go`、`relay/channel/openai/relay-openai.go`（`OaiStreamHandler` 尾部语义分派）、`service/log_info_generate.go`（`appendStreamStatus`、`consumeLogTypeForStream`）、`model/log.go`（`RecordConsumeLogParams.LogType`）
 
 ### 文件清单
 
 - `relay/common/stream_status.go` - `StreamOutcome` / `StreamFailureDomain` 与 `Outcome()` / `FailureDomain()` 分类
 - `relay/common/relay_info.go` - `StreamSucceeded()` 统一判定入口
-- `relay/channel/openai/relay-openai.go` - 语义分派 + `sendStreamErrorEvent`
-- `service/log_info_generate.go` - `appendStreamStatus` 分类字段 + `error_only` 按流结果附加快照
-- `service/text_quota.go` / `service/quota.go` - 性能指标按 `StreamSucceeded()` 记录
+- `relay/channel/openai/relay-openai.go` - 语义分派 + `terminateInterruptedStream`（`finish_reason=length` 收尾；Claude/Gemini 兜底 `sendStreamErrorEvent`）
+- `service/log_info_generate.go` - `appendStreamStatus` 分类字段 + `consumeLogTypeForStream` 日志类型判定 + `error_only` 按流结果附加快照
+- `service/text_quota.go` / `service/quota.go` - 消费日志按流结果写 `LogTypeError` + 性能指标按 `StreamSucceeded()` 记录
+- `model/log.go` - `RecordConsumeLogParams.LogType` 覆盖日志类型
 - 前端：`web/src/features/usage-logs/types.ts`、`details-dialog.tsx`、`web/src/i18n/locales/*.json`（`Failure Domain`）
-- 测试：`relay/common/stream_outcome_test.go`（分类逻辑，新增文件）、`relay/channel/openai/relay-openai-stream_test.go`
+- 测试：`relay/common/stream_outcome_test.go`（分类逻辑，新增文件）、`relay/channel/openai/relay-openai-stream_test.go`、`service/text_quota_test.go`（`TestConsumeLogTypeForStream`）
 
 ---
 
