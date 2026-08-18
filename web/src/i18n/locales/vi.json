@@ -5605,6 +5605,9 @@
     "How many consecutive slow events trigger demotion.": "Số sự kiện chậm liên tiếp đạt ngưỡng này sẽ kích hoạt hạ cấp.",
     "How many recent samples are kept for evaluation. Demotion triggers when first-token latency events reach the threshold within these samples.": "Số mẫu gần nhất được giữ để đánh giá. Hạ cấp xảy ra khi sự kiện độ trễ token đầu tiên đạt ngưỡng trong các mẫu này.",
     "How many recent samples are kept for evaluation. Demotion triggers when slow events reach the threshold within these samples. Fast samples only push out the oldest one, not reset all history.": "Số mẫu gần nhất được giữ để đánh giá. Hạ cấp xảy ra khi sự kiện chậm đạt ngưỡng trong các mẫu này. Mẫu nhanh chỉ đẩy ra mẫu cũ nhất, không xóa toàn bộ lịch sử.",
-    "Slow event sample size": "Kích thước mẫu sự kiện chậm"
+    "Slow event sample size": "Kích thước mẫu sự kiện chậm",
+    "Rate limit configured": "Đã cấu hình giới hạn tốc độ",
+    "recovers in": "phục hồi trong",
+    "Temporarily demoted (slow latency)": "Tạm thời bị hạ cấp (phản hồi chậm)"
   }
 }

@@ -5605,6 +5605,9 @@
     "How many consecutive slow events trigger demotion.": "Сколько последовательных медленных событий вызывает понижение.",
     "How many recent samples are kept for evaluation. Demotion triggers when first-token latency events reach the threshold within these samples.": "Сколько последних выборок сохраняется для оценки. Понижение срабатывает, когда события задержки первого токена достигают порога в этих выборках.",
     "How many recent samples are kept for evaluation. Demotion triggers when slow events reach the threshold within these samples. Fast samples only push out the oldest one, not reset all history.": "Сколько последних выборок сохраняется для оценки. Понижение срабатывает, когда медленные события достигают порога в этих выборках. Быстрые выборки лишь вытесняют самую старую, не сбрасывая всю историю.",
-    "Slow event sample size": "Размер выборки медленных событий"
+    "Slow event sample size": "Размер выборки медленных событий",
+    "Rate limit configured": "Лимит запросов настроен",
+    "recovers in": "восстановление через",
+    "Temporarily demoted (slow latency)": "Временно понижен (медленный ответ)"
   }
 }

@@ -301,3 +301,28 @@ func TestRecordSlowTtft_Disabled_ReturnsFalse(t *testing.T) {
 	assert.False(t, RecordSlowTtft(1, "gpt-4o", 6000))
 	assert.False(t, RecordSlowTtft(1, "gpt-4o", 10000))
 }
+
+func TestListDemoted_MemoryMode(t *testing.T) {
+	cfg := setupTest(t, true)
+	cfg.Threshold = 1
+	// 渠道 1（gpt-4o）、渠道 2（gpt-4o + claude-3-5）触发降级
+	assert.True(t, RecordSlowStream(1, "gpt-4o", 1.0))
+	assert.True(t, RecordSlowStream(2, "gpt-4o", 1.0))
+	assert.True(t, RecordSlowStream(2, "claude-3-5", 1.0))
+	demoted := ListDemoted()
+	require.Len(t, demoted[1], 1)
+	require.Len(t, demoted[2], 2)
+	assert.Equal(t, "gpt-4o", demoted[1][0].Model)
+	assert.Greater(t, demoted[1][0].RemainingSeconds, int64(0))
+	// 非降级渠道不出现
+	require.NotContains(t, demoted, 3)
+	// 默认 map 无降级时为空 map（controller 兜底也可用）
+	delete(demoted, 1)
+	delete(demoted, 2)
+	require.Empty(t, demoted)
+}
+
+func TestListDemoted_AllDisabled_ReturnsEmpty(t *testing.T) {
+	setupTest(t, false)
+	assert.Nil(t, ListDemoted())
+}

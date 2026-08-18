@@ -433,6 +433,8 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 **2026-08-18 增强（固定数量窗口 / ring buffer）**：判定从「时间窗口内连续慢」改为「最近 `sample_size` 次采样中慢事件达 `threshold` 次即触发」。快慢结果都入队，快结果只挤掉最旧样本、不洗白历史慢记录（容错更高，针对持续慢的渠道）；长请求不再受影响——3-5 分钟甚至更长的请求结束后才采样，但窗口按样本数量判定而非时间，不会因采样延迟导致窗口过期。`window_seconds`/`ttft_window_seconds` 废弃不再生效（保留字段兼容旧配置）。`threshold` 默认从 `1` 调至 `3`（1 次波动即降级容错太低）。
 
+**2026-08-18 增强（渠道页图标展示）**：渠道列表名称旁新增两个图标——降级中（`GET /api/channel/demoted` 轮询，显示降级模型与剩余恢复时长，5s 刷新）与渠道级速率限制已配置（`rate_limit_enabled` 且 rpm/tpm > 0）。图标仅展示，不影响渠道行为。
+
 ### 判定与降级语义
 
 - **样本**：仅成功流式请求（`IsStream && StreamSucceeded()`）；失败流式不参与（已有滑动窗口自动禁用机制），非流式无 `FirstResponseTime` 无法计算 generation TPS / TTFT，不参与
@@ -482,6 +484,11 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - `model/channel_cache.go` - `GetRandomSatisfiedChannel` 两段降级覆盖（import `pkg/channel_slowstream`）
 - `service/quota.go` / `service/text_quota.go` - 采样点各追加一行 `RecordFromRelayInfo` 调用
 - `main.go` - `channelslowstream.Init()` 后台恢复 goroutine 入口
+- `controller/channel-demoted.go` - `GET /api/channel/demoted` 降级状态查询（新文件）
+- `router/channel-router.go` - 注册 /demoted 路由（ChannelRead 权限）
+- `web/src/features/channels/components/channels-provider.tsx` - 5s 轮询降级状态注入 context
+- `web/src/features/channels/components/channels-columns.tsx` - 名称列降级图标 + 速率限制图标（tooltip 显示模型/剩余时长/RPM/TPM）
+- `web/src/features/channels/lib/channel-utils.ts` - `formatSeconds` 剩余时长格式化
 - `web/src/features/system-settings/models/routing-reliability-section.tsx` - Routing Reliability 下新增 Slow stream demotion 表单块（生成速率 8 项 + 首字延迟 4 项 + 排除渠道输入）
 - `web/src/features/system-settings/models/utils.ts` - 排除渠道显示/提交格式转换（`parseExcludeChannelIds` / `serializeExcludeChannelIds`）
 - `web/src/features/system-settings/models/index.tsx` / `section-registry.tsx` / `types.ts` - 默认值（默认开启、min_tps 8.0、threshold 3、sample_size 5、max_ttft_ms 5000、ttft_threshold 3）与字段透传

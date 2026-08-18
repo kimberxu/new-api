@@ -3,6 +3,8 @@ package channelslowstream
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -327,4 +329,101 @@ func CleanupExpiredDemotions() {
 	}
 	cleanupMap(slowStreamMap)
 	cleanupMap(slowStreamTtftMap)
+}
+
+// DemotionInfo 单个 (channelId, model) 的降级状态，供渠道列表展示。
+type DemotionInfo struct {
+	Model            string `json:"model"`
+	RemainingSeconds int64  `json:"remaining_seconds"`
+}
+
+type demotionCollector func(channelId int, model string, demotedUntil int64)
+
+// ListDemoted 返回当前所有降级中的渠道（channelId -> 降级模型列表）。
+// 内存模式遍历两个 sync.Map；Redis 模式 SCAN 两个降级标记 key 前缀。
+func ListDemoted() map[int][]DemotionInfo {
+	setting := operation_setting.GetChannelSlowStreamSetting()
+	if !setting.Enabled && !setting.TtftEnabled {
+		return nil
+	}
+	now := time.Now().Unix()
+	result := make(map[int][]DemotionInfo)
+	add := func(channelId int, model string, demotedUntil int64) {
+		if demotedUntil <= now {
+			return
+		}
+		info := DemotionInfo{Model: model, RemainingSeconds: demotedUntil - now}
+		if existing, ok := result[channelId]; ok {
+			result[channelId] = append(existing, info)
+		} else {
+			result[channelId] = []DemotionInfo{info}
+		}
+	}
+	if common.RedisEnabled && common.RDB != nil {
+		collectRedisDemoted(now, add)
+		return result
+	}
+	collectMemoryDemoted(&slowStreamMap, now, add)
+	collectMemoryDemoted(&slowStreamTtftMap, now, add)
+	return result
+}
+
+func collectMemoryDemoted(m *sync.Map, now int64, add demotionCollector) {
+	m.Range(func(key, value any) bool {
+		keyStr, ok := key.(string)
+		if !ok {
+			return true
+		}
+		sep := strings.Index(keyStr, ":")
+		if sep <= 0 {
+			return true
+		}
+		channelId, err := strconv.Atoi(keyStr[:sep])
+		if err != nil {
+			return true
+		}
+		state := value.(*demotionState)
+		state.mu.Lock()
+		until := state.demotedUntil
+		state.mu.Unlock()
+		add(channelId, keyStr[sep+1:], until)
+		return true
+	})
+}
+
+func collectRedisDemoted(now int64, add demotionCollector) {
+	ctx := context.Background()
+	for _, prefix := range []string{
+		slowStreamRedisNamespace + ":demoted:*",
+		slowStreamRedisNamespace + ":ttftDemoted:*",
+	} {
+		var cursor uint64
+		for {
+			keys, next, err := common.RDB.Scan(ctx, cursor, prefix, 100).Result()
+			if err != nil {
+				return
+			}
+			for _, k := range keys {
+				until, err := common.RDB.Get(ctx, k).Int64()
+				if err != nil || until <= now {
+					continue
+				}
+				rest := strings.TrimPrefix(k, slowStreamRedisNamespace+":demoted:")
+				rest = strings.TrimPrefix(rest, slowStreamRedisNamespace+":ttftDemoted:")
+				sep := strings.Index(rest, ":")
+				if sep <= 0 {
+					continue
+				}
+				channelId, err := strconv.Atoi(rest[:sep])
+				if err != nil {
+					continue
+				}
+				add(channelId, rest[sep+1:], until)
+			}
+			cursor = next
+			if cursor == 0 {
+				break
+			}
+		}
+	}
 }

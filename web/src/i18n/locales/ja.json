@@ -5605,6 +5605,9 @@
     "How many consecutive slow events trigger demotion.": "連続する遅延イベント数がこの回数に達すると降格します。",
     "How many recent samples are kept for evaluation. Demotion triggers when first-token latency events reach the threshold within these samples.": "評価に保持する直近のサンプル数。このサンプル内で初回トークン遅延イベントが閾値に達すると降格します。",
     "How many recent samples are kept for evaluation. Demotion triggers when slow events reach the threshold within these samples. Fast samples only push out the oldest one, not reset all history.": "評価に保持する直近のサンプル数。このサンプル内で遅延イベントが閾値に達すると降格します。高速サンプルは最古の1件を押し出すだけで、履歴をリセットしません。",
-    "Slow event sample size": "遅延イベントのサンプル数"
+    "Slow event sample size": "遅延イベントのサンプル数",
+    "Rate limit configured": "レート制限設定済み",
+    "recovers in": "回復まで",
+    "Temporarily demoted (slow latency)": "一時的に降格（遅延）"
   }
 }

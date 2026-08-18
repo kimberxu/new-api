@@ -5605,6 +5605,9 @@
     "How many consecutive slow events trigger demotion.": "How many consecutive slow events trigger demotion.",
     "How many recent samples are kept for evaluation. Demotion triggers when first-token latency events reach the threshold within these samples.": "How many recent samples are kept for evaluation. Demotion triggers when first-token latency events reach the threshold within these samples.",
     "How many recent samples are kept for evaluation. Demotion triggers when slow events reach the threshold within these samples. Fast samples only push out the oldest one, not reset all history.": "How many recent samples are kept for evaluation. Demotion triggers when slow events reach the threshold within these samples. Fast samples only push out the oldest one, not reset all history.",
-    "Slow event sample size": "Slow event sample size"
+    "Slow event sample size": "Slow event sample size",
+    "Rate limit configured": "Rate limit configured",
+    "recovers in": "recovers in",
+    "Temporarily demoted (slow latency)": "Temporarily demoted (slow latency)"
   }
 }

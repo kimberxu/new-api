@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  Gauge,
   ListOrdered,
   Shuffle,
   SlidersHorizontal,
@@ -63,6 +64,7 @@ import {
 import {
   formatRelativeTime,
   formatResponseTime,
+  formatSeconds,
   getBalanceVariant,
   getChannelTypeIcon,
   getChannelTypeLabel,
@@ -72,6 +74,7 @@ import {
   parseGroupsList,
   parseChannelSettings,
   channelsQueryKeys,
+  parseChannelOtherSettings,
   handleUpdateChannelField,
   handleUpdateTagField,
   createChannelFieldUpdateScheduler,
@@ -593,7 +596,7 @@ export function useChannelsColumns(
   } = {}
 ): ColumnDef<Channel>[] {
   const { t, i18n } = useTranslation()
-  const { sensitiveVisible } = useChannels()
+  const { sensitiveVisible, demoted } = useChannels()
   const enableSelection = options.enableSelection ?? true
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   // The column definitions only depend on the translation function, the active
@@ -698,6 +701,12 @@ export function useChannelsColumns(
           const settings = parseChannelSettings(channel.setting)
           const isPassThrough = settings.pass_through_body_enabled === true
           const hasParamOverride = Boolean(channel.param_override?.trim())
+          const otherSettings = parseChannelOtherSettings(channel.settings)
+          const hasRateLimit =
+            otherSettings.rate_limit_enabled === true &&
+            ((otherSettings.rate_limit_rpm ?? 0) > 0 ||
+              (otherSettings.rate_limit_tpm ?? 0) > 0)
+          const demotedInfos = demoted.get(channel.id)
 
           return (
             <div className='flex max-w-full min-w-0 items-center gap-2'>
@@ -734,6 +743,54 @@ export function useChannelsColumns(
                         />
                         <TooltipContent side='top'>
                           {t('Override request parameters')}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  {demotedInfos && demotedInfos.length > 0 && (
+                    <TooltipProvider delay={100}>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Gauge className='text-warning h-3.5 w-3.5 flex-shrink-0' />
+                          }
+                        />
+                        <TooltipContent side='top' className='max-w-xs'>
+                          <div className='flex flex-col gap-1'>
+                            <span className='font-medium'>
+                              {t('Temporarily demoted (slow latency)')}
+                            </span>
+                            {demotedInfos.map((info) => (
+                              <span key={info.model} className='text-xs'>
+                                {info.model} · {t('recovers in')}{' '}
+                                {formatSeconds(info.remaining_seconds)}
+                              </span>
+                            ))}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  {hasRateLimit && (
+                    <TooltipProvider delay={100}>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Gauge className='text-info h-3.5 w-3.5 flex-shrink-0' />
+                          }
+                        />
+                        <TooltipContent side='top'>
+                          {hasRateLimit && (
+                            <span>
+                              {t('Rate limit configured')}
+                              {otherSettings.rate_limit_rpm
+                                ? ` · ${t('RPM')} ${otherSettings.rate_limit_rpm}`
+                                : ''}
+                              {otherSettings.rate_limit_tpm
+                                ? ` · ${t('TPM')} ${otherSettings.rate_limit_tpm}`
+                                : ''}
+                            </span>
+                          )}
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -1236,6 +1293,6 @@ export function useChannelsColumns(
         meta: { pinned: 'right' as const },
       },
     ],
-    [enableSelection, t, locale, sensitiveVisible]
+    [enableSelection, t, locale, sensitiveVisible, demoted]
   )
 }

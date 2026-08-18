@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 /* eslint-disable react-refresh/only-export-components */
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import React, {
   createContext,
   useContext,
@@ -26,9 +26,10 @@ import React, {
   useMemo,
 } from 'react'
 
+import { getDemotedChannels } from '../api'
 import { useChannelUpstreamUpdates } from '../hooks/use-channel-upstream-updates'
 import { channelsQueryKeys } from '../lib'
-import type { Channel } from '../types'
+import type { Channel, DemotedChannelInfo } from '../types'
 
 // ============================================================================
 // Types
@@ -65,6 +66,7 @@ type ChannelsContextType = {
   sensitiveVisible: boolean
   setSensitiveVisible: (visible: boolean) => void
   upstream: UpstreamUpdateState
+  demoted: Map<number, DemotedChannelInfo[]>
 }
 
 // ============================================================================
@@ -98,6 +100,24 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient])
   const upstream = useChannelUpstreamUpdates(refreshChannels)
 
+  // 降级中的渠道（慢流式/首字延迟降级）。5s 轮询 + 失焦不可见时暂停。
+  const { data: demotedData } = useQuery({
+    queryKey: [...channelsQueryKeys.all, 'demoted'],
+    queryFn: getDemotedChannels,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: false,
+  })
+  const demoted = useMemo(() => {
+    const map = new Map<number, DemotedChannelInfo[]>()
+    const raw = demotedData?.data
+    if (raw) {
+      for (const [channelId, infos] of Object.entries(raw)) {
+        map.set(Number(channelId), infos)
+      }
+    }
+    return map
+  }, [demotedData])
+
   // useState setters are stable, so the context value only needs to change when
   // an actual state value changes. Memoizing avoids handing every consumer
   // (including all channel cards/cells) a brand-new object on each render.
@@ -118,6 +138,7 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
       sensitiveVisible,
       setSensitiveVisible,
       upstream,
+      demoted,
     }),
     [
       open,
@@ -128,6 +149,7 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
       batchMode,
       sensitiveVisible,
       upstream,
+      demoted,
     ]
   )
 
