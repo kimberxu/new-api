@@ -255,6 +255,7 @@ export type ModelSettings = {
   'channel_slow_stream_setting.enabled': boolean
   'channel_slow_stream_setting.min_tps': number
   'channel_slow_stream_setting.window_seconds': number
+'channel_slow_stream_setting.sample_size': number
   'channel_slow_stream_setting.threshold': number
   'channel_slow_stream_setting.min_output_tokens': number
   'channel_slow_stream_setting.min_input_tokens': number
@@ -263,7 +264,8 @@ export type ModelSettings = {
   'channel_slow_stream_setting.exclude_channel_ids': string
   'channel_slow_stream_setting.ttft_enabled': boolean
   'channel_slow_stream_setting.max_ttft_ms': number
-  'channel_slow_stream_setting.ttft_window_seconds': number
+  'channel_slow_stream_setting.ttft_sample_size': number
+  'channel_slow_stream_setting.ttft_threshold': number
   'channel_slow_stream_setting.ttft_threshold': number
   'model_deployment.ionet.api_key': string
   'model_deployment.ionet.enabled': boolean

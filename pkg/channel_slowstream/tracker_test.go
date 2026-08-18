@@ -27,6 +27,7 @@ func setupTest(t *testing.T, enabled bool) *operation_setting.ChannelSlowStreamS
 		Enabled:           enabled,
 		MinTps:            5.0,
 		WindowSeconds:     300,
+		SampleSize:        5,
 		Threshold:         3,
 		MinOutputTokens:   50,
 		DemoteDurationSec: 600,
@@ -34,6 +35,7 @@ func setupTest(t *testing.T, enabled bool) *operation_setting.ChannelSlowStreamS
 		TtftEnabled:       enabled,
 		MaxTtftMs:         5000,
 		TtftWindowSeconds: 300,
+		TtftSampleSize:    5,
 		TtftThreshold:     3,
 	}
 	t.Cleanup(func() {
@@ -71,33 +73,54 @@ func TestRecordSlowStream_TriggersDemotionAfterThreshold(t *testing.T) {
 	assert.Equal(t, int64(0), p)
 }
 
-func TestRecordSlowStream_ResetOnFastSample(t *testing.T) {
-	setupTest(t, true)
-	// 两次慢速
-	RecordSlowStream(1, "gpt-4o", 1.0)
-	RecordSlowStream(1, "gpt-4o", 1.0)
-	// 一次不慢 → 重置窗口计数
+func TestRecordSlowStream_FastSampleSlidesWindow(t *testing.T) {
+	cfg := setupTest(t, true)
+	cfg.SampleSize = 3
+	cfg.Threshold = 2
+	// ring buffer 核心语义：快事件不洗白历史慢记录，只挤掉最旧样本。
+	// 慢 快 慢 → 窗口 [慢,快,慢]，慢=2 ≥ threshold=2 → 触发
+	assert.False(t, RecordSlowStream(1, "gpt-4o", 1.0))
 	assert.False(t, RecordSlowStream(1, "gpt-4o", 10.0))
-	// 重置后需重新累计 Threshold 次才触发
-	assert.False(t, RecordSlowStream(1, "gpt-4o", 1.0))
-	assert.False(t, RecordSlowStream(1, "gpt-4o", 1.0))
 	assert.True(t, RecordSlowStream(1, "gpt-4o", 1.0))
+	demoted, p := GetDemotedPriority(1, "gpt-4o", 5)
+	assert.True(t, demoted)
+	assert.Equal(t, int64(0), p)
+}
+
+func TestRecordSlowStream_FastSampleSlidesOutOldest(t *testing.T) {
+	cfg := setupTest(t, true)
+	cfg.SampleSize = 3
+	cfg.Threshold = 2
+	// 慢 快 快 快：窗口 [快,快,快]，慢样本被挤出，slowCount 回到 0
+	// （slowCount 从未达到 threshold=2，不触发降级）
+	RecordSlowStream(1, "gpt-4o", 1.0)
+	RecordSlowStream(1, "gpt-4o", 10.0)
+	RecordSlowStream(1, "gpt-4o", 10.0)
+	assert.False(t, RecordSlowStream(1, "gpt-4o", 10.0))
+	state := loadState(t, 1, "gpt-4o")
+	require.NotNil(t, state)
+	assert.Equal(t, 0, state.slowCount)
+	demoted, p := GetDemotedPriority(1, "gpt-4o", 5)
+	assert.False(t, demoted)
+	assert.Equal(t, int64(5), p)
 	// 不同 (channelId, model) 独立计数
 	assert.False(t, RecordSlowStream(1, "claude-3-5", 1.0))
 	assert.False(t, RecordSlowStream(2, "gpt-4o", 1.0))
 }
 
-func TestRecordSlowStream_WindowExpiryResetsCount(t *testing.T) {
+func TestRecordSlowStream_LongGapStillCounts(t *testing.T) {
 	cfg := setupTest(t, true)
+	// 废弃字段 window_seconds 即使设成 1 也不影响计数：
+	// 固定数量窗口不按时间过期，长请求的采样延迟不会导致计数重置
 	cfg.WindowSeconds = 1
 	assert.False(t, RecordSlowStream(1, "gpt-4o", 1.0))
 	assert.False(t, RecordSlowStream(1, "gpt-4o", 1.0))
-	// 窗口过期 → 计数重置，重新累计
-	// 注意：unix 秒级时间戳，sleep 2.1s 保证 now-lastSlowAt >= 2 > WindowSeconds
+	// 间隔超过旧时间窗口后，慢事件仍连续计数，第三次直接触发降级
 	time.Sleep(2100 * time.Millisecond)
-	assert.False(t, RecordSlowStream(1, "gpt-4o", 1.0))
-	assert.False(t, RecordSlowStream(1, "gpt-4o", 1.0))
 	assert.True(t, RecordSlowStream(1, "gpt-4o", 1.0))
+	demoted, p := GetDemotedPriority(1, "gpt-4o", 5)
+	assert.True(t, demoted)
+	assert.Equal(t, int64(0), p)
 }
 
 func TestRecordSlowStream_NoRedundantDemotion_RenewsUntil(t *testing.T) {
@@ -224,11 +247,11 @@ func TestCleanupExpiredDemotions(t *testing.T) {
 	assert.False(t, RecordSlowStream(2, "gpt-4o", 1.0))
 	time.Sleep(1100 * time.Millisecond)
 	CleanupExpiredDemotions()
-	// 降级到期的条目被清除；未降级条目的计数保留（窗口未过期）
+	// 降级到期的条目被清除；未降级条目的计数保留（固定数量窗口不会自行过期）
 	require.Nil(t, loadState(t, 1, "gpt-4o"))
 	state := loadState(t, 2, "gpt-4o")
 	require.NotNil(t, state)
-	assert.Equal(t, 2, state.count)
+	assert.Equal(t, 2, state.slowCount)
 }
 
 func TestRecordSlowTtft_TriggersDemotionAfterThreshold(t *testing.T) {

@@ -425,21 +425,23 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 ### 功能概述
 
-利用成功流式请求的 generation TPS（`outputTokens / generationMs * 1000`），按 `(channel_id, model)` 维度统计连续慢速事件，达到阈值后临时将该渠道在对应模型上的优先级拍平到 `DemotedPriority`（默认 0），定时到期自动恢复。目标：慢渠道跌出最高优先级层、少承担流量，避免直接禁用导致容量骤减。
+利用成功流式请求的 generation TPS（`outputTokens / generationMs * 1000`），按 `(channel_id, model)` 维度统计慢速事件，达到阈值后临时将该渠道在对应模型上的优先级拍平到 `DemotedPriority`（默认 0），定时到期自动恢复。目标：慢渠道跌出最高优先级层、少承担流量，避免直接禁用导致容量骤减。
 
-**2026-08-17 增强（配置 UI + 排除渠道）**：默认开启（`enabled=true`），`min_tps` 默认调至 `8.0`、`threshold` 默认调至 `1`；新增 `exclude_channel_ids` 排除列表，填入的渠道编号不参与采样与降级（含历史降级记录即时失效）；全部参数在「系统设置 → 模型与路由 → Routing Reliability → Slow stream demotion」可视化配置，不再需要 API 手工下发。
+**2026-08-17 增强（配置 UI + 排除渠道）**：默认开启（`enabled=true`），`min_tps` 默认 `8.0`；新增 `exclude_channel_ids` 排除列表，填入的渠道编号不参与采样与降级（含历史降级记录即时失效）；全部参数在「系统设置 → 模型与路由 → Routing Reliability → Slow stream demotion」可视化配置，不再需要 API 手工下发。
 
-**2026-08-17 增强（首字延迟 TTFT 降级）**：新增第二降级源——首字延迟（`FirstResponseTime - StartTime`）超过 `max_ttft_ms`（默认 5000ms）计为慢事件，独立滑动窗口（`ttft_window_seconds`/`ttft_threshold`）计数，独立开关 `ttft_enabled`（默认开启）。与生成速率降级互不干扰：两源各自维护计数与降级标记，任一触发即降级（`GetDemotedPriority` 合并两源取 `min`）；排除渠道、降级时长（`demote_duration_sec`）与降级优先级（`demoted_priority`）两源共用。TTFT 采样设 `min_input_tokens` 门槛（默认 0），仅对输入足够长的请求采样首字延迟，过滤短请求噪声（短输入的 frt 基本不受 prefill 影响）。注意：长 prompt 的 prefill 会线性拉高首字延迟，健康渠道可能因此被降级——这是绝对时长阈值的设计取舍，可通过 `min_input_tokens` 与调高 `max_ttft_ms` 缓解。
+**2026-08-17 增强（首字延迟 TTFT 降级）**：新增第二降级源——首字延迟（`FirstResponseTime - StartTime`）超过 `max_ttft_ms`（默认 5000ms）计为慢事件，独立配置 `ttft_enabled`/`ttft_sample_size`/`ttft_threshold`。与生成速率降级互不干扰：两源各自维护计数与降级标记，任一触发即降级（`GetDemotedPriority` 合并两源取 `min`）；排除渠道、降级时长（`demote_duration_sec`）与降级优先级（`demoted_priority`）两源共用。TTFT 采样设 `min_input_tokens` 门槛（默认 0），仅对输入足够长的请求采样首字延迟，过滤短请求噪声（短输入的 frt 基本不受 prefill 影响）。
+
+**2026-08-18 增强（固定数量窗口 / ring buffer）**：判定从「时间窗口内连续慢」改为「最近 `sample_size` 次采样中慢事件达 `threshold` 次即触发」。快慢结果都入队，快结果只挤掉最旧样本、不洗白历史慢记录（容错更高，针对持续慢的渠道）；长请求不再受影响——3-5 分钟甚至更长的请求结束后才采样，但窗口按样本数量判定而非时间，不会因采样延迟导致窗口过期。`window_seconds`/`ttft_window_seconds` 废弃不再生效（保留字段兼容旧配置）。`threshold` 默认从 `1` 调至 `3`（1 次波动即降级容错太低）。
 
 ### 判定与降级语义
 
 - **样本**：仅成功流式请求（`IsStream && StreamSucceeded()`）；失败流式不参与（已有滑动窗口自动禁用机制），非流式无 `FirstResponseTime` 无法计算 generation TPS / TTFT，不参与
-- **阈值**：绝对 TPS 下限 `min_tps`；窗口（`window_seconds`）内连续慢速次数达到 `threshold` 触发降级；`min_output_tokens` 过滤短请求噪声
-- **首字延迟（TTFT）**：`frt = FirstResponseTime - StartTime`（毫秒）超过 `max_ttft_ms` 计为慢事件，窗口（`ttft_window_seconds`）内连续次数达 `ttft_threshold` 触发降级；与生成速率降级独立计数、独立降级标记，任一生效即降级；`min_input_tokens` 过滤短输入请求噪声（短输入 frt 不受 prefill 影响）
+- **ring buffer 判定**：每个 `(channelId, model)` 保留最近 `sample_size` 次采样结果（快慢都记），其中慢事件数 ≥ `threshold` 即触发降级；快结果不洗白，只把最旧样本挤出窗口；`min_output_tokens` 过滤短请求噪声
+- **首字延迟（TTFT）**：`frt = FirstResponseTime - StartTime`（毫秒）超过 `max_ttft_ms` 计为慢事件，独立 ring buffer（`ttft_sample_size`/`ttft_threshold`）判定；与生成速率降级独立计数、独立降级标记，任一生效即降级；`min_input_tokens` 过滤短输入请求噪声（短输入 frt 不受 prefill 影响）
 - **排除渠道**：`exclude_channel_ids` 中的渠道在 `RecordSlowStream` / `RecordSlowTtft` / `GetDemotedPriority` 处均直接放行——不计数、不触发降级，且已存在的降级记录即时失效（改配置即可立即解除）
 - **只降 priority，不动 weight**：降级渠道跌出原优先级层，同组更高层渠道存在时不被选中；重试链路上更高层渠道全部被排除后，降级渠道回到候选按原 weight 参与加权随机——不会永久饿死（单渠道场景仍照常选中）
-- **只有一档，无阶梯**：已降级时再次慢速仅续期 `demoted_until`，不叠加、不进一步降；恢复后再次连续慢才触发新一轮降级
-- **快请求不取消降级**：`tps >= min_tps` 时只重置窗口计数，不清除进行中的降级标记；降级到期由惰性检查（`GetDemotedPriority`）与后台清理（`CleanupExpiredDemotions`）恢复
+- **只有一档，无阶梯**：已降级时再次慢速仅续期 `demoted_until`，不叠加、不进一步降；恢复后再次达到阈值才触发新一轮降级
+- **快结果不取消降级**：快结果只入队挤掉最旧样本，不清除进行中的降级标记；降级到期由惰性检查（`GetDemotedPriority`）与后台清理（`CleanupExpiredDemotions`）恢复
 - **fail-open**：Redis 出错时记录与查询均放行，不影响请求
 
 ### 配置
@@ -448,10 +450,11 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 | 字段 | 默认值 | 说明 |
 |------|--------|------|
-| `enabled` | `true` | 全局开关 |
+| `enabled` | `true` | 生成速率降级开关 |
 | `min_tps` | `8.0` | TPS 下限（tokens/s）；仅统计生成阶段，不含首字延迟 |
-| `window_seconds` | `300` | 滑动窗口秒数 |
-| `threshold` | `1` | 窗口内连续慢速次数触发降级 |
+| `window_seconds` | `300` | **[废弃]** 时间窗口秒数，2026-08-18 起不再生效（ring buffer 按样本数量判定），保留兼容旧配置 |
+| `sample_size` | `5` | ring buffer 容量：保留最近多少次采样结果 |
+| `threshold` | `3` | 窗口内慢事件次数触发降级（须 ≤ sample_size） |
 | `min_output_tokens` | `50` | 生成速率最小输出 token 数门槛 |
 | `min_input_tokens` | `0` | TTFT 采样最小输入 token 数门槛（0=采样全部） |
 | `demote_duration_sec` | `600` | 降级持续时间秒 |
@@ -459,13 +462,14 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 | `exclude_channel_ids` | 空 | 排除渠道编号列表（逗号分隔），不参与采样与降级（含生成速率与首字延迟两源） |
 | `ttft_enabled` | `true` | 首字延迟降级开关 |
 | `max_ttft_ms` | `5000` | 首字延迟上限（毫秒）；长 prompt 的 prefill 会拉高此值 |
-| `ttft_window_seconds` | `300` | 首字延迟慢事件滑动窗口秒数 |
-| `ttft_threshold` | `1` | 窗口内连续首字延迟慢事件次数触发降级 |
+| `ttft_window_seconds` | `300` | **[废弃]** 首字延迟时间窗口秒数，2026-08-18 起不再生效，保留兼容旧配置 |
+| `ttft_sample_size` | `5` | 首字延迟 ring buffer 容量 |
+| `ttft_threshold` | `3` | 窗口内首字延迟慢事件次数触发降级（须 ≤ ttft_sample_size） |
 
 ### 实现细节
 
-- 内存模式：`sync.Map`，key = `channelId:model`，value = `demotionState{count, lastSlowAt, demotedUntil}`；生成速率与首字延迟各一个 map，独立计数；快请求清零计数（未降级条目直接移除）
-- Redis 模式：窗口 key `slowStream:{channelId}:{model}`（生成速率）与 `slowStream:ttftWindow:{channelId}:{model}`（首字延迟）复用 `LPUSH+LTRIM+EXPIRE` Lua（同 `channelDisableWindowLuaScript` 模式）；降级标记 key `slowStream:demoted:{channelId}:{model}` / `slowStream:ttftDemoted:{channelId}:{model}`（SET + EXPIRE，value = demotedUntil 时间戳）
+- 内存模式：`sync.Map`，key = `channelId:model`，value = `demotionState{results []bool, slowCount, demotedUntil}`；采样结果入队，超出 sample_size 弹出最旧样本并同步 slowCount，slowCount ≥ threshold 触发降级
+- Redis 模式：窗口 key `slowStream:{channelId}:{model}`（生成速率）与 `slowStream:ttftWindow:{channelId}:{model}`（首字延迟）复用 `LPUSH`（1=慢/0=快）+ `LTRIM`（保留 sample_size 条）+ `LRANGE` 统计慢次数 Lua；降级标记 key `slowStream:demoted:{channelId}:{model}` / `slowStream:ttftDemoted:{channelId}:{model}`（SET + EXPIRE，value = demotedUntil 时间戳）
 - 采样入口 `service.RecordFromRelayInfo` 挂在 `PostAudioConsumeQuota` / `PostTextConsumeQuota` 的 `gopool.Go` 中（纯追加一行，与 `RecordRelaySample` 并列）；同一适配器内先采样 TTFT（`frt`）再采样生成 TPS，两源独立调用
 - `GetDemotedPriority` 合并两源：任一降级标记未过期即降级，取 `min(originalPriority, demoted_priority)`
 - 渠道选择 `GetRandomSatisfiedChannel` 的 highestPriority 计算段与 targetChannels 收集段均将 `GetPriority()` 替换为降级感知版本（`GetDemotedPriority`），weight 与加权随机段不动；不修改缓存中的 `*Channel` 对象，降级为运行时计算
@@ -482,4 +486,4 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - `web/src/features/system-settings/models/utils.ts` - 排除渠道显示/提交格式转换（`parseExcludeChannelIds` / `serializeExcludeChannelIds`）
 - `web/src/features/system-settings/models/index.tsx` / `section-registry.tsx` / `types.ts` - 默认值（默认开启、min_tps 8.0、threshold 1、max_ttft_ms 5000）与字段透传
 - `web/src/i18n/locales/*.json` - 七语言文案
-- 测试：`pkg/channel_slowstream/tracker_test.go`（未启用/阈值触发/快请求重置/窗口过期/续期/到期恢复/清理/快请求不取消降级/排除渠道不计数不降级/排除后历史降级即时失效/首字延迟阈值触发/两源独立计数互不干扰/首字延迟排除渠道）、`model/channel_slow_stream_selection_test.go`（降级渠道跌出最高层 + 高层耗尽后级联）、`web/src/features/system-settings/models/__tests__/exclude-channel-ids.test.ts`（排除渠道格式转换）
+- 测试：`pkg/channel_slowstream/tracker_test.go`（未启用/阈值触发/ring buffer 滑动窗口——快结果压出最旧样本不洗白/长间隔仍连续计数/续期/到期恢复/清理/快结果不取消降级/排除渠道不计数不降级/排除后历史降级即时失效/首字延迟阈值触发/两源独立计数互不干扰/首字延迟排除渠道/sample_size 小于 threshold 时 sanitize 兜底）、`model/channel_slow_stream_selection_test.go`（降级渠道跌出最高层 + 高层耗尽后级联）、`service/channel_slow_stream_record_test.go`（min_input_tokens 门槛生效）、`web/src/features/system-settings/models/__tests__/exclude-channel-ids.test.ts`（排除渠道格式转换）
