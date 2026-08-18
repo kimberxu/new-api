@@ -109,6 +109,7 @@ const createRoutingReliabilitySchema = (
         enabled: z.boolean(),
         min_tps: z.coerce.number().min(0),
         window_seconds: z.coerce.number().int().min(1),
+        sample_size: z.coerce.number().int().min(1),
         threshold: z.coerce.number().int().min(1),
         min_output_tokens: z.coerce.number().int().min(1),
         demote_duration_sec: z.coerce.number().int().min(1),
@@ -117,6 +118,7 @@ const createRoutingReliabilitySchema = (
         ttft_enabled: z.boolean(),
         max_ttft_ms: z.coerce.number().int().min(1),
         ttft_window_seconds: z.coerce.number().int().min(1),
+        ttft_sample_size: z.coerce.number().int().min(1),
         ttft_threshold: z.coerce.number().int().min(1),
         min_input_tokens: z.coerce.number().int().min(0),
       }),
@@ -145,6 +147,29 @@ const createRoutingReliabilitySchema = (
           message: t('Invalid status code rules: {{tokens}}', {
             tokens: retryParsed.invalidTokens.join(', '),
           }),
+        })
+      }
+
+      if (
+        values.channel_slow_stream_setting.sample_size <
+        values.channel_slow_stream_setting.threshold
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['channel_slow_stream_setting.sample_size'],
+          message: 'Sample size must be at least the slow-event threshold',
+        })
+      }
+
+      if (
+        values.channel_slow_stream_setting.ttft_sample_size <
+        values.channel_slow_stream_setting.ttft_threshold
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['channel_slow_stream_setting.ttft_sample_size'],
+          message:
+            'Sample size must be at least the first-token latency threshold',
         })
       }
     })
@@ -176,6 +201,7 @@ type RoutingReliabilitySectionProps = {
     'channel_slow_stream_setting.enabled': boolean
     'channel_slow_stream_setting.min_tps': number
     'channel_slow_stream_setting.window_seconds': number
+    'channel_slow_stream_setting.sample_size': number
     'channel_slow_stream_setting.threshold': number
     'channel_slow_stream_setting.min_output_tokens': number
     'channel_slow_stream_setting.min_input_tokens': number
@@ -185,6 +211,7 @@ type RoutingReliabilitySectionProps = {
     'channel_slow_stream_setting.ttft_enabled': boolean
     'channel_slow_stream_setting.max_ttft_ms': number
     'channel_slow_stream_setting.ttft_window_seconds': number
+    'channel_slow_stream_setting.ttft_sample_size': number
     'channel_slow_stream_setting.ttft_threshold': number
   }
 }
@@ -213,6 +240,7 @@ type NormalizedRoutingReliabilityValues = {
   'channel_slow_stream_setting.enabled': boolean
   'channel_slow_stream_setting.min_tps': number
   'channel_slow_stream_setting.window_seconds': number
+  'channel_slow_stream_setting.sample_size': number
   'channel_slow_stream_setting.threshold': number
   'channel_slow_stream_setting.min_output_tokens': number
   'channel_slow_stream_setting.min_input_tokens': number
@@ -222,6 +250,7 @@ type NormalizedRoutingReliabilityValues = {
   'channel_slow_stream_setting.ttft_enabled': boolean
   'channel_slow_stream_setting.max_ttft_ms': number
   'channel_slow_stream_setting.ttft_window_seconds': number
+  'channel_slow_stream_setting.ttft_sample_size': number
   'channel_slow_stream_setting.ttft_threshold': number
 }
 
@@ -264,6 +293,7 @@ const buildFormDefaults = (
     enabled: defaults['channel_slow_stream_setting.enabled'],
     min_tps: defaults['channel_slow_stream_setting.min_tps'],
     window_seconds: defaults['channel_slow_stream_setting.window_seconds'],
+    sample_size: defaults['channel_slow_stream_setting.sample_size'],
     threshold: defaults['channel_slow_stream_setting.threshold'],
     min_output_tokens:
       defaults['channel_slow_stream_setting.min_output_tokens'],
@@ -279,6 +309,8 @@ const buildFormDefaults = (
     max_ttft_ms: defaults['channel_slow_stream_setting.max_ttft_ms'],
     ttft_window_seconds:
       defaults['channel_slow_stream_setting.ttft_window_seconds'],
+    ttft_sample_size:
+      defaults['channel_slow_stream_setting.ttft_sample_size'],
     ttft_threshold: defaults['channel_slow_stream_setting.ttft_threshold'],
   },
 })
@@ -319,6 +351,8 @@ const normalizeDefaults = (
     defaults['channel_slow_stream_setting.min_tps'],
   'channel_slow_stream_setting.window_seconds':
     defaults['channel_slow_stream_setting.window_seconds'],
+  'channel_slow_stream_setting.sample_size':
+    defaults['channel_slow_stream_setting.sample_size'],
   'channel_slow_stream_setting.threshold':
     defaults['channel_slow_stream_setting.threshold'],
   'channel_slow_stream_setting.min_output_tokens':
@@ -338,6 +372,8 @@ const normalizeDefaults = (
     defaults['channel_slow_stream_setting.max_ttft_ms'],
   'channel_slow_stream_setting.ttft_window_seconds':
     defaults['channel_slow_stream_setting.ttft_window_seconds'],
+  'channel_slow_stream_setting.ttft_sample_size':
+    defaults['channel_slow_stream_setting.ttft_sample_size'],
   'channel_slow_stream_setting.ttft_threshold':
     defaults['channel_slow_stream_setting.ttft_threshold'],
 })
@@ -376,6 +412,8 @@ const normalizeFormValues = (
     values.channel_slow_stream_setting.min_tps,
   'channel_slow_stream_setting.window_seconds':
     values.channel_slow_stream_setting.window_seconds,
+  'channel_slow_stream_setting.sample_size':
+    values.channel_slow_stream_setting.sample_size,
   'channel_slow_stream_setting.threshold':
     values.channel_slow_stream_setting.threshold,
   'channel_slow_stream_setting.min_output_tokens':
@@ -396,6 +434,8 @@ const normalizeFormValues = (
     values.channel_slow_stream_setting.max_ttft_ms,
   'channel_slow_stream_setting.ttft_window_seconds':
     values.channel_slow_stream_setting.ttft_window_seconds,
+  'channel_slow_stream_setting.ttft_sample_size':
+    values.channel_slow_stream_setting.ttft_sample_size,
   'channel_slow_stream_setting.ttft_threshold':
     values.channel_slow_stream_setting.ttft_threshold,
 })
@@ -1025,7 +1065,7 @@ export function RoutingReliabilitySection({
                     </FormControl>
                     <FormDescription>
                       {t(
-                        'How many slow events within the window trigger demotion.'
+                        'How many consecutive slow events trigger demotion.'
                       )}
                     </FormDescription>
                     <FormMessage />
@@ -1035,10 +1075,10 @@ export function RoutingReliabilitySection({
 
               <FormField
                 control={form.control}
-                name='channel_slow_stream_setting.window_seconds'
+                name='channel_slow_stream_setting.sample_size'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Slow event window (seconds)')}</FormLabel>
+                    <FormLabel>{t('Slow event sample size')}</FormLabel>
                     <FormControl>
                       <Input
                         type='number'
@@ -1049,7 +1089,7 @@ export function RoutingReliabilitySection({
                     </FormControl>
                     <FormDescription>
                       {t(
-                        'Slow events are counted as consecutive only when they occur within this window.'
+                        'How many recent samples are kept for evaluation. Demotion triggers when slow events reach the threshold within these samples. Fast samples only push out the oldest one, not reset all history.'
                       )}
                     </FormDescription>
                     <FormMessage />
@@ -1251,7 +1291,7 @@ export function RoutingReliabilitySection({
                     </FormControl>
                     <FormDescription>
                       {t(
-                        'How many first-token latency events within the window trigger demotion.'
+                        'How many consecutive first-token latency events trigger demotion.'
                       )}
                     </FormDescription>
                     <FormMessage />
@@ -1261,11 +1301,11 @@ export function RoutingReliabilitySection({
 
               <FormField
                 control={form.control}
-                name='channel_slow_stream_setting.ttft_window_seconds'
+                name='channel_slow_stream_setting.ttft_sample_size'
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      {t('First-token latency event window (seconds)')}
+                      {t('First-token latency sample size')}
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -1277,7 +1317,7 @@ export function RoutingReliabilitySection({
                     </FormControl>
                     <FormDescription>
                       {t(
-                        'First-token latency events are counted as consecutive only when they occur within this window.'
+                        'How many recent samples are kept for evaluation. Demotion triggers when first-token latency events reach the threshold within these samples.'
                       )}
                     </FormDescription>
                     <FormMessage />
