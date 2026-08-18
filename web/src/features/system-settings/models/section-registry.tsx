@@ -96,6 +96,8 @@ const MODELS_SECTIONS = [
             settings['channel_slow_stream_setting.min_tps'],
           'channel_slow_stream_setting.window_seconds':
             settings['channel_slow_stream_setting.window_seconds'],
+          'channel_slow_stream_setting.sample_size':
+            settings['channel_slow_stream_setting.sample_size'],
           'channel_slow_stream_setting.threshold':
             settings['channel_slow_stream_setting.threshold'],
           'channel_slow_stream_setting.min_output_tokens':
@@ -114,6 +116,8 @@ const MODELS_SECTIONS = [
             settings['channel_slow_stream_setting.max_ttft_ms'],
           'channel_slow_stream_setting.ttft_window_seconds':
             settings['channel_slow_stream_setting.ttft_window_seconds'],
+          'channel_slow_stream_setting.ttft_sample_size':
+            settings['channel_slow_stream_setting.ttft_sample_size'],
           'channel_slow_stream_setting.ttft_threshold':
             settings['channel_slow_stream_setting.ttft_threshold'],
         }}

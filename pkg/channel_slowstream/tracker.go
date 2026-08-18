@@ -22,11 +22,13 @@ import (
 // 只降 priority，不动 weight；只有一档降级，无阶梯。
 
 // demotionState 内存模式下的单个 (channelId, model) 降级记录。
+// results 保存最近 sampleSize 次采样结果（true=慢，false=快），
+// slowCount 为其中慢事件数；快事件只挤掉最旧样本，不洗白历史慢记录。
 type demotionState struct {
 	mu           sync.Mutex
-	demotedUntil int64 // unix timestamp，到期恢复
-	count        int   // 当前窗口内连续慢速计数
-	lastSlowAt   int64 // 上次慢速事件时间戳
+	demotedUntil int64   // unix timestamp，到期恢复
+	results      []bool  // ring buffer，append 端为最新样本
+	slowCount    int     // 当前窗口内慢事件数
 }
 
 var slowStreamMap sync.Map     // 生成速率降级：key: fmt.Sprintf("%d:%s", channelId, model) -> *demotionState
@@ -43,17 +45,19 @@ func slowStreamRedisDemotedKey(channelId int, model string) string {
 	return fmt.Sprintf("%s:demoted:%d:%s", slowStreamRedisNamespace, channelId, model)
 }
 
-// slowStreamLuaScript atomically pushes a timestamp, trims to the threshold,
-// sets expiry, and returns the current count. Same pattern as
-// channelDisableWindowLuaScript.
+// slowStreamLuaScript ring buffer 语义：LPUSH 本次采样结果（1=慢 0=快），
+// LTRIM 保留最近 sampleSize 条，返回窗口内慢事件总数。
 const slowStreamLuaScript = `
-local count = redis.call('LPUSH', KEYS[1], ARGV[1])
-if count > tonumber(ARGV[2]) then
-  redis.call('LTRIM', KEYS[1], 0, tonumber(ARGV[2]) - 1)
-  count = tonumber(ARGV[2])
+redis.call('LPUSH', KEYS[1], ARGV[1])
+redis.call('LTRIM', KEYS[1], 0, tonumber(ARGV[2]) - 1)
+local slowCount = 0
+local items = redis.call('LRANGE', KEYS[1], 0, -1)
+for _, v in ipairs(items) do
+  if tonumber(v) == 1 then
+    slowCount = slowCount + 1
+  end
 end
-redis.call('EXPIRE', KEYS[1], ARGV[3])
-return count
+return slowCount
 `
 
 var slowStreamLuaSha string
@@ -83,9 +87,23 @@ func isExcludedChannel(channelId int, setting *operation_setting.ChannelSlowStre
 
 // demotionWindow 一次降级事件源（生成慢速或首字延迟）的窗口配置。
 type demotionWindow struct {
-	windowSeconds     int64
-	threshold         int
-	demoteDurationSec int64
+	sampleSize        int   // ring buffer 容量（最近多少次采样）
+	threshold         int   // 窗口内慢事件次数触发降级
+	demoteDurationSec int64 // 降级持续时间秒
+}
+
+// sanitize 修正无效配置：ring buffer 容量至少等于 threshold，
+// 否则窗口内永远凑不够慢事件数，降级永不触发。
+func (w *demotionWindow) sanitize() {
+	if w.sampleSize < w.threshold {
+		w.sampleSize = w.threshold
+	}
+	if w.threshold <= 0 {
+		w.threshold = 1
+	}
+	if w.demoteDurationSec <= 0 {
+		w.demoteDurationSec = 1
+	}
 }
 
 func slowStreamRedisTtftWindowKey(channelId int, model string) string {
@@ -96,35 +114,10 @@ func slowStreamRedisTtftDemotedKey(channelId int, model string) string {
 	return fmt.Sprintf("%s:ttftDemoted:%d:%s", slowStreamRedisNamespace, channelId, model)
 }
 
-// resetSlowWindow 重置一个事件源（生成慢速或首字延迟）的窗口计数。
-// 清零 count，保留 demotedUntil——一次正常请求不得取消进行中的定时降级；
-// 降级到期由 GetDemotedPriority / CleanupExpiredDemotions 处理。
-// memoryKey 为内存 map 的 key，redisWindowKey 为 Redis 窗口 key（两者格式不同）。
-func resetSlowWindow(windowMap *sync.Map, memoryKey string, redisWindowKey string) {
-	if common.RedisEnabled && common.RDB != nil {
-		ctx := context.Background()
-		common.RDB.Del(ctx, redisWindowKey)
-		return
-	}
-	if value, ok := windowMap.Load(memoryKey); ok {
-		state := value.(*demotionState)
-		state.mu.Lock()
-		now := time.Now().Unix()
-		if state.demotedUntil <= now {
-			// 未降级或降级已到期：直接移除条目
-			windowMap.Delete(memoryKey)
-		} else {
-			// 降级中：只重置窗口计数，保留 demotedUntil
-			state.count = 0
-			state.lastSlowAt = 0
-		}
-		state.mu.Unlock()
-	}
-}
-
-// RecordSlowStream 记录一次慢速流式请求事件，返回 true 表示本次触发降级。
+// RecordSlowStream 记录一次流式请求的生成速率采样，返回 true 表示本次触发降级。
+// 快慢都在 ring buffer 中记录；慢事件数达到 threshold 触发降级。
 // 已处于降级态时不重复降级，仅续期 demotedUntil。
-// 配置未启用、渠道在排除列表、tps 未低于阈值、Redis 出错时均返回 false（fail-open）。
+// 配置未启用、渠道在排除列表、Redis 出错时均返回 false（fail-open）。
 func RecordSlowStream(channelId int, model string, tps float64) bool {
 	setting := operation_setting.GetChannelSlowStreamSetting()
 	if !setting.Enabled || setting.Threshold <= 0 {
@@ -133,22 +126,19 @@ func RecordSlowStream(channelId int, model string, tps float64) bool {
 	if isExcludedChannel(channelId, &setting) {
 		return false
 	}
-	if tps >= setting.MinTps {
-		// 不慢：重置窗口计数
-		resetSlowWindow(&slowStreamMap, memoryKey(channelId, model), slowStreamRedisWindowKey(channelId, model))
-		return false
-	}
-	// 慢速事件
-	window := demotionWindow{setting.WindowSeconds, setting.Threshold, setting.DemoteDurationSec}
+	window := demotionWindow{setting.SampleSize, setting.Threshold, setting.DemoteDurationSec}
+	window.sanitize()
+	isSlow := tps < setting.MinTps
 	if common.RedisEnabled && common.RDB != nil {
-		return redisRecordSlow(slowStreamRedisWindowKey(channelId, model), slowStreamRedisDemotedKey(channelId, model), window)
+		return redisRecordSlow(slowStreamRedisWindowKey(channelId, model), slowStreamRedisDemotedKey(channelId, model), window, isSlow)
 	}
-	return memoryRecordSlow(&slowStreamMap, memoryKey(channelId, model), window)
+	return memoryRecordSlow(&slowStreamMap, memoryKey(channelId, model), window, isSlow)
 }
 
-// RecordSlowTtft 记录一次首字延迟（TTFT）慢速事件，返回 true 表示本次触发降级。
+// RecordSlowTtft 记录一次首字延迟（TTFT）采样，返回 true 表示本次触发降级。
 // frtMs 为首字延迟毫秒数；超过 MaxTtftMs 计为慢事件。
-// 配置未启用、渠道在排除列表、frt 未超过阈值、Redis 出错时均返回 false（fail-open）。
+// 快慢都在 ring buffer 中记录；慢事件数达到 threshold 触发降级。
+// 配置未启用、渠道在排除列表、Redis 出错时均返回 false（fail-open）。
 func RecordSlowTtft(channelId int, model string, frtMs int64) bool {
 	setting := operation_setting.GetChannelSlowStreamSetting()
 	if !setting.TtftEnabled || setting.TtftThreshold <= 0 {
@@ -157,36 +147,39 @@ func RecordSlowTtft(channelId int, model string, frtMs int64) bool {
 	if isExcludedChannel(channelId, &setting) {
 		return false
 	}
-	if frtMs <= setting.MaxTtftMs {
-		// 首字不快：重置 TTFT 窗口计数
-		resetSlowWindow(&slowStreamTtftMap, memoryKey(channelId, model), slowStreamRedisTtftWindowKey(channelId, model))
-		return false
-	}
-	// 慢首字事件
-	window := demotionWindow{setting.TtftWindowSeconds, setting.TtftThreshold, setting.DemoteDurationSec}
+	window := demotionWindow{setting.TtftSampleSize, setting.TtftThreshold, setting.DemoteDurationSec}
+	window.sanitize()
+	isSlow := frtMs > setting.MaxTtftMs
 	if common.RedisEnabled && common.RDB != nil {
-		return redisRecordSlow(slowStreamRedisTtftWindowKey(channelId, model), slowStreamRedisTtftDemotedKey(channelId, model), window)
+		return redisRecordSlow(slowStreamRedisTtftWindowKey(channelId, model), slowStreamRedisTtftDemotedKey(channelId, model), window, isSlow)
 	}
-	return memoryRecordSlow(&slowStreamTtftMap, memoryKey(channelId, model), window)
+	return memoryRecordSlow(&slowStreamTtftMap, memoryKey(channelId, model), window, isSlow)
 }
 
 func memoryKey(channelId int, model string) string {
 	return fmt.Sprintf("%d:%s", channelId, model)
 }
 
-func memoryRecordSlow(windowMap *sync.Map, key string, window demotionWindow) bool {
+// memoryRecordSlow 内存模式 ring buffer 计数：采样结果（快/慢）入队，
+// 超出 sampleSize 时弹出最旧样本并同步 slowCount；slowCount 达到 threshold
+// 触发降级。不按时间过期——长请求的采样延迟不影响窗口判定。
+func memoryRecordSlow(windowMap *sync.Map, key string, window demotionWindow, isSlow bool) bool {
 	now := time.Now().Unix()
 	value, _ := windowMap.LoadOrStore(key, &demotionState{})
 	state := value.(*demotionState)
 	state.mu.Lock()
 	defer state.mu.Unlock()
-	if now-state.lastSlowAt > window.windowSeconds {
-		// 窗口过期，重新计数
-		state.count = 0
+	state.results = append(state.results, isSlow)
+	if isSlow {
+		state.slowCount++
 	}
-	state.count++
-	state.lastSlowAt = now
-	if state.count < window.threshold {
+	if len(state.results) > window.sampleSize {
+		if state.results[0] {
+			state.slowCount--
+		}
+		state.results = state.results[1:]
+	}
+	if state.slowCount < window.threshold {
 		return false
 	}
 	if state.demotedUntil > now {
@@ -198,23 +191,27 @@ func memoryRecordSlow(windowMap *sync.Map, key string, window demotionWindow) bo
 	return true
 }
 
-func redisRecordSlow(windowKey string, demotedKey string, window demotionWindow) bool {
+func redisRecordSlow(windowKey string, demotedKey string, window demotionWindow, isSlow bool) bool {
 	ctx := context.Background()
 	now := time.Now().Unix()
 
-	var count int64
+	slowMark := "0"
+	if isSlow {
+		slowMark = "1"
+	}
+	var slowCount int64
 	var err error
 	sha := getSlowStreamLuaSha()
 	if sha != "" {
-		count, err = common.RDB.EvalSha(ctx, sha, []string{windowKey}, now, window.threshold, window.windowSeconds).Int64()
+		slowCount, err = common.RDB.EvalSha(ctx, sha, []string{windowKey}, slowMark, window.sampleSize).Int64()
 	} else {
-		count, err = common.RDB.Eval(ctx, slowStreamLuaScript, []string{windowKey}, now, window.threshold, window.windowSeconds).Int64()
+		slowCount, err = common.RDB.Eval(ctx, slowStreamLuaScript, []string{windowKey}, slowMark, window.sampleSize).Int64()
 	}
 	if err != nil {
 		// fail-open：Redis 出错不影响请求
 		return false
 	}
-	if count < int64(window.threshold) {
+	if slowCount < int64(window.threshold) {
 		return false
 	}
 

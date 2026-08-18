@@ -43,6 +43,7 @@ func setupTtftSampleTest(t *testing.T) {
 		TtftEnabled:       true,
 		MaxTtftMs:         1000,
 		TtftThreshold:     1,
+		TtftSampleSize:    5,
 		TtftWindowSeconds: 300,
 		DemoteDurationSec: 600,
 		MinInputTokens:    100,
