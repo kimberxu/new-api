@@ -29,6 +29,7 @@ import type {
   ChannelTestResponse,
   CopyChannelParams,
   CopyChannelResponse,
+  DemotedChannelInfo,
   FetchModelsResponse,
   GetChannelResponse,
   GetChannelsParams,
@@ -120,6 +121,14 @@ export async function getChannel(id: number): Promise<GetChannelResponse> {
  */
 export async function getChannelOps(): Promise<ChannelOpsResponse> {
   const res = await api.get('/api/channel/ops', channelActionConfig())
+  return res.data
+}
+
+export async function getDemotedChannels(): Promise<{
+  success: boolean
+  data: Record<number, DemotedChannelInfo[]>
+}> {
+  const res = await api.get('/api/channel/demoted', channelActionConfig())
   return res.data
 }
 

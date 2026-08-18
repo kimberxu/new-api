@@ -410,6 +410,23 @@ export function getResponseTimeConfig(timeMs: number) {
  * short inside table cells, e.g. "4h ago" / "42m ago" (en) or "4 小时前" (zh),
  * instead of the verbose "4 hours ago".
  */
+/**
+ * Format a duration in seconds into a compact human-readable string
+ * (e.g. 45s, 3m 5s, 1h 2m). Used for demotion remaining time display.
+ */
+export function formatSeconds(totalSeconds: number): string {
+  const sec = Math.max(0, Math.floor(totalSeconds))
+  const MINUTE = 60
+  const HOUR = 60 * MINUTE
+  if (sec < MINUTE) {
+    return `${sec}s`
+  }
+  if (sec < HOUR) {
+    return `${Math.floor(sec / MINUTE)}m ${sec % MINUTE}s`
+  }
+  return `${Math.floor(sec / HOUR)}h ${Math.floor((sec % HOUR) / MINUTE)}m`
+}
+
 export function formatRelativeTime(
   timestamp: number,
   locale?: Intl.LocalesArgument

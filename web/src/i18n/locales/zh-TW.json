@@ -5605,6 +5605,9 @@
     "How many consecutive slow events trigger demotion.": "連續慢速事件達到該次數即觸發降級。",
     "How many recent samples are kept for evaluation. Demotion triggers when first-token latency events reach the threshold within these samples.": "保留最近多少次取樣用於評估；視窗內首字延遲事件達到門檻即降級。",
     "How many recent samples are kept for evaluation. Demotion triggers when slow events reach the threshold within these samples. Fast samples only push out the oldest one, not reset all history.": "保留最近多少次取樣用於評估；視窗內慢事件達到門檻即降級。快結果只擠掉最舊樣本，不會清空歷史。",
-    "Slow event sample size": "慢速事件取樣次數"
+    "Slow event sample size": "慢速事件取樣次數",
+    "Rate limit configured": "已配置速率限制",
+    "recovers in": "恢復於",
+    "Temporarily demoted (slow latency)": "臨時降級（慢回應）"
   }
 }

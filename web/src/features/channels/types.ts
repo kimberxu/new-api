@@ -184,6 +184,11 @@ export interface ChannelOpsResponse {
   }
 }
 
+export interface DemotedChannelInfo {
+  model: string
+  remaining_seconds: number
+}
+
 export interface ChannelTestResponse {
   success: boolean
   message?: string
