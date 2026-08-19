@@ -341,6 +341,8 @@ func migrateDB() error {
 		&Redemption{},
 		&Ability{},
 		&ChannelDisabledModel{},
+		&ModelGroup{},
+		&ModelGroupItem{},
 		&Log{},
 		&Midjourney{},
 		&TopUp{},
