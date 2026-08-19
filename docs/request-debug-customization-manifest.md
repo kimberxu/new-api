@@ -34,7 +34,7 @@
 | 滑动窗口渠道自动禁用 | `5704e700` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） | `独立文件`（service/channel_disable_window.go）+ `挂载点`（channel.go/relay.go/channel-test.go） | 否 |
 | 日志 t/s 计算排除 TTFT | `e4da650b` | 低（`web/src/features/usage-logs/`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
 | 渠道流速率降级（含首字延迟 TTFT 降级） | `021771ae`、`4dc6823b` | 中（`model/channel_cache.go`、`service/quota.go`、`service/text_quota.go`、`web/src/features/system-settings/models/routing-reliability-section.tsx`） | `独立文件`（pkg/channel_slowstream/）+ `挂载点`（channel_cache.go/服务计费） | 否 |
-| 模型级路由表与模型级禁用（待实施） | （待实施，见独立计划） | 中（模型级路由表功能并入后依赖 channel_cache.go/relay.go/channel-test.go） | `独立文件`（model/channel_disabled_model.go、service/channel_model_disable.go、controller/channel_ability.go）+ `挂载点`（channel_cache.go、ability.go、relay.go、channel-test.go） | 否 |
+| 模型级路由表前台化与模型级禁用（含 auto-ban 细化） | `702be7eb` | 中（`controller/relay.go`、`model/channel_cache.go`、`model/ability.go`、`controller/channel-test.go`） | `独立文件`（model/channel_disabled_model.go、service/channel_model_disable.go、controller/channel_ability.go、web/src/features/channel-abilities/）+ `挂载点`（channel_cache.go、ability.go、relay.go、channel-test.go、channel.go、main.go、channel-router.go） | 否 |
 
 > **标注口径**：「扩展点形态」按各功能详情章节文件清单判定（`独立文件`=新文件承载全部逻辑；`挂载点`=既有文件仅插入少量挂载调用；`内联`=逻辑直接改在既有文件中，为负债项，后续同步冲突时优先迁移）；「上游实现替代」以实施时 `remotes/upstream/*` 可见主题为准，发现新对应分支即改标 `待观察` 并注明分支名。
 
@@ -508,3 +508,50 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - `web/src/features/system-settings/models/index.tsx` / `section-registry.tsx` / `types.ts` - 默认值（默认开启、min_tps 8.0、threshold 3、sample_size 5、max_ttft_ms 5000、ttft_threshold 3）与字段透传
 - `web/src/i18n/locales/*.json` - 七语言文案
 - 测试：`pkg/channel_slowstream/tracker_test.go`（未启用/阈值触发/ring buffer 滑动窗口——快结果压出最旧样本不洗白/长间隔仍连续计数/续期/到期恢复/清理/快结果不取消降级/排除渠道不计数不降级/排除后历史降级即时失效/首字延迟阈值触发/两源独立计数互不干扰/首字延迟排除渠道/sample_size 小于 threshold 时 sanitize 兜底）、`model/channel_slow_stream_selection_test.go`（降级渠道跌出最高层 + 高层耗尽后级联）、`service/channel_slow_stream_record_test.go`（min_input_tokens 门槛生效）、`web/src/features/system-settings/models/__tests__/exclude-channel-ids.test.ts`（排除渠道格式转换）
+
+---
+
+## 模型级路由表前台化与模型级禁用（含 auto-ban 细化）
+
+### 功能概述
+
+new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管理面只有渠道级：启用/禁用、自动禁用（auto-ban）都作用于整个渠道。上游某个模型不可用（404 model not found / 400 invalid model 等）时，只能整个渠道一起禁，误伤同渠道其他可用模型。本次实现：
+
+- **渠道模型路由表前台化**：新增独立管理页面 `/channel-abilities`（侧边栏 Admin 组「渠道路由表」+ 渠道页「路由表」入口按钮），展示渠道×模型能力行（渠道名/类型、模型、分组、优先级、权重、状态徽章），支持渠道/模型/分组/状态筛选与分页；行内可禁用/启用单模型、「测试此模型」。
+- **禁用粒度细化为「渠道×模型」**：新增独立禁用表 `channel_disabled_models`（channel_id × model，source=manual|auto，reason），路由构建（内存缓存 `InitChannelCache` 与 DB 路径 `getChannelQuery` NOT EXISTS）排除被禁的 (channel, model) 对。独立表隔离于「channel.status ↔ ability.enabled」既有同步不变式——渠道重新启用不会抹掉模型级禁用。
+- **auto-ban 模型级判定**：`processChannelError` 对明确模型类错误（404 消息含 model，或 400/422 命中模型关键词）只禁该渠道该模型（source=auto），不再整个渠道禁；模型维度独立滑动窗口（复用 `ConfiguredDisable*` 阈值），key = `channelID:modelName:statusCode:tier`。
+- **测试语义细化到模型级**：测试模型 A 通过只恢复 A（手动测试恢复任意来源，自动周期仅恢复 auto 来源）；渠道级禁用仍由任一模型测试通过整体恢复，语义不变。
+
+### 风险与渠道处理
+
+- 渠道级恢复语义不变（`ShouldEnableChannel` + `EnableChannel` 不动）；自动测试保持每渠道单模型串行，不做全模型并发测试。
+- 模型级错误均按 configured 档计数（`isConfiguredError=true`），语义上模型类错误属于「明确错误」。
+- 多 key 渠道：禁用记录按 channel_id 作用于整个渠道（所有 key），不做 key 粒度细分，与渠道级禁用粒度一致。
+- 渠道更新模型列表不清除禁用记录（记录独立存在）；模型不在渠道 models 中时 ability 行不存在、路由表页不展示孤儿记录，属预期行为。
+- 404 宽松判定（消息含 model 即模型级）若线上误判（上游整体 404 页面含 model 字样），可收紧为「含 model 且含 not found/not exist」，同步更新 `IsModelLevelError` 测试。
+
+### 文件清单
+
+**新增：**
+- `model/channel_disabled_model.go` - `ChannelDisabledModel` 表模型 + CRUD（`AddChannelDisabledModels` OnConflict 幂等、`DeleteChannelDisabledModels*`、`EnableChannelModelDisabled` 按 source 清除）；`(channel_id, model)` 复合唯一索引使幂等生效
+- `service/channel_model_disable.go` - `IsModelLevelError` 判定、`CheckAndRecordDisableModel` 模型维度滑动窗口（Redis Lua + 内存双模式，仿 `channel_disable_window.go`）、`DisableChannelModel` / `EnableChannelModel`（写库 + `InitChannelCache` + `NotifyRootUser`）
+- `controller/channel_ability.go` - `GetChannelAbilities`（两步组装：SQL 筛 channel/model/group + 内存合并禁用记录做 status 过滤与分页）、`DisableChannelAbilities` / `EnableChannelAbilities`
+- `web/src/features/channel-abilities/` - 前端页面（`lib/api.ts`、`index.tsx`、`components/channel-abilities-table.tsx`）
+- `web/src/routes/_authenticated/channel-abilities/index.tsx` - 路由（ROLE.ADMIN 守卫，路径 `/channel-abilities`）
+
+**改动（挂载点/最小插入）：**
+- `model/main.go` - AutoMigrate 注册 `&ChannelDisabledModel{}`
+- `model/channel.go` - 三处渠道删除清理（单删、批量删事务内、`DeleteDisabledChannel` 子查询）
+- `model/channel_cache.go` - `InitChannelCache` 加载禁用记录并在 `group2model2channels` 构建循环过滤
+- `model/ability.go` - `getChannelQuery` 追加 NOT EXISTS 子查询；新增 `GetChannelAbilities` / `GetChannelDisabledModelsByChannelIds`
+- `controller/relay.go` - `processChannelError` 模型级分支（包进 else，task relay 传 nil 走渠道级）
+- `controller/channel-test.go` - `testResult.modelName`（命名返回值 + defer 注入）、`performChannelTests` 失败/成功分支模型级禁用与恢复、`TestChannel` 手动测试成功恢复任意来源
+- `router/channel-router.go` - 注册 `/abilities`、`/abilities/disable`、`/abilities/enable`
+- `web/src/hooks/use-sidebar-data.ts` - Admin 组「渠道路由表」菜单项
+- `web/src/features/channels/index.tsx` - Actions 区「路由表」入口按钮
+- `web/src/i18n/locales/*.json` - 七语言文案（新增 8 键）
+
+**测试：**
+- `service/channel_model_disable_test.go` - `IsModelLevelError` 表驱动（404 宽松档/400/422 关键词/非 404-400-422 不判/nil）+ 模型维度窗口（模型/状态码/渠道独立、threshold 0/1）
+- `model/channel_disabled_model_test.go` - DB 路径排除、缓存路径排除、Add 幂等、按 source 清除、渠道清理
+- `model/task_cas_test.go` - 测试 DB AutoMigrate 注册新表
