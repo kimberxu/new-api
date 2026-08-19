@@ -5608,6 +5608,14 @@
     "Slow event sample size": "慢速事件采样次数",
     "Rate limit configured": "已配置速率限制",
     "recovers in": "恢复于",
-    "Temporarily demoted (slow latency)": "临时降级（慢响应）"
+    "Temporarily demoted (slow latency)": "临时降级（慢响应）",
+    "Automatically Disabled": "自动禁用",
+    "Channel Abilities": "渠道路由表",
+    "Disable model {{model}} on channel {{name}}?": "确定禁用渠道 {{name}} 的模型 {{model}} 吗？",
+    "Manual": "手动",
+    "Manually Disabled": "手动禁用",
+    "No Channel Abilities Found": "未找到渠道路由",
+    "No channel abilities match your filters.": "没有符合筛选条件的渠道路由。",
+    "Route Table": "路由表"
   }
 }

@@ -60,6 +60,35 @@ func GetAllEnableAbilities() []Ability {
 	return abilities
 }
 
+// GetChannelAbilities returns abilities matching the given filters. Status
+// filtering (enabled / manual_disabled / auto_disabled) is applied by the
+// caller after merging ChannelDisabledModel records, so pagination also
+// happens in the caller; this query only narrows by channel/model/group.
+func GetChannelAbilities(channelId int, modelQuery string, group string) ([]Ability, error) {
+	query := DB.Model(&Ability{})
+	if channelId > 0 {
+		query = query.Where("channel_id = ?", channelId)
+	}
+	if modelQuery != "" {
+		query = query.Where("lower(model) like ?", "%"+strings.ToLower(modelQuery)+"%")
+	}
+	if group != "" {
+		query = query.Where(commonGroupCol+" = ?", group)
+	}
+	var abilities []Ability
+	// `group` is a reserved word: order by it via commonGroupCol.
+	err := query.Order("channel_id, " + commonGroupCol + ", model").Find(&abilities).Error
+	return abilities, err
+}
+
+// GetChannelDisabledModelsByChannelIds returns all model-level disable
+// records for the given channels (used by the ability route-table page).
+func GetChannelDisabledModelsByChannelIds(channelIds []int) ([]ChannelDisabledModel, error) {
+	var records []ChannelDisabledModel
+	err := DB.Where("channel_id IN ?", channelIds).Find(&records).Error
+	return records, err
+}
+
 func getChannelQuery(group string, model string) (*gorm.DB, error) {
 	// Select only the highest-priority enabled channels for the group/model.
 	// Retries never demote to a lower priority tier here: once the top tier is
@@ -69,6 +98,10 @@ func getChannelQuery(group string, model string) (*gorm.DB, error) {
 	// top tier. Cross-tier fallback is handled by the caller (auto-groups).
 	maxPrioritySubQuery := DB.Model(&Ability{}).Select("MAX(priority)").Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, model, true)
 	channelQuery := DB.Where(commonGroupCol+" = ? and model = ? and enabled = ? and priority = (?)", group, model, true, maxPrioritySubQuery)
+	// Exclude (channel, model) pairs that are model-level disabled. The
+	// subquery is dialect-neutral (SQLite/MySQL/PostgreSQL) and only touches
+	// non-reserved columns.
+	channelQuery = channelQuery.Where("NOT EXISTS (SELECT 1 FROM channel_disabled_models WHERE channel_id = abilities.channel_id AND model = abilities.model)")
 	return channelQuery, nil
 }
 

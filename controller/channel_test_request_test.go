@@ -234,6 +234,7 @@ func TestDirectOpenAIResponsesKeepsExistingParameters(t *testing.T) {
 	require.NoError(t, err)
 	assert.JSONEq(t, body, string(encoded))
 }
+
 // TestBuildTestRequestMessageRandomized 验证 buildTestRequest 对所有含用户消息的
 // 测试请求格式都使用随机化的测试问句（而非固定文案），且消息体结构正确。
 func TestBuildTestRequestMessageRandomized(t *testing.T) {

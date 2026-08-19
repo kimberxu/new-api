@@ -5608,6 +5608,14 @@
     "Slow event sample size": "Slow event sample size",
     "Rate limit configured": "Rate limit configured",
     "recovers in": "recovers in",
-    "Temporarily demoted (slow latency)": "Temporarily demoted (slow latency)"
+    "Temporarily demoted (slow latency)": "Temporarily demoted (slow latency)",
+    "Automatically Disabled": "Automatically Disabled",
+    "Channel Abilities": "Channel Abilities",
+    "Disable model {{model}} on channel {{name}}?": "Disable model {{model}} on channel {{name}}?",
+    "Manual": "Manual",
+    "Manually Disabled": "Manually Disabled",
+    "No Channel Abilities Found": "No Channel Abilities Found",
+    "No channel abilities match your filters.": "No channel abilities match your filters.",
+    "Route Table": "Route Table"
   }
 }

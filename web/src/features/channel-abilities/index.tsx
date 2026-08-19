@@ -16,20 +16,22 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import {
-  Activity,
-  Box,
-  ClipboardList,
-  CreditCard,
-  FileText,
-  FlaskConical,
-  Key,
-  LayoutDashboard,
-  ListTodo,
-  MessageSquare,
-  PlugZap,
-  Radio,
-  ServerCog,
-  Settings,
-  ShieldCheck,
-  Table2,
+import { useTranslation } from 'react-i18next'
+
+import { SectionPageLayout } from '@/components/layout'
+import { ChannelAbilitiesTable } from './components/channel-abilities-table'
+
+export function ChannelAbilities() {
+  const { t } = useTranslation()
+
+  return (
+    <SectionPageLayout fixedContent>
+      <SectionPageLayout.Title>
+        <span className='truncate'>{t('Channel Abilities')}</span>
+      </SectionPageLayout.Title>
+      <SectionPageLayout.Content>
+        <ChannelAbilitiesTable />
+      </SectionPageLayout.Content>
+    </SectionPageLayout>
+  )
+}

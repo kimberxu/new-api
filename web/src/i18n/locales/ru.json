@@ -5608,6 +5608,14 @@
     "Slow event sample size": "Размер выборки медленных событий",
     "Rate limit configured": "Лимит запросов настроен",
     "recovers in": "восстановление через",
-    "Temporarily demoted (slow latency)": "Временно понижен (медленный ответ)"
+    "Temporarily demoted (slow latency)": "Временно понижен (медленный ответ)",
+    "Automatically Disabled": "Отключено автоматически",
+    "Channel Abilities": "Возможности каналов",
+    "Disable model {{model}} on channel {{name}}?": "Отключить модель {{model}} на канале {{name}}?",
+    "Manual": "Вручную",
+    "Manually Disabled": "Отключено вручную",
+    "No Channel Abilities Found": "Возможности каналов не найдены",
+    "No channel abilities match your filters.": "Нет возможностей каналов, соответствующих фильтрам.",
+    "Route Table": "Таблица маршрутов"
   }
 }

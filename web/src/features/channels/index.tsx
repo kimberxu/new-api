@@ -18,11 +18,12 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Settings2 } from 'lucide-react'
+import { Settings2, Table2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Tooltip,
   TooltipContent,
@@ -95,6 +96,12 @@ export function Channels() {
         </SectionPageLayout.Title>
         <SectionPageLayout.Actions>
           <ChannelsPrimaryButtons />
+          <Button asChild variant='outline' size='default'>
+            <Link to='/channel-abilities'>
+              <Table2 className='size-4' />
+              <span className='max-sm:hidden'>{t('Route Table')}</span>
+            </Link>
+          </Button>
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
           <ChannelsTable />

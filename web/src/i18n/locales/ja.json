@@ -5608,6 +5608,14 @@
     "Slow event sample size": "遅延イベントのサンプル数",
     "Rate limit configured": "レート制限設定済み",
     "recovers in": "回復まで",
-    "Temporarily demoted (slow latency)": "一時的に降格（遅延）"
+    "Temporarily demoted (slow latency)": "一時的に降格（遅延）",
+    "Automatically Disabled": "自動無効化",
+    "Channel Abilities": "チャネル能力",
+    "Disable model {{model}} on channel {{name}}?": "チャネル {{name}} のモデル {{model}} を無効にしますか？",
+    "Manual": "手動",
+    "Manually Disabled": "手動無効化",
+    "No Channel Abilities Found": "チャネル能力が見つかりません",
+    "No channel abilities match your filters.": "フィルターに一致するチャネル能力はありません。",
+    "Route Table": "ルートテーブル"
   }
 }

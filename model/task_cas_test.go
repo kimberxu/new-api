@@ -50,6 +50,7 @@ func TestMain(m *testing.M) {
 		&Channel{},
 		&QuotaData{},
 		&Ability{},
+		&ChannelDisabledModel{},
 		&TopUp{},
 		&SubscriptionPlan{},
 		&SubscriptionOrder{},
