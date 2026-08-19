@@ -4,7 +4,7 @@
 
 ## 标准触发短语
 
-向维护助手说 **「同步上游到 deploy」**(参考 `docs/local-github-workflow.md`) 即按本文档执行完整同步流程:fetch upstream → merge 进 deploy → 按「保留魔改 + 采纳上游语义」解决冲突 → 合并后验证 → push origin deploy → 更新本文档头部标记。**默认同时同步 `main`**(merge upstream/main 后推送)。
+向维护助手说 **「同步上游到 deploy」**(参考 `docs/local-github-workflow.md`) 即按本文档执行完整同步流程:fetch upstream → **`git rebase upstream/main deploy`** 重放魔改提交 → 逐提交按「保留魔改 + 采纳上游语义」解决冲突 → 合并后验证 → force-push origin deploy → 更新本文档头部标记。**默认同时同步 `main`**(merge upstream/main 后推送)。
 
 可选追加：`不同步 main`（仅同步 deploy）、`不更新文档`（跳过头部标记更新）、`跳过验证`（不推荐）。
 
@@ -36,11 +36,20 @@ git push origin main
 ```bash
 git fetch upstream
 git checkout deploy
-git merge upstream/main
-# 有冲突 → 见"冲突处理原则"
+git rebase upstream/main
+# 有冲突 → 见"冲突处理原则"。逐提交解决：当前正在重放的魔改提交与上游本次
+#           改动的冲突；解决后 git add + git rebase --continue 进入下一个提交
+# 任何时刻可 git rebase --abort 整体回退到同步前状态
 # 无冲突 → 仍建议执行"合并后验证"
-git push origin deploy
+git push --force-with-lease origin deploy
 ```
+
+补充说明（决策与影响）：
+
+- **为何 rebase 而非 merge**：冲突从「一大坨对冲」变为「逐魔改 commit 的小冲突」，定位靠 `git log --oneline upstream/main..deploy` 预扫；失败可整体回退（merge 只能回滚合并）。代价是重写 deploy 历史。
+- **force-push 影响面**：GHCR 镜像由 `deploy-image` / `deploy-image-<sha>` git tag 触发构建，tag 不随分支重写；部署机只从 GHCR 拉镜像，不受分支历史重写影响。文档头部 commit 标记在每次同步后更新即可。
+- **push 命令用 `--force-with-lease` 而非 `-f`**，防止覆盖他人/他机推送。
+- 「合并后验证」三件套（root go build / relaykit build / bun build）在 rebase 完成后照常执行，位置不变。
 
 #### 冲突处理原则
 
@@ -52,11 +61,15 @@ git push origin deploy
 
 已知高风险文件（上游改动最易与魔改冲突）：
 
-| 文件 | 魔改内容 | 上游易冲突点 |
-|------|----------|--------------|
-| `controller/relay.go` | 渠道限流检查、同优先级重试 `ExcludeChannel`、全渠道限流 429 兜底 | 重试/计费逻辑（如 `PrepareTieredBillingForSelectedGroup`） |
-| `relay/common/relay_info.go` | `RequestDebugSnapshot` 字段 | `RelayInfo` 结构体字段增减、注释更新 |
-| `web/src/features/usage-logs/components/dialogs/details-dialog.tsx` | 请求调试快照面板 | 日志详情功能（如 stream status） |
+| 文件 | 魔改内容 | 上游易冲突点 | 解决决策记录 |
+|------|----------|--------------|--------------|
+| `controller/relay.go` | 渠道限流检查、同优先级重试 `ExcludeChannel`、全渠道限流 429 兜底、（新增）模型级禁用分支 | 重试/计费逻辑（如 `PrepareTieredBillingForSelectedGroup`） | `e0b9f243`：2026-08-01 同步 8 提交；重试/计费逻辑拼序采纳、限流检查保留 |
+| `relay/common/relay_info.go` | `RequestDebugSnapshot` 字段 | `RelayInfo` 结构体字段增减、注释更新 | （空，待首录） |
+| `web/src/features/usage-logs/components/dialogs/details-dialog.tsx` | 请求调试快照面板 | 日志详情功能（如 stream status） | （空，待首录） |
+
+#### 冲突决策记录规则
+
+每次 rebase/merge 解完冲突后，把「上游改了啥 / 本地怎么拼 / 结论一句话」追加到对应文件行的「解决决策记录」列（格式：`<提交短SHA>：<日期> 同步 N 提交；<本次决策一句话>`）。列内多记录用 `；` 分隔。记忆原则：同类冲突再次出现时，先查本表照抄决策，不再重新设计。
 
 历史参考：2026-08-01 同步 8 个上游提交时，前两个文件各产生一处冲突，处理方式记录在合并提交 `e0b9f243`。
 

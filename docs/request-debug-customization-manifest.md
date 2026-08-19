@@ -10,27 +10,33 @@
 - 必须改动既有文件时，限制为最小必要 diff——只做纯追加/局部插入，不修改、不删除、不重排已有代码，能不改就不改。
 - 每次新增魔改前按此顺序审查：先问「这个文件能不能不动」，再问「改动能不能再小」；改动文件越少、越偏向新增文件，后续合并 `upstream/main` 冲突越少。
 - 例外：`docs/` 文档与 `AGENTS.md` 登记类改动属于分支约定本身，不受最小化约束。
+- **扩展点织入是改动最小化的执行形态**：新魔改必须过两道审查——①能否完全新文件承载；②必须动既有文件时，是否只插入「挂载点行」（函数调用 / 中间件 / context key / 路由行），魔改逻辑本体是否全部在新增文件中。两者都过才允许动既有文件。
+- 每项魔改在总览表「扩展点形态」列登记实际形态；`内联` 形态为负债项，后续同步出现冲突时优先顺手迁移（把逻辑抽到新文件、原位置留挂载点调用）。
+- 例外不变：`docs/` 与 `AGENTS.md` 登记类改动不受最小化约束。
 
 ## 功能总览
 
-| 功能 | 引入提交 | 上游冲突风险 |
-|------|----------|--------------|
-| 请求调试日志 | `bfa99ad6` | 中（`controller/relay.go`、`relay/common/relay_info.go`） |
-| 日志自动清理 | `bfa99ad6` | 低 |
-| 同优先级渠道重试 | `bfa99ad6` | 中（`controller/relay.go`） |
-| 504/524 超时重试开关与自动禁用 | `ff2462de` | 中（`controller/relay.go`、`setting/operation_setting/status_code_ranges.go`、系统设置前端） |
-| 流式结束原因分类与中断流语义 | `62830da3` | 中（`relay/common/stream_status.go`、`relay/channel/openai/relay-openai.go`、`service/log_info_generate.go`） |
-| 实时连接追踪 | `3a1279f1`、`977d2d5a`、`15e56fb6` | 中（`controller/relay.go`、`router/api-router.go`、`service/inflight_tracker.go`） |
-| GHCR 部署镜像构建 | `bfa99ad6` | 低 |
-| GHCR 镜像自动清理 | `ae34ad6a` | 低（`.github/workflows/deploy-image-ghcr.yml`） |
-| 渠道请求频率限制（RPM/TPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） |
-| 渠道测试请求文案定制 | `d0fdb047` | 低（`controller/channel-test.go`） |
-| 加权模型映射（1 对多） | `9a20e660`、`c6c4bcf8`、`83329f48` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） |
-| 额度显示模式切换修复 | `d8378ee7` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） |
-| token 大数 K/M/B 分级显示 | `ea91ebf1`、`4ce5615c` | 低（`web/src/lib/currency.ts`） |
-| 滑动窗口渠道自动禁用 | `5704e700` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） |
-| 日志 t/s 计算排除 TTFT | `e4da650b` | 低（`web/src/features/usage-logs/`） |
-| 渠道流速率降级（含首字延迟 TTFT 降级） | `021771ae`、`4dc6823b` | 中（`model/channel_cache.go`、`service/quota.go`、`service/text_quota.go`、`web/src/features/system-settings/models/routing-reliability-section.tsx`） |
+| 功能 | 引入提交 | 上游冲突风险 | 扩展点形态 | 上游实现替代 |
+|------|----------|--------------|------------|--------------|
+| 请求调试日志 | `bfa99ad6` | 中（`controller/relay.go`、`relay/common/relay_info.go`） | `挂载点`+`独立文件`（核心在 relay/common/request_debug.go，relay.go 为挂载点） | 否 |
+| 日志自动清理 | `bfa99ad6` | 低 | `挂载点`+`独立文件`（service/system_task.go 任务注册挂载） | 否 |
+| 同优先级渠道重试 | `bfa99ad6` | 中（`controller/relay.go`） | `内联`（controller/relay.go 内）→ 待迁移 | 待观察（upstream `fix/tiered-retry-billing-followups` 主题相邻；上游合并后审查能否退役本地版） |
+| 504/524 超时重试开关与自动禁用 | `ff2462de` | 中（`controller/relay.go`、`setting/operation_setting/status_code_ranges.go`、系统设置前端） | `挂载点`（relay.go 接入点 + status_code_ranges.go 独立） | 否 |
+| 流式结束原因分类与中断流语义 | `62830da3` | 中（`relay/common/stream_status.go`、`relay/channel/openai/relay-openai.go`、`service/log_info_generate.go`） | `挂载点`（stream_status.go 新文件 + relay-openai.go 接入） | 否 |
+| 实时连接追踪 | `3a1279f1`、`977d2d5a`、`15e56fb6` | 中（`controller/relay.go`、`router/api-router.go`、`service/inflight_tracker.go`） | `独立文件`（service/inflight_tracker.go）+ `挂载点`（relay.go） | 否 |
+| GHCR 部署镜像构建 | `bfa99ad6` | 低 | `挂载点`+`独立文件`（workflow 文件独立） | 否 |
+| GHCR 镜像自动清理 | `ae34ad6a` | 低（`.github/workflows/deploy-image-ghcr.yml`） | `挂载点`+`独立文件`（workflow 步骤独立） | 否 |
+| 渠道请求频率限制（RPM/TPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） | `内联` → 待迁移 | 否 |
+| 渠道测试请求文案定制 | `d0fdb047` | 低（`controller/channel-test.go`） | `内联`（channel-test.go）→ 待迁移 | 否 |
+| 加权模型映射（1 对多） | `9a20e660`、`c6c4bcf8`、`83329f48` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） | `内联`（relay/helper/model_mapped.go）→ 待迁移 | 否 |
+| 额度显示模式切换修复 | `d8378ee7` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
+| token 大数 K/M/B 分级显示 | `ea91ebf1`、`4ce5615c` | 低（`web/src/lib/currency.ts`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
+| 滑动窗口渠道自动禁用 | `5704e700` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） | `独立文件`（service/channel_disable_window.go）+ `挂载点`（channel.go/relay.go/channel-test.go） | 否 |
+| 日志 t/s 计算排除 TTFT | `e4da650b` | 低（`web/src/features/usage-logs/`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
+| 渠道流速率降级（含首字延迟 TTFT 降级） | `021771ae`、`4dc6823b` | 中（`model/channel_cache.go`、`service/quota.go`、`service/text_quota.go`、`web/src/features/system-settings/models/routing-reliability-section.tsx`） | `独立文件`（pkg/channel_slowstream/）+ `挂载点`（channel_cache.go/服务计费） | 否 |
+| 模型级路由表与模型级禁用（待实施） | （待实施，见独立计划） | 中（模型级路由表功能并入后依赖 channel_cache.go/relay.go/channel-test.go） | `独立文件`（model/channel_disabled_model.go、service/channel_model_disable.go、controller/channel_ability.go）+ `挂载点`（channel_cache.go、ability.go、relay.go、channel-test.go） | 否 |
+
+> **标注口径**：「扩展点形态」按各功能详情章节文件清单判定（`独立文件`=新文件承载全部逻辑；`挂载点`=既有文件仅插入少量挂载调用；`内联`=逻辑直接改在既有文件中，为负债项，后续同步冲突时优先迁移）；「上游实现替代」以实施时 `remotes/upstream/*` 可见主题为准，发现新对应分支即改标 `待观察` 并注明分支名。
 
 > **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`，`deploy` 与上游文件一致。
 
