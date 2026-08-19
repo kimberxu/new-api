@@ -483,6 +483,10 @@ func BatchDeleteChannels(ids []int) (int64, error) {
 			tx.Rollback()
 			return 0, err
 		}
+		if err := tx.Where("channel_id in (?)", chunk).Delete(&ChannelDisabledModel{}).Error; err != nil {
+			tx.Rollback()
+			return 0, err
+		}
 	}
 	if err := tx.Commit().Error; err != nil {
 		return 0, err
@@ -615,7 +619,10 @@ func (channel *Channel) Delete() error {
 		return err
 	}
 	err = channel.DeleteAbilities()
-	return err
+	if err != nil {
+		return err
+	}
+	return DeleteChannelDisabledModelsByChannelId(channel.Id)
 }
 
 var channelStatusLock sync.Mutex
@@ -890,6 +897,15 @@ func DeleteChannelByStatus(status int64) (int64, error) {
 }
 
 func DeleteDisabledChannel() (int64, error) {
+	// Remove model-level disable records for the channels being deleted.
+	// Must run before the channel delete: the subquery keys off status, so it
+	// would find nothing after the rows are gone. SQLite/MySQL/PostgreSQL all
+	// support DELETE ... WHERE channel_id IN (SELECT ...).
+	if err := DB.Where("channel_id IN (SELECT id FROM channels WHERE status = ? or status = ?)",
+		common.ChannelStatusAutoDisabled, common.ChannelStatusManuallyDisabled).
+		Delete(&ChannelDisabledModel{}).Error; err != nil {
+		return 0, err
+	}
 	result := DB.Where("status = ? or status = ?", common.ChannelStatusAutoDisabled, common.ChannelStatusManuallyDisabled).Delete(&Channel{})
 	return result.RowsAffected, result.Error
 }

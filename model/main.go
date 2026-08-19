@@ -269,6 +269,7 @@ func migrateDB() error {
 		&Option{},
 		&Redemption{},
 		&Ability{},
+		&ChannelDisabledModel{},
 		&Log{},
 		&Midjourney{},
 		&TopUp{},

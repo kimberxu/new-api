@@ -415,11 +415,19 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 	logger.LogError(c, fmt.Sprintf("channel error (channel #%d, status code: %d): %s", channelError.ChannelId, err.StatusCode, common.LocalLogPreview(err.Error())))
 	// 不要使用context获取渠道信息，异步处理时可能会出现渠道信息不一致的情况
 	// do not use context to get channel info, there may be inconsistent channel info when processing asynchronously
-	decision := service.ShouldDisableChannelWithDecision(channelError.ChannelId, err)
-	if decision.ShouldDisable && channelError.AutoBan {
-		gopool.Go(func() {
-			service.DisableChannel(channelError, decision.Reason)
-		})
+	if channelError.AutoBan && relayInfo != nil && relayInfo.OriginModelName != "" && service.IsModelLevelError(err) {
+		if service.CheckAndRecordDisableModel(channelError.ChannelId, relayInfo.OriginModelName, err.StatusCode, true) {
+			gopool.Go(func() {
+				_ = service.DisableChannelModel(channelError.ChannelId, relayInfo.OriginModelName, err.ErrorWithStatusCode())
+			})
+		}
+	} else {
+		decision := service.ShouldDisableChannelWithDecision(channelError.ChannelId, err)
+		if decision.ShouldDisable && channelError.AutoBan {
+			gopool.Go(func() {
+				service.DisableChannel(channelError, decision.Reason)
+			})
+		}
 	}
 
 	if constant.ErrorLogEnabled && types.IsRecordErrorLog(err) {

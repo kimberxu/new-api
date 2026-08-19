@@ -29,6 +29,7 @@ import {
   Radio,
   ServerCog,
   Settings,
+  Table2,
   Ticket,
   User,
   Users,
@@ -129,6 +130,11 @@ export function useSidebarData(): SidebarData {
             title: t('Channels'),
             url: '/channels',
             icon: Radio,
+          },
+          {
+            title: t('Channel Abilities'),
+            url: '/channel-abilities',
+            icon: Table2,
           },
           {
             title: t('Models'),

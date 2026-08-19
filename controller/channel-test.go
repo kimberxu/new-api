@@ -40,6 +40,7 @@ type testResult struct {
 	context     *gin.Context
 	localErr    error
 	newAPIError *types.NewAPIError
+	modelName   string
 }
 
 func normalizeChannelTestEndpoint(channel *model.Channel, endpointType string) string {
@@ -70,7 +71,7 @@ func resolveChannelTestUserID(c *gin.Context) (int, error) {
 	return rootUser.Id, nil
 }
 
-func testChannel(ctx context.Context, channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool) testResult {
+func testChannel(ctx context.Context, channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool) (result testResult) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -107,6 +108,10 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 			}
 		}
 	}
+	// Record the resolved test model on every return path (defer runs after
+	// the return value is set). Early returns before this point keep an empty
+	// modelName, which is correct for unsupported-channel-type paths.
+	defer func() { result.modelName = testModel }()
 
 	endpointType = normalizeChannelTestEndpoint(channel, endpointType)
 
@@ -472,8 +477,8 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 			newAPIError: types.NewOpenAIError(usageErr, types.ErrorCodeBadResponseBody, http.StatusInternalServerError),
 		}
 	}
-	result := w.Result()
-	respBody, err := readTestResponseBody(result.Body, isStream)
+	httpResult := w.Result()
+	respBody, err := readTestResponseBody(httpResult.Body, isStream)
 	if err != nil {
 		return testResult{
 			context:     c,
@@ -924,6 +929,11 @@ func TestChannel(c *gin.Context) {
 		})
 		return
 	}
+	// Manual test of a specific model passed: clear any model-level disable
+	// for it (any source — a manual test is the authoritative probe).
+	if result.modelName != "" {
+		_ = service.EnableChannelModel(channelId, result.modelName, "")
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -978,7 +988,14 @@ func performChannelTests(ctx context.Context, channels []*model.Channel, testUse
 		newAPIError := result.newAPIError
 		// request error disables the channel
 		if newAPIError != nil {
-			shouldBanChannel = service.ShouldDisableChannelWithDecision(channel.Id, result.newAPIError).ShouldDisable
+			if result.modelName != "" && service.IsModelLevelError(newAPIError) {
+				if service.CheckAndRecordDisableModel(channel.Id, result.modelName, newAPIError.StatusCode, true) {
+					summary.Disabled++
+					_ = service.DisableChannelModel(channel.Id, result.modelName, newAPIError.ErrorWithStatusCode())
+				}
+			} else {
+				shouldBanChannel = service.ShouldDisableChannelWithDecision(channel.Id, result.newAPIError).ShouldDisable
+			}
 		}
 
 		// 当错误检查通过，才检查响应时间
@@ -1006,6 +1023,12 @@ func performChannelTests(ctx context.Context, channels []*model.Channel, testUse
 		if result.localErr == nil && !isChannelEnabled && service.ShouldEnableChannel(newAPIError, channel.Status) {
 			service.EnableChannel(channel.Id, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.Name)
 			summary.Enabled++
+		}
+
+		// model-level recovery: an automatic periodic test pass only clears
+		// auto-sourced disables (manual disables need a manual test).
+		if result.localErr == nil && result.modelName != "" {
+			_ = service.EnableChannelModel(channel.Id, result.modelName, "auto")
 		}
 
 		channel.UpdateResponseTime(milliseconds)
