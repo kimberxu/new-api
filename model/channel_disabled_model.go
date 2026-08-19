@@ -18,7 +18,11 @@ type ChannelDisabledModel struct {
 	// cross-database AutoMigrate churn.
 	Source    string `json:"source" gorm:"type:varchar(16)"`
 	Reason    string `json:"reason" gorm:"type:text"`
-	CreatedAt int64  `json:"created_at" gorm:"bigint;autoCreateTime"`
+	// [personal] BannedUntil is the unix timestamp after which an auto ban
+	// expires (0 = permanent). Only auto-sourced bans carry a deadline; the
+	// periodic recovery probe re-tests the model when it passes.
+	BannedUntil int64 `json:"banned_until" gorm:"bigint;default:0"`
+	CreatedAt   int64 `json:"created_at" gorm:"bigint;autoCreateTime"`
 }
 
 // AddChannelDisabledModels inserts model-level disable records, ignoring
@@ -96,4 +100,12 @@ func EnableChannelModelDisabled(channelId int, model string, source string) erro
 		query = query.Where("source = ?", source)
 	}
 	return query.Delete(&ChannelDisabledModel{}).Error
+}
+
+// SetChannelDisabledModelBannedUntil updates the ban deadline of an existing
+// model-level disable record. No-op (nil) when the record is absent.
+func SetChannelDisabledModelBannedUntil(channelId int, model string, bannedUntil int64) error {
+	return DB.Model(&ChannelDisabledModel{}).
+		Where("channel_id = ? AND model = ?", channelId, model).
+		Update("banned_until", bannedUntil).Error
 }

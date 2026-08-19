@@ -26,6 +26,9 @@ type GroupMemberView struct {
 	Enabled      bool   `json:"enabled"`
 	ChannelPrio  int64  `json:"channel_priority"`
 	ChannelWt    int    `json:"channel_weight"`
+	// [personal] Disabled carries the model-level disable record (auto/manual)
+	// for this (channel, model) pair, if any.
+	Disabled *model.ChannelDisabledModel `json:"disabled,omitempty"`
 }
 
 // GroupView is a model group plus its member list.
@@ -38,6 +41,25 @@ type GroupView struct {
 // getGroupMemberViews resolves members with channel metadata.
 func getGroupMemberViews(groupId int, items []*model.ModelGroupItem) []GroupMemberView {
 	views := make([]GroupMemberView, 0, len(items))
+	if len(items) == 0 {
+		return views
+	}
+	// [personal] Batch-load model-level disable records for the involved
+	// channels (channel_disabled_models) so members can surface their ban
+	// status without a query per member.
+	channelIds := make([]int, 0, len(items))
+	for _, it := range items {
+		channelIds = append(channelIds, it.ChannelId)
+	}
+	disabledRows, _ := model.GetChannelDisabledModelsByChannelIds(channelIds)
+	disabledByChannelModel := make(map[int]map[string]*model.ChannelDisabledModel)
+	for i := range disabledRows {
+		r := &disabledRows[i]
+		if disabledByChannelModel[r.ChannelId] == nil {
+			disabledByChannelModel[r.ChannelId] = make(map[string]*model.ChannelDisabledModel)
+		}
+		disabledByChannelModel[r.ChannelId][r.Model] = r
+	}
 	for _, it := range items {
 		view := GroupMemberView{
 			Id:        it.Id,
@@ -53,6 +75,9 @@ func getGroupMemberViews(groupId int, items []*model.ModelGroupItem) []GroupMemb
 			view.ChannelType = ch.Type
 			view.ChannelPrio = ch.GetPriority()
 			view.ChannelWt = ch.GetWeight()
+		}
+		if byModel, ok := disabledByChannelModel[it.ChannelId]; ok {
+			view.Disabled = byModel[it.Model]
 		}
 		views = append(views, view)
 	}

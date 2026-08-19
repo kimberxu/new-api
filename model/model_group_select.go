@@ -115,5 +115,7 @@ func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChan
 	if picked < 0 {
 		return nil, errors.New("no channel found, group: " + group + ", model: " + model)
 	}
-	return GetChannelById(picked, false)
+	// selectAll=true: the relay needs the key for the upstream Authorization
+	// header; the legacy DB path also loaded the full row.
+	return GetChannelById(picked, true)
 }
