@@ -632,6 +632,22 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	if mergedParam, applied := service.ApplyChannelAffinityOverrideTemplate(c, paramOverride); applied {
 		paramOverride = mergedParam
 	}
+	// [personal] Group-level param override: channel override is the base,
+	// the group override wins per key (applied after the channel-level one).
+	if gpo := model.GetModelGroupParamOverride(modelName); len(gpo) > 0 {
+		if paramOverride == nil {
+			paramOverride = gpo
+		} else {
+			merged := make(map[string]interface{}, len(paramOverride)+len(gpo))
+			for k, v := range paramOverride {
+				merged[k] = v
+			}
+			for k, v := range gpo {
+				merged[k] = v
+			}
+			paramOverride = merged
+		}
+	}
 	common.SetContextKey(c, constant.ContextKeyChannelParamOverride, paramOverride)
 	common.SetContextKey(c, constant.ContextKeyChannelHeaderOverride, headerOverride)
 	if nil != channel.OpenAIOrganization && *channel.OpenAIOrganization != "" {

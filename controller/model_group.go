@@ -204,6 +204,8 @@ func SetModelGroupEnabled(c *gin.Context) {
 type AddGroupItemRequest struct {
 	ChannelId int    `json:"channel_id"`
 	Model     string `json:"model"`
+	Priority  *int64 `json:"priority"`
+	Weight    *uint  `json:"weight"`
 }
 
 // AddGroupItem adds a real upstream model of an existing channel to a group.
@@ -242,8 +244,8 @@ func AddGroupItem(c *gin.Context) {
 	items := []model.ModelGroupItem{{
 		ChannelId: req.ChannelId,
 		Model:     req.Model,
-		Priority:  nil, // inherit channel priority
-		Weight:    nil, // inherit channel weight
+		Priority:  req.Priority, // nil = inherit channel priority
+		Weight:    req.Weight,   // nil = inherit channel weight
 		Enabled:   true,
 	}}
 	if err := model.AddModelGroupItems(g.Id, items); err != nil {
@@ -313,4 +315,40 @@ func GetChannelModelOptions(c *gin.Context) {
 		return
 	}
 	common.ApiSuccess(c, gin.H{"models": ch.GetModels()})
+}
+
+// SetModelGroupParamOverride validates the group-level param override JSON
+// (same schema as the channel-level param_override) and stores it on the
+// group. An empty string clears the override.
+func SetModelGroupParamOverride(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		common.ApiError(c, fmt.Errorf("invalid group id"))
+		return
+	}
+	g, err := model.GetModelGroupById(id)
+	if err != nil || g == nil {
+		common.ApiError(c, fmt.Errorf("model group #%d not found", id))
+		return
+	}
+	var req struct {
+		ParamOverride string `json:"param_override"`
+	}
+	if err := common.UnmarshalBodyReusable(c, &req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if strings.TrimSpace(req.ParamOverride) != "" {
+		var parsed map[string]interface{}
+		if err := common.Unmarshal([]byte(req.ParamOverride), &parsed); err != nil {
+			common.ApiError(c, fmt.Errorf("param_override must be a valid JSON object"))
+			return
+		}
+	}
+	if err := model.SetModelGroupParamOverride(g.Id, req.ParamOverride); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	model.InitChannelCache()
+	common.ApiSuccess(c, gin.H{"param_override": req.ParamOverride})
 }

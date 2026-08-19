@@ -22,7 +22,10 @@ type ModelGroup struct {
 	Name      string `json:"name" gorm:"type:varchar(128);uniqueIndex"`
 	Source    string `json:"source" gorm:"type:varchar(16)"` // auto | manual；默认值代码层设置
 	Enabled   bool   `json:"enabled"`                        // 组级开关；默认 true 代码层设置
-	CreatedAt int64  `json:"created_at" gorm:"bigint;autoCreateTime"`
+	// ParamOverride is a group-level parameter override JSON (same schema as
+	// the channel-level param_override). Empty string = no override.
+	ParamOverride string `json:"param_override" gorm:"type:text"`
+	CreatedAt     int64  `json:"created_at" gorm:"bigint;autoCreateTime"`
 }
 
 // ModelGroupItem is one member of a model group: a real upstream model on a
@@ -215,4 +218,62 @@ func DeleteModelGroupItemsByDisabledChannelStatus(statuses ...int) error {
 	}
 	return DB.Where("channel_id IN (SELECT id FROM channels WHERE status IN ?)", statuses).
 		Delete(&ModelGroupItem{}).Error
+}
+
+// SetModelGroupParamOverride updates the group-level parameter override JSON.
+// An empty string clears the override.
+func SetModelGroupParamOverride(groupId int, paramOverride string) error {
+	return DB.Model(&ModelGroup{}).Where("id = ?", groupId).Update("param_override", paramOverride).Error
+}
+
+// GetModelGroupByNameMap returns the groups for the given names keyed by name.
+// Missing groups are simply absent from the map.
+func GetModelGroupByNameMap(names []string) (map[string]*ModelGroup, error) {
+	result := make(map[string]*ModelGroup, len(names))
+	if len(names) == 0 {
+		return result, nil
+	}
+	var groups []*ModelGroup
+	if err := DB.Where("name IN ?", names).Find(&groups).Error; err != nil {
+		return nil, err
+	}
+	for _, g := range groups {
+		result[g.Name] = g
+	}
+	return result, nil
+}
+
+// DeleteModelGroupItemsNotIn removes all members of a channel whose model is
+// no longer in the given list. An empty list deletes every member of the
+// channel (the channel has no routable models left).
+func DeleteModelGroupItemsNotIn(channelId int, models []string) error {
+	q := DB.Where("channel_id = ?", channelId)
+	if len(models) == 0 {
+		// models empty: delete all members of this channel
+		return q.Delete(&ModelGroupItem{}).Error
+	}
+	return q.Where("model NOT IN ?", models).Delete(&ModelGroupItem{}).Error
+}
+
+// GetEnabledModelGroupsWithItems returns enabled groups mapped to their
+// enabled members (route-cache building). Full-table scan; fine at personal
+// scale.
+func GetEnabledModelGroupsWithItems() (map[string][]ModelGroupItem, error) {
+	var groups []*ModelGroup
+	if err := DB.Where("enabled = ?", true).Find(&groups).Error; err != nil {
+		return nil, err
+	}
+	var items []ModelGroupItem
+	if err := DB.Where("enabled = ?", true).Find(&items).Error; err != nil {
+		return nil, err
+	}
+	itemByGroup := make(map[int][]ModelGroupItem, len(groups))
+	for _, it := range items {
+		itemByGroup[it.GroupId] = append(itemByGroup[it.GroupId], it)
+	}
+	result := make(map[string][]ModelGroupItem, len(groups))
+	for _, g := range groups {
+		result[g.Name] = itemByGroup[g.Id]
+	}
+	return result, nil
 }
