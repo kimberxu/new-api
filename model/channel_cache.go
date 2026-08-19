@@ -35,6 +35,17 @@ func InitChannelCache() {
 	newChannel2advancedCustomConfig := make(map[int]*kitdto.AdvancedCustomConfig)
 	var channels []*Channel
 	DB.Find(&channels)
+	// Load model-level disable records so disabled (channel, model) pairs are
+	// excluded from the routing index.
+	var disabledRows []ChannelDisabledModel
+	DB.Find(&disabledRows)
+	disabledByChannel := make(map[int]map[string]struct{}, len(disabledRows))
+	for _, r := range disabledRows {
+		if disabledByChannel[r.ChannelId] == nil {
+			disabledByChannel[r.ChannelId] = make(map[string]struct{})
+		}
+		disabledByChannel[r.ChannelId][r.Model] = struct{}{}
+	}
 	for _, channel := range channels {
 		newChannelId2channel[channel.Id] = channel
 		if channel.Type == constant.ChannelTypeAdvancedCustom {
@@ -61,6 +72,9 @@ func InitChannelCache() {
 		for _, group := range groups {
 			models := strings.Split(channel.Models, ",")
 			for _, model := range models {
+				if _, disabled := disabledByChannel[channel.Id][model]; disabled {
+					continue // model-level disabled for this channel
+				}
 				if _, ok := newGroup2model2channels[group][model]; !ok {
 					newGroup2model2channels[group][model] = make([]int, 0)
 				}
