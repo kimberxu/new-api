@@ -1,6 +1,6 @@
 # 本地 GitHub Fork 工作流
 
-> 对应分支:`deploy` @ `701cb0bb`(2026-08-19 更新)
+> 对应分支:`deploy` @ `702be7eb`(2026-08-19 更新)
 
 ## 标准触发短语
 
@@ -63,7 +63,7 @@ git push --force-with-lease origin deploy
 
 | 文件 | 魔改内容 | 上游易冲突点 | 解决决策记录 |
 |------|----------|--------------|--------------|
-| `controller/relay.go` | 渠道限流检查、同优先级重试 `ExcludeChannel`、全渠道限流 429 兜底、（新增）模型级禁用分支 | 重试/计费逻辑（如 `PrepareTieredBillingForSelectedGroup`） | `e0b9f243`：2026-08-01 同步 8 提交；重试/计费逻辑拼序采纳、限流检查保留 |
+| `controller/relay.go` | 渠道限流检查、同优先级重试 `ExcludeChannel`、全渠道限流 429 兜底、（新增）模型级禁用分支 | 重试/计费逻辑（如 `PrepareTieredBillingForSelectedGroup`） | `e0b9f243`：2026-08-01 同步 8 提交；重试/计费逻辑拼序采纳、限流检查保留；`702be7eb`：2026-08-19 同步 0 提交；`processChannelError` 既有禁用两行包进 else、前插模型级 if 分支（包 else 非纯追加，冲突时按「保留魔改 + 采纳上游语义」手动合并） |
 | `relay/common/relay_info.go` | `RequestDebugSnapshot` 字段 | `RelayInfo` 结构体字段增减、注释更新 | （空，待首录） |
 | `web/src/features/usage-logs/components/dialogs/details-dialog.tsx` | 请求调试快照面板 | 日志详情功能（如 stream status） | （空，待首录） |
 
