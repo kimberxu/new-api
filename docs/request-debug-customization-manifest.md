@@ -236,13 +236,21 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 ### 功能概述
 
-很多中转渠道把单个 `hi` 列为屏蔽词（视为无意义刷量请求），导致渠道测试/自动健康检查误报失败。本次将渠道测试（`buildTestRequest`）向上游发送的用户消息由 `hi` 改为「彩虹有几种颜色」——一个简单、少见、非敏感的中文短问句，几乎不会命中中转屏蔽词表。
+很多中转渠道把单个 `hi` 列为屏蔽词（视为无意义刷量请求），导致渠道测试/自动健康检查误报失败。历史演进：
+
+- 初始：将测试用户消息由 `hi` 改为「彩虹有几种颜色」——一个简单、少见、非敏感的中文短问句，几乎不会命中中转屏蔽词表。
+- 2026-08-19 增强：固定文案「彩虹有几种颜色」本身成为新的测活指纹（上游可按文本/请求结构匹配），改为**随机问句池 + 随机 max_tokens**：
+
+  - `testUserMessages`：9 条简短、答案固定、无需发散思考的常识性问句（如「中国的首都是哪里」「水的化学式是什么」），每次测试随机取一条；刻意避开经典测活题（`hi`/`ping`/`test`/算术题/纯数字日历题）。
+  - `testMaxTokensRange [16, 64]`：chat 类测试请求的 `max_tokens` 在该范围内随机（此前固定 16/50），打散请求长度指纹。
+  - 问句池与范围均为包级变量，后续调整无需改动请求构造逻辑。
 
 覆盖全部含用户消息的测试请求格式：OpenAI chat/completions、OpenAI Responses、Responses compact、Claude、Gemini。（Embedding / Image / Rerank 测试请求不含用户消息文本，不受影响。）
 
 ### 文件清单
 
-- `controller/channel-test.go` - `buildTestRequest` 中 7 处测试用户消息（`content` / `text` / `input`）
+- `controller/channel-test.go` - `buildTestRequest` 中 7 处测试用户消息（`content` / `text` / `input`）、`testUserMessages` 问句池、`pickTestUserMessage` / `pickTestMaxTokens` 随机选择
+- `controller/channel_test_request_test.go` - 回归测试：消息来自问句池、无历史固定测活文案、随机覆盖全池、max_tokens 范围与随机性
 
 ---
 
