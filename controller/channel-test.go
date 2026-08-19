@@ -1072,6 +1072,14 @@ func runChannelTestTask(ctx context.Context, mode string, notify bool, report fu
 	}
 	selected := selectChannelsForAutomaticTest(channels, mode)
 	allowDisable := mode != operation_setting.ChannelTestModePassiveRecovery
+	// [personal] Model-level recovery: probe expired auto bans with one
+	// targeted request per model before the channel sweep. Runs on every
+	// channel_test task (scheduled and manual).
+	if ctx != nil && ctx.Err() == nil {
+		if _, rerr := recoverExpiredModelBans(ctx, testUserID); rerr != nil {
+			common.SysLog(fmt.Sprintf("failed to recover expired model bans: %v", rerr))
+		}
+	}
 	summary := performChannelTests(ctx, selected, testUserID, allowDisable, report)
 	if notify && (ctx == nil || ctx.Err() == nil) {
 		service.NotifyRootUser(dto.NotifyTypeChannelTest, "通道测试完成", "所有通道测试已完成")
