@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -698,8 +699,40 @@ func detectErrorMessageFromJSONBytes(jsonBytes []byte) string {
 	return message
 }
 
+// testUserMessages 是渠道测试/自动健康检查向模型发送的用户消息池。
+// 刻意使用简短、答案固定、无需发散思考的常识性问题：请求轻量、输出短、
+// 结果可预期，且避免固定文案（如历史上的 "hi"、之后的 "彩虹有几种颜色"）
+// 被上游中转按文本指纹识别为测活请求。
+var testUserMessages = []string{
+	"中国的首都是哪里",
+	"太阳从哪边升起",
+	"水的化学式是什么",
+	"世界上最高的山峰是哪座",
+	"地球绕太阳转一圈需要多久",
+	"世界上最大的海洋是什么",
+	"北极熊主要生活在哪里",
+	"大象属于哺乳动物吗",
+	"青蛙是两栖动物吗",
+}
+
+// testMaxTokensRange 给出测试请求 max_tokens 的随机范围（含两端）。
+// 问句答案固定且短，保持快速往返的同时打散请求长度指纹。
+var testMaxTokensRange = [2]uint{16, 64}
+
+// pickTestUserMessage 返回一条随机的测试用户消息。
+func pickTestUserMessage() string {
+	return testUserMessages[rand.IntN(len(testUserMessages))]
+}
+
+// pickTestMaxTokens 返回随机的测试 max_tokens 值。
+func pickTestMaxTokens() uint {
+	return testMaxTokensRange[0] + uint(rand.IntN(int(testMaxTokensRange[1]-testMaxTokensRange[0]+1)))
+}
+
 func buildTestRequest(model string, endpointType string, channel *model.Channel, isStream bool) dto.Request {
-	testResponsesInput := json.RawMessage(`[{"role":"user","content":"彩虹有几种颜色"}]`)
+	testUserMessage := pickTestUserMessage()
+	maxTokens := lo.ToPtr(pickTestMaxTokens())
+	testResponsesInput := json.RawMessage(fmt.Sprintf(`[{"role":"user","content":%q}]`, testUserMessage))
 
 	// 根据端点类型构建不同的测试请求
 	if endpointType != "" {
@@ -730,7 +763,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 			// 返回 OpenAIResponsesRequest
 			return &dto.OpenAIResponsesRequest{
 				Model:  model,
-				Input:  json.RawMessage(`[{"role":"user","content":"彩虹有几种颜色"}]`),
+				Input:  testResponsesInput,
 				Stream: lo.ToPtr(isStream),
 			}
 		case constant.EndpointTypeOpenAIResponseCompact:
@@ -743,11 +776,11 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 			return &dto.ClaudeRequest{
 				Model:     model,
 				Stream:    lo.ToPtr(isStream),
-				MaxTokens: lo.ToPtr(uint(16)),
+				MaxTokens: maxTokens,
 				Messages: []dto.ClaudeMessage{
 					{
 						Role:    "user",
-						Content: "彩虹有几种颜色",
+						Content: testUserMessage,
 					},
 				},
 			}
@@ -756,7 +789,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 				Contents: []dto.GeminiChatContent{
 					{
 						Role:  "user",
-						Parts: []dto.GeminiPart{{Text: "彩虹有几种颜色"}},
+						Parts: []dto.GeminiPart{{Text: testUserMessage}},
 					},
 				},
 				GenerationConfig: dto.GeminiChatGenerationConfig{
@@ -770,10 +803,10 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 				Messages: []dto.Message{
 					{
 						Role:    "user",
-						Content: "彩虹有几种颜色",
+						Content: testUserMessage,
 					},
 				},
-				MaxTokens: lo.ToPtr(uint(16)),
+				MaxTokens: maxTokens,
 			}
 			if isStream {
 				req.StreamOptions = &dto.StreamOptions{IncludeUsage: true}
@@ -807,7 +840,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 	if strings.Contains(strings.ToLower(model), "codex") {
 		return &dto.OpenAIResponsesRequest{
 			Model:  model,
-			Input:  json.RawMessage(`[{"role":"user","content":"彩虹有几种颜色"}]`),
+			Input:  testResponsesInput,
 			Stream: lo.ToPtr(isStream),
 		}
 	}
@@ -819,7 +852,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 		Messages: []dto.Message{
 			{
 				Role:    "user",
-				Content: "彩虹有几种颜色",
+				Content: testUserMessage,
 			},
 		},
 	}
@@ -836,7 +869,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 	} else if strings.Contains(model, "gemini") {
 		testRequest.MaxTokens = lo.ToPtr(uint(3000))
 	} else {
-		testRequest.MaxTokens = lo.ToPtr(uint(16))
+		testRequest.MaxTokens = maxTokens
 	}
 
 	return testRequest
