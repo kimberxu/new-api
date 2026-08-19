@@ -24,10 +24,33 @@ var channelsIDM map[int]*Channel                     // all channels include dis
 var channel2advancedCustomConfig map[int]*dto.AdvancedCustomConfig
 var channelSyncLock sync.RWMutex
 
+// [personal] modelGroupItemOverride holds member-level priority/weight
+// overrides (nil = inherit the channel value). Keyed by
+// modelGroupItemOverrides[groupName][model][channelId]; the groupName is the
+// routable model name, model is the member's upstream model on that channel.
+type modelGroupItemOverride struct {
+	priority *int64
+	weight   *uint
+}
+
+// [personal] modelGroupItemOverrides caches member-level overrides for the
+// routing selector (built in InitChannelCache).
+var modelGroupItemOverrides = map[string]map[string]map[int]modelGroupItemOverride{}
+
+// [personal] modelGroupParamOverride caches parsed group-level param
+// override JSON (groupName → object). Invalid JSON is dropped at load.
+var modelGroupParamOverride = map[string]map[string]interface{}{}
+
 func InitChannelCache() {
 	if !common.MemoryCacheEnabled {
 		InvalidatePricingCache()
 		return
+	}
+	// [personal] Reconcile every channel's models into model groups before
+	// building the routing index from group members. Idempotent; this also
+	// migrates pre-existing channels on first startup.
+	if err := SyncAllModelGroups(); err != nil {
+		common.SysLog(fmt.Sprintf("failed to sync all model groups: %v", err))
 	}
 	newChannelId2channel := make(map[int]*Channel)
 	newChannel2advancedCustomConfig := make(map[int]*dto.AdvancedCustomConfig)
@@ -52,40 +75,71 @@ func InitChannelCache() {
 			}
 		}
 	}
-	var abilities []*Ability
-	DB.Find(&abilities)
-	groups := make(map[string]bool)
-	for _, ability := range abilities {
-		groups[ability.Group] = true
+	// [personal] The routing index is built from model groups (group name =
+	// routable model name) instead of the raw channel Models list: enabled
+	// groups x enabled members on enabled channels become routable pairs.
+	// Member-level priority/weight overrides are cached alongside for the
+	// selector; the group-level param override JSON is parsed here too.
+	enabledGroups, groupErr := GetEnabledModelGroupsWithItems()
+	if groupErr != nil {
+		common.SysError(fmt.Sprintf("failed to load enabled model groups: %v", groupErr))
+		enabledGroups = map[string][]ModelGroupItem{}
+	}
+	newModelGroupItemOverrides := make(map[string]map[string]map[int]modelGroupItemOverride)
+	newModelGroupParamOverride := make(map[string]map[string]interface{})
+	allGroups, groupsErr := ListModelGroups("")
+	if groupsErr == nil {
+		for _, g := range allGroups {
+			if strings.TrimSpace(g.ParamOverride) == "" {
+				continue
+			}
+			var parsed map[string]interface{}
+			if err := common.Unmarshal([]byte(g.ParamOverride), &parsed); err != nil {
+				common.SysError(fmt.Sprintf("invalid param_override for model group %q: %v", g.Name, err))
+				continue
+			}
+			newModelGroupParamOverride[g.Name] = parsed
+		}
 	}
 	newGroup2model2channels := make(map[string]map[string][]int)
-	for group := range groups {
-		newGroup2model2channels[group] = make(map[string][]int)
-	}
-	for _, channel := range channels {
-		if channel.Status != common.ChannelStatusEnabled {
-			continue // skip disabled channels
-		}
-		groups := strings.Split(channel.Group, ",")
-		for _, group := range groups {
-			models := strings.Split(channel.Models, ",")
-			for _, model := range models {
-				if _, disabled := disabledByChannel[channel.Id][model]; disabled {
-					continue // model-level disabled for this channel
+	for groupName, items := range enabledGroups {
+		for _, item := range items {
+			channel, ok := newChannelId2channel[item.ChannelId]
+			if !ok || channel.Status != common.ChannelStatusEnabled {
+				continue // channel missing or disabled
+			}
+			if _, disabled := disabledByChannel[item.ChannelId][item.Model]; disabled {
+				continue // (channel, model) model-level disabled
+			}
+			if newModelGroupItemOverrides[groupName] == nil {
+				newModelGroupItemOverrides[groupName] = make(map[string]map[int]modelGroupItemOverride)
+			}
+			if newModelGroupItemOverrides[groupName][item.Model] == nil {
+				newModelGroupItemOverrides[groupName][item.Model] = make(map[int]modelGroupItemOverride)
+			}
+			newModelGroupItemOverrides[groupName][item.Model][item.ChannelId] = modelGroupItemOverride{
+				priority: item.Priority,
+				weight:   item.Weight,
+			}
+			groups := strings.Split(channel.Group, ",")
+			for _, group := range groups {
+				if _, ok := newGroup2model2channels[group]; !ok {
+					newGroup2model2channels[group] = make(map[string][]int)
 				}
-				if _, ok := newGroup2model2channels[group][model]; !ok {
-					newGroup2model2channels[group][model] = make([]int, 0)
+				if _, ok := newGroup2model2channels[group][groupName]; !ok {
+					newGroup2model2channels[group][groupName] = make([]int, 0)
 				}
-				newGroup2model2channels[group][model] = append(newGroup2model2channels[group][model], channel.Id)
+				newGroup2model2channels[group][groupName] = append(newGroup2model2channels[group][groupName], channel.Id)
 			}
 		}
 	}
 
-	// sort by priority
+	// sort by (effective) priority
 	for group, model2channels := range newGroup2model2channels {
 		for model, channels := range model2channels {
 			sort.Slice(channels, func(i, j int) bool {
-				return newChannelId2channel[channels[i]].GetPriority() > newChannelId2channel[channels[j]].GetPriority()
+				return effectivePriorityWith(channels[i], model, newChannelId2channel, newModelGroupItemOverrides) >
+					effectivePriorityWith(channels[j], model, newChannelId2channel, newModelGroupItemOverrides)
 			})
 			newGroup2model2channels[group][model] = channels
 		}
@@ -93,6 +147,8 @@ func InitChannelCache() {
 
 	channelSyncLock.Lock()
 	group2model2channels = newGroup2model2channels
+	modelGroupItemOverrides = newModelGroupItemOverrides
+	modelGroupParamOverride = newModelGroupParamOverride
 	//channelsIDM = newChannelId2channel
 	for i, channel := range newChannelId2channel {
 		if channel.ChannelInfo.IsMultiKey {
@@ -128,10 +184,11 @@ func SyncChannelCache(frequency int) {
 
 func GetRandomSatisfiedChannel(group string, model string, retry int, requestPath string, excludeChannels []int) (*Channel, error) {
 	// if memory cache is disabled, get channel directly from database.
-	// The non-memory-cache path ignores excludeChannels and falls back to the
-	// legacy selection in GetChannel, which also targets the highest priority.
+	// [personal] The DB fallback is driven by model groups (not abilities).
+	// It drops already-tried channels, targets the highest effective
+	// priority tier, and draws weighted within the tier.
 	if !common.MemoryCacheEnabled {
-		return GetChannel(group, model, retry, requestPath)
+		return GetRandomSatisfiedChannelFromGroups(group, model, excludeChannels)
 	}
 
 	channelSyncLock.RLock()
@@ -184,11 +241,11 @@ func GetRandomSatisfiedChannel(group string, model string, retry int, requestPat
 	highestPriority := int64(0)
 	first := true
 	for _, channelId := range channels {
-		channel, ok := channelsIDM[channelId]
-		if !ok {
+		if _, ok := channelsIDM[channelId]; !ok {
 			return nil, fmt.Errorf("数据库一致性错误,渠道# %d 不存在,请联系管理员修复", channelId)
 		}
-		priority := channel.GetPriority()
+		// [personal] member-level override wins, else channel priority
+		priority := effectivePriority(channelId, model)
 		// [deploy 分支定制] 慢速渠道降级：priority 拍平
 		if demoted, p := channelslowstream.GetDemotedPriority(channelId, model, priority); demoted {
 			priority = p
@@ -204,13 +261,14 @@ func GetRandomSatisfiedChannel(group string, model string, retry int, requestPat
 	var targetChannels []*Channel
 	for _, channelId := range channels {
 		if channel, ok := channelsIDM[channelId]; ok {
-			priority := channel.GetPriority()
+			// [personal] member-level override wins, else channel priority
+			priority := effectivePriority(channelId, model)
 			// [deploy 分支定制] 慢速渠道降级：priority 拍平
 			if demoted, p := channelslowstream.GetDemotedPriority(channelId, model, priority); demoted {
 				priority = p
 			}
 			if priority == highestPriority {
-				sumWeight += channel.GetWeight()
+				sumWeight += effectiveWeight(channelId, model)
 				targetChannels = append(targetChannels, channel)
 			}
 		} else {
@@ -244,13 +302,78 @@ func GetRandomSatisfiedChannel(group string, model string, retry int, requestPat
 
 	// Find a channel based on its weight
 	for _, channel := range targetChannels {
-		randomWeight -= channel.GetWeight()*smoothingFactor + smoothingAdjustment
+		randomWeight -= effectiveWeight(channel.Id, model)*smoothingFactor + smoothingAdjustment
 		if randomWeight < 0 {
 			return channel, nil
 		}
 	}
 	// return null if no channel is not found
 	return nil, errors.New("channel not found")
+}
+
+// [personal] effectivePriorityWith resolves the effective routing priority for
+// (channelId, model) inside group: a member-level override wins, else the
+// channel's own priority. The overrides map is passed in so both the cache
+// build (before the global swap) and the selector can share the logic.
+func effectivePriorityWith(channelId int, model string, chanById map[int]*Channel, overrides map[string]map[string]map[int]modelGroupItemOverride) int64 {
+	if groupModelMap, ok := overrides[model]; ok {
+		if modelChanMap, ok := groupModelMap[model]; ok {
+			if o, ok := modelChanMap[channelId]; ok && o.priority != nil {
+				return *o.priority
+			}
+		}
+		// Fall back: a manual group may hold a member whose model differs from
+		// the group name (routable name). Any member override of this channel
+		// in the group applies.
+		for _, modelChanMap := range groupModelMap {
+			if o, ok := modelChanMap[channelId]; ok && o.priority != nil {
+				return *o.priority
+			}
+		}
+	}
+	if ch, ok := chanById[channelId]; ok {
+		return ch.GetPriority()
+	}
+	return 0
+}
+
+// [personal] effectivePriority is the selector-time wrapper using the live
+// global caches.
+func effectivePriority(channelId int, model string) int64 {
+	return effectivePriorityWith(channelId, model, channelsIDM, modelGroupItemOverrides)
+}
+
+// [personal] effectiveWeightWith mirrors effectivePriorityWith for weights.
+func effectiveWeightWith(channelId int, model string, chanById map[int]*Channel, overrides map[string]map[string]map[int]modelGroupItemOverride) int {
+	if groupModelMap, ok := overrides[model]; ok {
+		if modelChanMap, ok := groupModelMap[model]; ok {
+			if o, ok := modelChanMap[channelId]; ok && o.weight != nil {
+				return int(*o.weight)
+			}
+		}
+		for _, modelChanMap := range groupModelMap {
+			if o, ok := modelChanMap[channelId]; ok && o.weight != nil {
+				return int(*o.weight)
+			}
+		}
+	}
+	if ch, ok := chanById[channelId]; ok {
+		return ch.GetWeight()
+	}
+	return 0
+}
+
+func effectiveWeight(channelId int, model string) int {
+	return effectiveWeightWith(channelId, model, channelsIDM, modelGroupItemOverrides)
+}
+
+// [personal] GetModelGroupParamOverride returns the parsed group-level param
+// override for the given routable model name, or nil when absent. Callers must
+// treat the returned map as read-only.
+func GetModelGroupParamOverride(groupName string) map[string]interface{} {
+	channelSyncLock.RLock()
+	defer channelSyncLock.RUnlock()
+	return modelGroupParamOverride[groupName]
 }
 
 // filterChannelsByRequestPathAndModel restricts candidates by request path and

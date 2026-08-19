@@ -549,9 +549,15 @@ func checkAndPersistChannelUpstreamModelUpdates(
 		return false, autoAdded, err
 	}
 	if modelsChanged {
-		if err = channel.UpdateAbilities(nil); err != nil {
-			return true, autoAdded, err
+if err = channel.UpdateAbilities(nil); err != nil {
+		return false, autoAdded, err
+	}
+	// [personal] Keep model groups in sync after upstream model updates.
+	if modelsChanged {
+		if serr := model.SyncModelGroupForChannel(channel); serr != nil {
+			common.SysLog(fmt.Sprintf("failed to sync model groups for channel #%d: %v", channel.Id, serr))
 		}
+	}
 	}
 	return modelsChanged, autoAdded, nil
 }
@@ -997,6 +1003,10 @@ func applyChannelUpstreamModelUpdates(
 	if modelsChanged {
 		if err := channel.UpdateAbilities(nil); err != nil {
 			return addModels, removeModels, remainingModels, remainingRemoveModels, true, err
+		}
+		// [personal] Keep model groups in sync after upstream model updates.
+		if serr := model.SyncModelGroupForChannel(channel); serr != nil {
+			common.SysLog(fmt.Sprintf("failed to sync model groups for channel #%d: %v", channel.Id, serr))
 		}
 	}
 	return addModels, removeModels, remainingModels, remainingRemoveModels, modelsChanged, nil

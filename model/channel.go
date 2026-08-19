@@ -447,19 +447,35 @@ func BatchInsertChannels(channels []Channel) error {
 		}
 	}()
 
+	var savedChannels []*Channel
 	for _, chunk := range lo.Chunk(channels, 50) {
 		if err := tx.Create(&chunk).Error; err != nil {
 			tx.Rollback()
 			return err
 		}
-		for _, channel_ := range chunk {
+		for i := range chunk {
+			channel_ := &chunk[i]
 			if err := channel_.AddAbilities(tx); err != nil {
 				tx.Rollback()
 				return err
 			}
+			savedChannels = append(savedChannels, channel_)
 		}
 	}
-	return tx.Commit().Error
+	if err := tx.Commit().Error; err != nil {
+		return err
+	}
+	// [personal] Aggregate the new channels' models into model groups. Runs
+	// after commit so a rolled-back channel never leaves orphan members and
+	// uses the back-filled ids from the inserted chunk copies (the outer
+	// slice keeps Id=0). Sync failures only log: the periodic full rebuild
+	// (SyncAllModelGroups in InitChannelCache) reconciles eventually.
+	for _, channel_ := range savedChannels {
+		if err := SyncModelGroupForChannel(channel_); err != nil {
+			common.SysLog(fmt.Sprintf("failed to sync model groups for channel #%d: %v", channel_.Id, err))
+		}
+	}
+	return nil
 }
 
 func BatchDeleteChannels(ids []int) (int64, error) {
@@ -484,6 +500,11 @@ func BatchDeleteChannels(ids []int) (int64, error) {
 			return 0, err
 		}
 		if err := tx.Where("channel_id in (?)", chunk).Delete(&ChannelDisabledModel{}).Error; err != nil {
+			tx.Rollback()
+			return 0, err
+		}
+		// [personal] Remove model-group members of the deleted channels.
+		if err := tx.Where("channel_id in (?)", chunk).Delete(&ModelGroupItem{}).Error; err != nil {
 			tx.Rollback()
 			return 0, err
 		}
@@ -589,7 +610,15 @@ func (channel *Channel) Update() error {
 	}
 	DB.Model(channel).First(channel, "id = ?", channel.Id)
 	err = channel.UpdateAbilities(nil)
-	return err
+	if err != nil {
+		return err
+	}
+	// [personal] Keep model groups in sync with the channel's models after an
+	// update. Failures are logged; the periodic full rebuild reconciles.
+	if err := SyncModelGroupForChannel(channel); err != nil {
+		common.SysLog(fmt.Sprintf("failed to sync model groups for channel #%d: %v", channel.Id, err))
+	}
+	return nil
 }
 
 func (channel *Channel) UpdateResponseTime(responseTime int64) {
@@ -622,7 +651,10 @@ func (channel *Channel) Delete() error {
 	if err != nil {
 		return err
 	}
-	return DeleteChannelDisabledModelsByChannelId(channel.Id)
+	if err := DeleteChannelDisabledModelsByChannelId(channel.Id); err != nil {
+		return err
+	}
+	return DeleteModelGroupItemsByChannelId(channel.Id)
 }
 
 var channelStatusLock sync.Mutex
@@ -904,6 +936,11 @@ func DeleteDisabledChannel() (int64, error) {
 	if err := DB.Where("channel_id IN (SELECT id FROM channels WHERE status = ? or status = ?)",
 		common.ChannelStatusAutoDisabled, common.ChannelStatusManuallyDisabled).
 		Delete(&ChannelDisabledModel{}).Error; err != nil {
+		return 0, err
+	}
+	// [personal] Remove model-group members of the disabled channels being deleted.
+	if err := DeleteModelGroupItemsByDisabledChannelStatus(
+		common.ChannelStatusAutoDisabled, common.ChannelStatusManuallyDisabled); err != nil {
 		return 0, err
 	}
 	result := DB.Where("status = ? or status = ?", common.ChannelStatusAutoDisabled, common.ChannelStatusManuallyDisabled).Delete(&Channel{})
