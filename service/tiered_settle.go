@@ -1,8 +1,6 @@
 package service
 
 import (
-	"net/http"
-
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
@@ -123,36 +121,7 @@ func refreshTieredBillingGroup(relayInfo *relaycommon.RelayInfo) (*billingexpr.B
 // estimate before sending. If the initial group was free and skipped
 // pre-consume, switching to a paid group creates the session at that point.
 func PrepareTieredBillingForSelectedGroup(c *gin.Context, relayInfo *relaycommon.RelayInfo) *types.NewAPIError {
-	snap, err := refreshTieredBillingGroup(relayInfo)
-	if err != nil {
-		return types.NewErrorWithStatusCode(
-			err,
-			types.ErrorCodeModelPriceError,
-			http.StatusBadRequest,
-			types.ErrOptionWithSkipRetry(),
-		)
-	}
-	if snap == nil {
-		return nil
-	}
-	if snap.GroupRatio == 0 {
-		// Paid-to-free keeps FreeModel as-is: FreeModel means "pre-consume was
-		// skipped", which is not true once a session exists, and settlement
-		// already yields 0 for a zero group ratio.
-		return nil
-	}
-
-	// The selected group is paid; clear a FreeModel flag frozen when the
-	// initial group was free so downstream state stays consistent.
-	relayInfo.PriceData.FreeModel = false
-
-	if relayInfo.Billing == nil {
-		return PreConsumeBilling(c, snap.EstimatedQuotaAfterGroup, relayInfo)
-	}
-	if err := relayInfo.Billing.Reserve(snap.EstimatedQuotaAfterGroup); err != nil {
-		return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
-	}
-	relayInfo.FinalPreConsumedQuota = relayInfo.Billing.GetPreConsumedQuota()
+	// [personal] 计费功能级移除：不再有模型价格门槛与分组预扣，任意模型可路由。
 	return nil
 }
 
