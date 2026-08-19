@@ -41,16 +41,31 @@ func GetAllEnableAbilityWithChannels() ([]AbilityWithChannel, error) {
 }
 
 func GetGroupEnabledModels(group string) []string {
+	// [personal] /v1/models lists routable model names from model groups
+	// (group name = routable model). A model is visible when an enabled group
+	// of that name has enabled members on enabled channels whose channel
+	// group matches (keeping the previous channel-group filter semantics).
 	var models []string
-	// Find distinct models
-	DB.Table("abilities").Where(commonGroupCol+" = ? and enabled = ?", group, true).Distinct("model").Pluck("model", &models)
+	DB.Table("model_group_items").
+		Select("DISTINCT model_groups.name AS model").
+		Joins("JOIN model_groups ON model_group_items.group_id = model_groups.id").
+		Joins("JOIN channels ON model_group_items.channel_id = channels.id").
+		Where("model_groups.enabled = ? AND model_group_items.enabled = ? AND channels.status = ? AND channels."+commonGroupCol+" = ?",
+			true, true, common.ChannelStatusEnabled, group).
+		Pluck("model", &models)
 	return models
 }
 
 func GetEnabledModels() []string {
+	// [personal] same as GetGroupEnabledModels without the channel-group filter.
 	var models []string
-	// Find distinct models
-	DB.Table("abilities").Where("enabled = ?", true).Distinct("model").Pluck("model", &models)
+	DB.Table("model_group_items").
+		Select("DISTINCT model_groups.name AS model").
+		Joins("JOIN model_groups ON model_group_items.group_id = model_groups.id").
+		Joins("JOIN channels ON model_group_items.channel_id = channels.id").
+		Where("model_groups.enabled = ? AND model_group_items.enabled = ? AND channels.status = ?",
+			true, true, common.ChannelStatusEnabled).
+		Pluck("model", &models)
 	return models
 }
 
