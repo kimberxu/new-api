@@ -5608,6 +5608,14 @@
     "Slow event sample size": "Kích thước mẫu sự kiện chậm",
     "Rate limit configured": "Đã cấu hình giới hạn tốc độ",
     "recovers in": "phục hồi trong",
-    "Temporarily demoted (slow latency)": "Tạm thời bị hạ cấp (phản hồi chậm)"
+    "Temporarily demoted (slow latency)": "Tạm thời bị hạ cấp (phản hồi chậm)",
+    "Automatically Disabled": "Đã tắt tự động",
+    "Channel Abilities": "Khả năng kênh",
+    "Disable model {{model}} on channel {{name}}?": "Tắt mô hình {{model}} trên kênh {{name}}?",
+    "Manual": "Thủ công",
+    "Manually Disabled": "Đã tắt thủ công",
+    "No Channel Abilities Found": "Không tìm thấy khả năng kênh",
+    "No channel abilities match your filters.": "Không có khả năng kênh nào khớp với bộ lọc của bạn.",
+    "Route Table": "Bảng định tuyến"
   }
 }

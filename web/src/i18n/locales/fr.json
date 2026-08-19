@@ -5608,6 +5608,14 @@
     "Slow event sample size": "Taille d'échantillon des événements lents",
     "Rate limit configured": "Limite de débit configurée",
     "recovers in": "récupère dans",
-    "Temporarily demoted (slow latency)": "Temporairement déclassé (latence lente)"
+    "Temporarily demoted (slow latency)": "Temporairement déclassé (latence lente)",
+    "Automatically Disabled": "Désactivé automatiquement",
+    "Channel Abilities": "Capacités des canaux",
+    "Disable model {{model}} on channel {{name}}?": "Désactiver le modèle {{model}} sur le canal {{name}} ?",
+    "Manual": "Manuel",
+    "Manually Disabled": "Désactivé manuellement",
+    "No Channel Abilities Found": "Aucune capacité de canal trouvée",
+    "No channel abilities match your filters.": "Aucune capacité de canal ne correspond à vos filtres.",
+    "Route Table": "Table de routage"
   }
 }
