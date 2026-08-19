@@ -46,6 +46,56 @@ func IsModelLevelError(err *types.NewAPIError) bool {
 	return false
 }
 
+// [personal] channelLevelBalanceKeywords are error message fragments that
+// identify a channel-level upstream account/quota problem (key invalid, out
+// of balance). Such errors disable the whole channel, not a single model.
+var channelLevelBalanceKeywords = []string{
+	"insufficient_balance", "insufficient balance", "payment required",
+	"quota exhausted", "insufficient quota", "余额不足", "配额不足", "已欠费",
+	"账户余额", "balance is insufficient",
+}
+
+var channelLevelAuthKeywords = []string{
+	"invalid api key", "authentication", "unauthorized", "permission",
+	"key 无效", "密钥无效",
+}
+
+// [personal] IsChannelLevelError reports whether the error indicates a
+// channel-level problem (upstream key/balance), which disables the whole
+// channel. It is checked BEFORE IsModelLevelError in processChannelError so
+// balance-deficit messages mentioning "model" are never swallowed by the
+// model-level branch. Semantics:
+//   - 402 always channel-level;
+//   - 403 with auth or balance keywords channel-level;
+//   - any other status code with a balance keyword channel-level.
+func IsChannelLevelError(err *types.NewAPIError) bool {
+	if err == nil || err.StatusCode < 100 || err.StatusCode > 599 {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	if err.StatusCode == http.StatusPaymentRequired {
+		return true
+	}
+	hasBalance := false
+	for _, kw := range channelLevelBalanceKeywords {
+		if strings.Contains(msg, kw) {
+			hasBalance = true
+			break
+		}
+	}
+	if hasBalance {
+		return true
+	}
+	if err.StatusCode == http.StatusForbidden {
+		for _, kw := range channelLevelAuthKeywords {
+			if strings.Contains(msg, kw) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 const channelModelDisableWindowRedisNamespace = "channelModelDisableWindow"
 
 var (
@@ -154,13 +204,27 @@ func CheckAndRecordDisableModel(channelID int, modelName string, statusCode int,
 	return !getChannelModelDisableWindowMemoryLimiter().Request(key, threshold-1, windowSec)
 }
 
+// [personal] modelBanAutoDuration is how long an auto model-level ban lasts
+// before the periodic recovery probe re-tests the model.
+const modelBanAutoDuration = 30 * time.Minute
+
 // DisableChannelModel disables a single model on a channel (source=auto) and
-// rebuilds the channel cache so routing excludes the pair immediately.
+// rebuilds the channel cache so routing excludes the pair immediately. Auto
+// bans expire after modelBanAutoDuration (BannedUntil); manual bans are
+// permanent (BannedUntil=0).
 func DisableChannelModel(channelID int, modelName string, reason string) error {
 	common.SysLog(fmt.Sprintf("通道 #%d 模型 %s 发生模型级错误，准备禁用该模型，原因：%s", channelID, modelName, common.LocalLogPreview(reason)))
 
+	now := time.Now()
+	bannedUntil := now.Add(modelBanAutoDuration).Unix()
 	if err := model.AddChannelDisabledModels(channelID, []string{modelName}, "auto", reason); err != nil {
 		common.SysLog(fmt.Sprintf("failed to add channel disabled model: channel_id=%d, model=%s, error=%v", channelID, modelName, err))
+		return err
+	}
+	// Set the ban deadline on the record (AutoMigrate already added the
+	// column; existing records keep BannedUntil=0 = permanent until now).
+	if err := model.SetChannelDisabledModelBannedUntil(channelID, modelName, bannedUntil); err != nil {
+		common.SysLog(fmt.Sprintf("failed to set banned_until: channel_id=%d, model=%s, error=%v", channelID, modelName, err))
 		return err
 	}
 	model.InitChannelCache()
@@ -182,5 +246,17 @@ func EnableChannelModel(channelID int, modelName string, source string) error {
 		return err
 	}
 	model.InitChannelCache()
+	return nil
+}
+
+// ExtendChannelModelBan renews the ban deadline of an auto model-level
+// disable record (used when the recovery probe still fails). Does not touch
+// the sliding-window counters: the recovery probe is a single targeted
+// request, not a repeat error storm.
+func ExtendChannelModelBan(channelID int, modelName string) error {
+	if err := model.SetChannelDisabledModelBannedUntil(channelID, modelName, time.Now().Add(modelBanAutoDuration).Unix()); err != nil {
+		common.SysLog(fmt.Sprintf("failed to extend channel disabled model ban: channel_id=%d, model=%s, error=%v", channelID, modelName, err))
+		return err
+	}
 	return nil
 }
