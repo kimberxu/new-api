@@ -83,7 +83,7 @@ export function getChannelTypeIcon(type: number): string {
     45: 'Volcengine', // VolcEngine
 
     // Other AI providers
-    4: 'Ollama', // Ollama
+    4: 'Ollama', // Ollama (removed in personal)
     27: 'Perplexity', // Perplexity
     34: 'Cohere', // Cohere
     42: 'Mistral', // Mistral
