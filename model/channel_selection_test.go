@@ -1,12 +1,14 @@
 package model
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func insertChannelSelectionTestData(t *testing.T, channels []struct {
@@ -16,8 +18,17 @@ func insertChannelSelectionTestData(t *testing.T, channels []struct {
 }) {
 	t.Helper()
 	// Truncate leftover rows from other tests sharing the in-memory DB.
-	for _, table := range []string{"abilities", "channels"} {
+	for _, table := range []string{"abilities", "channels", "model_group_items", "model_groups"} {
 		require.NoError(t, DB.Exec("DELETE FROM "+table).Error)
+	}
+	// 组名即路由模型名：default 组 + test-model 只有一个模型组，成员按渠道展开
+	var group ModelGroup
+	err := DB.Where("name = ?", "test-model").First(&group).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		group = ModelGroup{Name: "test-model", Source: GroupSourceManual, Enabled: true}
+		require.NoError(t, DB.Create(&group).Error)
+	} else {
+		require.NoError(t, err)
 	}
 	for _, ch := range channels {
 		require.NoError(t, DB.Create(&Channel{
@@ -38,6 +49,14 @@ func insertChannelSelectionTestData(t *testing.T, channels []struct {
 			Enabled:   true,
 			Priority:  &ch.priority,
 			Weight:    ch.weight,
+		}).Error)
+		require.NoError(t, DB.Create(&ModelGroupItem{
+			GroupId:   group.Id,
+			ChannelId: ch.id,
+			Model:     "test-model",
+			Enabled:   true,
+			Priority:  &ch.priority,
+			Weight:    &ch.weight,
 		}).Error)
 	}
 }
