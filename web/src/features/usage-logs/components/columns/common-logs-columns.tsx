@@ -36,29 +36,19 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
-import { formatBillingCurrencyFromUSD } from '@/lib/currency'
-import { formatLogQuota, formatTimestampToDate } from '@/lib/format'
+import { formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { LOG_TYPE_ALL_VALUE } from '../../constants'
 import type { UsageLog } from '../../data/schema'
 import {
   formatModelName,
-  getTieredBillingSummary,
-  hasAnyCacheTokens,
   parseLogOther,
-  isViolationFeeLog,
   renderAuditContent,
 } from '../../lib/format'
-import {
-  isDisplayableLogType,
-  isTimingLogType,
-  getLogTypeConfig,
-  isPerCallBilling,
-} from '../../lib/utils'
+import { isDisplayableLogType, isTimingLogType, getLogTypeConfig } from '../../lib/utils'
 import type { LogOtherData } from '../../types'
 import { DetailsDialog } from '../dialogs/details-dialog'
-import { LogCostDisplay } from '../log-cost-display'
 import { ModelBadge } from '../model-badge'
 import { TimingMetricsCell, StreamTpsCell } from '../timing-metrics-cell'
 import { useUsageLogsContext } from '../usage-logs-provider'
@@ -67,31 +57,6 @@ interface DetailSegment {
   text: string
   muted?: boolean
   danger?: boolean
-}
-
-function formatRatioCompact(ratio: number | undefined): string {
-  if (ratio == null || !Number.isFinite(ratio)) return '-'
-  return ratio % 1 === 0
-    ? String(ratio)
-    : ratio.toFixed(4).replace(/\.?0+$/, '')
-}
-
-function getGroupRatio(other: LogOtherData | null): number | null {
-  const userGroupRatio = other?.user_group_ratio
-  if (
-    userGroupRatio != null &&
-    userGroupRatio !== -1 &&
-    Number.isFinite(userGroupRatio)
-  ) {
-    return userGroupRatio
-  }
-
-  const groupRatio = other?.group_ratio
-  if (groupRatio != null && groupRatio !== 1 && Number.isFinite(groupRatio)) {
-    return groupRatio
-  }
-
-  return null
 }
 
 function buildDetailSegments(
@@ -137,158 +102,13 @@ function buildTypeDetailSegments(
 
   if (log.type !== 2) return []
 
-  const isViolation = isViolationFeeLog(other)
-  if (isViolation) {
-    const segments: DetailSegment[] = []
-    segments.push({ text: t('Violation Fee'), danger: true })
-    if (other?.violation_fee_code) {
-      segments.push({
-        text: other.violation_fee_code,
-        muted: true,
-      })
-    }
-    segments.push({
-      text: `${t('Fee')}: ${formatLogQuota(other?.fee_quota ?? log.quota)}`,
-      muted: true,
-    })
-    return segments
-  }
-
   if (!other) return []
 
-  const segments: DetailSegment[] = []
-
-  const priceOpts = { digitsLarge: 4, digitsSmall: 6, abbreviate: false }
-  const formatPrice = (price: number) =>
-    `${formatBillingCurrencyFromUSD(price, priceOpts)}/M`
-  const formatPriceCompact = (price: number) =>
-    formatBillingCurrencyFromUSD(price, priceOpts)
-  const formatPriceList = (prices: string[], showUnit: boolean) => {
-    const text = prices.join(' / ')
-    return showUnit ? `${text}/M` : text
-  }
-  const isTieredExpr = other.billing_mode === 'tiered_expr'
-  const tieredSummary = getTieredBillingSummary(other)
-  if (isTieredExpr) {
-    if (tieredSummary) {
-      const baseEntries = tieredSummary.priceEntries
-        .filter((entry) => ['inputPrice', 'outputPrice'].includes(entry.field))
-        .map((entry) => formatPriceCompact(entry.price))
-      if (baseEntries.length > 0) {
-        const tierLabel = tieredSummary.tier.label || t('Default')
-        segments.push({
-          text: `${tierLabel} · ${formatPriceList(baseEntries, true)}`,
-        })
-      }
-
-      const cacheEntries = tieredSummary.priceEntries
-        .filter((entry) =>
-          ['cacheReadPrice', 'cacheCreatePrice', 'cacheCreate1hPrice'].includes(
-            entry.field
-          )
-        )
-        .map((entry) => {
-          return formatPriceCompact(entry.price)
-        })
-      if (cacheEntries.length > 0) {
-        segments.push({
-          text: `${t('Cache')} ${formatPriceList(cacheEntries, false)}`,
-          muted: true,
-        })
-      }
-
-      const otherEntries = tieredSummary.priceEntries
-        .filter(
-          (entry) =>
-            ![
-              'inputPrice',
-              'outputPrice',
-              'cacheReadPrice',
-              'cacheCreatePrice',
-              'cacheCreate1hPrice',
-            ].includes(entry.field)
-        )
-        .map((entry) => `${t(entry.shortLabel)} ${formatPrice(entry.price)}`)
-      if (otherEntries.length > 0) {
-        segments.push({
-          text: otherEntries.join(' · '),
-          muted: true,
-        })
-      }
-    } else {
-      segments.push({
-        text: `${t('Dynamic Pricing')} · ${t('No matching results')}`,
-        muted: true,
-      })
-    }
-  } else {
-    const modelPrice = other.model_price
-    const isPerCall = isPerCallBilling(modelPrice)
-    if (isPerCall && modelPrice != null) {
-      segments.push({
-        text: `${t('Per-call')} · ${formatBillingCurrencyFromUSD(modelPrice, priceOpts)}`,
-      })
-    } else if (other.model_ratio != null) {
-      const inputPriceUSD = other.model_ratio * 2.0
-      const baseEntries = [formatPriceCompact(inputPriceUSD)]
-      if (other.completion_ratio != null) {
-        baseEntries.push(
-          formatPriceCompact(inputPriceUSD * other.completion_ratio)
-        )
-      }
-      segments.push({
-        text: `${t('Standard')} · ${formatPriceList(baseEntries, true)}`,
-      })
-
-      if (hasAnyCacheTokens(other)) {
-        const cacheEntries = [
-          other.cache_ratio != null && other.cache_ratio !== 1
-            ? formatPriceCompact(inputPriceUSD * other.cache_ratio)
-            : null,
-          other.cache_creation_ratio != null && other.cache_creation_ratio !== 1
-            ? formatPriceCompact(inputPriceUSD * other.cache_creation_ratio)
-            : null,
-          other.cache_creation_ratio_1h != null &&
-          other.cache_creation_ratio_1h !== 0
-            ? formatPriceCompact(inputPriceUSD * other.cache_creation_ratio_1h)
-            : null,
-        ].filter(Boolean) as string[]
-
-        if (cacheEntries.length > 0) {
-          segments.push({
-            text: `${t('Cache')} ${formatPriceList(cacheEntries, false)}`,
-            muted: true,
-          })
-        }
-      }
-    } else {
-      const userGroupRatio = other.user_group_ratio
-      const groupRatio = other.group_ratio
-      const isUserGroup =
-        userGroupRatio != null &&
-        Number.isFinite(userGroupRatio) &&
-        userGroupRatio !== -1
-      const effectiveRatio = isUserGroup ? userGroupRatio : groupRatio
-      const ratioLabel = isUserGroup
-        ? t('User Exclusive Ratio')
-        : t('Group Ratio')
-
-      if (effectiveRatio != null && Number.isFinite(effectiveRatio)) {
-        segments.push({
-          text: `${ratioLabel} ${formatRatioCompact(effectiveRatio)}x`,
-        })
-      }
-    }
-  }
-
   if (other.is_system_prompt_overwritten) {
-    segments.push({
-      text: t('System Prompt Override'),
-      danger: true,
-    })
+    return [{ text: t('System Prompt Override'), danger: true }]
   }
 
-  return segments
+  return []
 }
 
 export function useCommonLogsColumns(
@@ -561,7 +381,6 @@ export function useCommonLogsColumns(
       const displayName = sensitiveVisible ? tokenName : '••••'
       let group = log.group
       if (!group) group = other?.group || ''
-      const groupRatio = getGroupRatio(other)
 
       return (
         <div className='flex max-w-[200px] flex-col gap-0.5'>
@@ -584,23 +403,15 @@ export function useCommonLogsColumns(
               )}
             </Tooltip>
           </TooltipProvider>
-          {(group || groupRatio != null) && (
+          {group && (
             <span className='block max-w-full truncate text-xs leading-none'>
-              {group ? (
-                <GroupBadge
-                  group={group}
-                  label={sensitiveVisible ? undefined : '••••'}
-                  type='text'
-                  size='sm'
-                  className='inline align-baseline text-xs leading-none [&>span]:leading-none'
-                />
-              ) : null}
-              {group && groupRatio != null ? ' ' : null}
-              {groupRatio != null ? (
-                <span className='text-muted-foreground/60 relative top-px align-baseline tabular-nums'>
-                  {formatRatioCompact(groupRatio)}x
-                </span>
-              ) : null}
+              <GroupBadge
+                group={group}
+                label={sensitiveVisible ? undefined : '••••'}
+                type='text'
+                size='sm'
+                className='inline align-baseline text-xs leading-none [&>span]:leading-none'
+              />
             </span>
           )}
         </div>
@@ -704,19 +515,6 @@ export function useCommonLogsColumns(
         )
       },
     },
-    {
-      accessorKey: 'quota',
-      header: t('Cost'),
-      cell: ({ row }) => {
-        const log = row.original
-        if (!isDisplayableLogType(log.type)) return null
-
-        const quota = row.getValue('quota') as number
-        const other = parseLogOther(log.other)
-        return <LogCostDisplay quota={quota} other={other} />
-      },
-    },
-
     {
       accessorKey: 'use_time',
       header: t('Timing'),

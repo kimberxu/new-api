@@ -20,13 +20,11 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   ArrowRight,
-  BookOpen,
   Check,
   ChevronDown,
   ChevronUp,
   Circle,
   Copy,
-  CreditCard,
   FileText,
   KeyRound,
   ListChecks,
@@ -83,11 +81,9 @@ const SETUP_GUIDE_CODE_PATTERN = [
 
 type DashboardActionPath =
   | '/keys'
-  | '/wallet'
   | '/playground'
   | '/channels'
   | '/usage-logs'
-  | '/pricing'
 
 interface StartStep {
   title: string
@@ -470,8 +466,6 @@ export function OverviewDashboard() {
   >(() => getSavedSetupGuideExpanded())
 
   const requestCount = Number(user?.request_count ?? 0)
-  const remainQuota = Number(user?.quota ?? 0)
-  const usedQuota = Number(user?.used_quota ?? 0)
   const isAdmin = Boolean(user?.role && user.role >= ROLE.ADMIN)
 
   const apiKeysQuery = useQuery({
@@ -507,13 +501,6 @@ export function OverviewDashboard() {
         completed: Boolean(preferredKey),
       },
       {
-        title: t('Add credits'),
-        description: t('Keep enough balance before production traffic'),
-        to: '/wallet',
-        icon: CreditCard,
-        completed: remainQuota > 0 || usedQuota > 0,
-      },
-      {
         title: t('Send a request'),
         description: t('Verify routing with Playground or your client'),
         to: '/playground',
@@ -521,7 +508,7 @@ export function OverviewDashboard() {
         completed: requestCount > 0,
       },
     ],
-    [preferredKey, remainQuota, requestCount, t, usedQuota]
+    [preferredKey, requestCount, t]
   )
 
   const quickActions = useMemo<QuickAction[]>(
@@ -544,12 +531,6 @@ export function OverviewDashboard() {
         description: t('Inspect requests, errors, and billing details'),
         to: '/usage-logs',
         icon: FileText,
-      },
-      {
-        title: t('Pricing'),
-        description: t('Review model rates before scaling traffic'),
-        to: '/pricing',
-        icon: BookOpen,
       },
     ],
     [t]
