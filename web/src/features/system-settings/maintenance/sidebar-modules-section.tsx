@@ -124,10 +124,6 @@ export function SidebarModulesSection({
       },
     },
     personal: {
-      topup: {
-        title: t('Wallet'),
-        description: t('Top up balance and view billing history.'),
-      },
       personal: {
         title: t('Profile'),
         description: t('Personal settings and profile management.'),
@@ -146,10 +142,6 @@ export function SidebarModulesSection({
         title: t('Models'),
         description: t('Manage catalog visibility and pricing.'),
       },
-      redemption: {
-        title: t('Redeem codes'),
-        description: t('Create and review invite or credit codes.'),
-      },
       user: {
         title: t('Users'),
         description: t('Administer user accounts and roles.'),
@@ -157,10 +149,6 @@ export function SidebarModulesSection({
       setting: {
         title: t('System settings'),
         description: t('Advanced platform configuration.'),
-      },
-      subscription: {
-        title: t('Subscription Management'),
-        description: t('Manage subscription plans and pricing.'),
       },
     },
   }
