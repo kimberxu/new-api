@@ -17,7 +17,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
-import type { CustomOAuthBinding } from '@/lib/oauth'
 import { authRequestOptions, authResult } from '@/lib/secure-verification'
 import type { LoginSession } from '@/stores/auth-store'
 
@@ -245,38 +244,6 @@ export async function revokeLoginSession(sid: string): Promise<ApiResponse> {
 export async function revokeOtherLoginSessions(): Promise<ApiResponse> {
   const res = await api.post('/api/user/sessions/revoke-others')
   return res.data
-}
-
-// ============================================================================
-// Custom OAuth Binding APIs
-// ============================================================================
-
-/**
- * Get current user's custom OAuth bindings
- */
-export async function getSelfOAuthBindings(): Promise<
-  ApiResponse<CustomOAuthBinding[]>
-> {
-  const res = await api.get('/api/user/oauth/bindings')
-  return res.data
-}
-
-/**
- * Unbind a custom OAuth provider for current user
- */
-export function unbindCustomOAuth(
-  providerId: number,
-  proofToken: string,
-  signal: AbortSignal
-): Promise<AccountSecurityResult> {
-  return authResult(
-    api.delete(`/api/user/oauth/bindings/${providerId}`, {
-      ...authRequestOptions,
-      headers: { 'X-Security-Proof': proofToken },
-      singleUseAuthorization: true,
-      signal,
-    })
-  )
 }
 
 // ============================================================================

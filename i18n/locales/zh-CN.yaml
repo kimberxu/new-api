@@ -66,8 +66,6 @@ redemption.expire_time_invalid: "过期时间不能早于当前时间"
 
 # User messages
 user.password_login_disabled: "管理员关闭了密码登录"
-user.register_disabled: "管理员关闭了新用户注册"
-user.password_register_disabled: "管理员关闭了通过密码进行注册，请使用第三方账户验证的形式进行注册"
 user.username_or_password_empty: "用户名或密码为空"
 user.username_or_password_error: "用户名或密码错误，或用户已被封禁"
 user.email_or_password_empty: "邮箱地址或密码为空！"
@@ -97,17 +95,8 @@ user.transfer_quota_minimum: "转移额度最小为{{.Min}}！"
 user.transfer_success: "划转成功"
 user.transfer_failed: "划转失败 {{.Error}}"
 user.topup_processing: "充值处理中，请稍后重试"
-user.register_failed: "用户注册失败或用户ID获取失败"
-user.default_token_failed: "生成默认令牌失败"
 user.aff_code_empty: "affCode 为空！"
 user.email_empty: "email 为空！"
-user.github_id_empty: "GitHub id 为空！"
-user.discord_id_empty: "discord id 为空！"
-user.oidc_id_empty: "oidc id 为空！"
-user.wechat_id_empty: "WeChat id 为空！"
-user.telegram_id_empty: "Telegram id 为空！"
-user.telegram_not_bound: "该 Telegram 账户未绑定"
-user.linux_do_id_empty: "Linux DO id 为空！"
 user.quota_change_zero: "额度变更量不能为0"
 
 # Quota messages
@@ -188,11 +177,6 @@ checkin.failed: "签到失败，请稍后重试"
 checkin.quota_failed: "签到失败：更新额度出错"
 
 # Passkey messages
-passkey.create_failed: "无法创建 Passkey 凭证"
-passkey.login_abnormal: "Passkey 登录状态异常"
-passkey.update_failed: "Passkey 凭证更新失败"
-passkey.invalid_user_id: "无效的用户 ID"
-passkey.verify_failed: "Passkey 验证失败，请重试或联系管理员"
 
 # 2FA messages
 twofa.not_enabled: "用户未启用2FA"
@@ -240,24 +224,9 @@ ability.db_corrupted: "数据库一致性被破坏"
 ability.repair_running: "已经有一个修复任务在运行中，请稍后再试"
 
 # OAuth messages
-oauth.invalid_code: "无效的授权码"
-oauth.get_user_error: "获取用户信息失败"
-oauth.account_used: "该账户已被其他用户绑定"
-oauth.unknown_provider: "未知的 OAuth 提供商"
-oauth.state_invalid: "state 参数为空或不匹配"
-oauth.not_enabled: "管理员未开启通过 {{.Provider}} 登录以及注册"
-oauth.user_deleted: "用户已注销"
-oauth.user_banned: "用户已被封禁"
-oauth.bind_success: "绑定成功"
-oauth.already_bound: "该 {{.Provider}} 账户已被绑定"
-oauth.connect_failed: "无法连接至 {{.Provider}} 服务器，请稍后重试"
-oauth.token_failed: "{{.Provider}} 获取 Token 失败，请检查设置"
-oauth.user_info_empty: "{{.Provider}} 获取用户信息为空，请检查设置"
-oauth.trust_level_low: "Linux DO 信任等级未达到管理员设置的最低信任等级"
 
 # Model layer error messages
 redeem.failed: "兑换失败，请稍后重试"
-user.create_default_token_error: "创建默认令牌失败"
 common.uuid_duplicate: "请重试，系统生成的 UUID 竟然重复了！"
 common.invalid_input: "输入不合法"
 
@@ -279,10 +248,3 @@ distributor.invalid_request_parse_model: "无效的请求,无法解析模型"
 distributor.channel_rate_limited: "该渠道已超过速率限制,请稍后重试"
 
 # Custom OAuth provider messages
-custom_oauth.not_found: "自定义 OAuth 提供商不存在"
-custom_oauth.slug_empty: "标识符不能为空"
-custom_oauth.slug_exists: "标识符已存在"
-custom_oauth.name_empty: "提供商名称不能为空"
-custom_oauth.has_bindings: "无法删除已有用户绑定的提供商"
-custom_oauth.binding_not_found: "OAuth 绑定不存在"
-custom_oauth.provider_id_field_invalid: "无法从提供商响应中提取用户 ID"
