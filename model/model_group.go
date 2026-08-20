@@ -338,11 +338,17 @@ func ListModelGroupReferences(groupId int) ([]*ModelGroupReference, error) {
 	return refs, err
 }
 
+// maxModelGroupReferenceDepth bounds both reference-cycle detection (write)
+// and reference expansion (read) to the same number of hops, so a valid
+// reference chain is never accepted by the write path yet silently truncated
+// by the read path.
+const maxModelGroupReferenceDepth = 10
+
 // checkModelGroupReferenceCycle reports whether following references starting
 // from `to` can reach `from` — i.e. whether adding the edge from -> to would
 // create a cycle. The walk is bounded to 10 levels of indirection.
 func checkModelGroupReferenceCycle(from, to int, visited map[int]bool) bool {
-	if len(visited) >= 10 || visited[to] {
+	if len(visited) > maxModelGroupReferenceDepth || visited[to] {
 		return false
 	}
 	visited[to] = true
@@ -365,8 +371,10 @@ func checkModelGroupReferenceCycle(from, to int, visited map[int]bool) bool {
 
 // ListModelGroupItemsExpanded returns direct members plus expanded reference
 // members (deduplicated by channel_id+model, with SourceGroup populated).
+// The depth bound matches the cycle check bound (maxModelGroupReferenceDepth)
+// so a reference chain valid at write time is fully expanded at read time.
 func ListModelGroupItemsExpanded(groupId int, depth int, visited map[int]bool) ([]*ModelGroupItem, error) {
-	if depth > 5 || visited[groupId] {
+	if depth > maxModelGroupReferenceDepth || visited[groupId] {
 		return nil, nil
 	}
 	visited[groupId] = true
