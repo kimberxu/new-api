@@ -20,4 +20,150 @@ import {
   Activity,
   Box,
   ClipboardList,
-  CreditCard,
+  FileText,
+  FlaskConical,
+  Key,
+  LayoutDashboard,
+  ListTodo,
+  MessageSquare,
+  PlugZap,
+  Radio,
+  ServerCog,
+  Settings,
+  ShieldCheck,
+  User,
+  Users,
+} from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+
+import type { SidebarData } from '@/components/layout/types'
+import { ROLE } from '@/lib/roles'
+
+/**
+ * Root navigation groups for the application sidebar.
+ *
+ * These are shown when the URL does not match any nested sidebar view
+ * registered in `layout/lib/sidebar-view-registry.ts`.
+ */
+export function useSidebarData(): SidebarData {
+  const { t } = useTranslation()
+
+  return {
+    navGroups: [
+      {
+        id: 'chat',
+        title: t('Chat'),
+        items: [
+          {
+            title: t('Playground'),
+            url: '/playground',
+            icon: FlaskConical,
+          },
+          {
+            title: t('Chat'),
+            icon: MessageSquare,
+            type: 'chat-presets',
+          },
+        ],
+      },
+      {
+        id: 'general',
+        title: t('General'),
+        items: [
+          {
+            title: t('Overview'),
+            url: '/dashboard/overview',
+            icon: Activity,
+          },
+          {
+            title: t('Dashboard'),
+            url: '/dashboard/models',
+            icon: LayoutDashboard,
+          },
+          {
+            title: t('API Keys'),
+            url: '/keys',
+            icon: Key,
+          },
+          {
+            title: t('Usage Logs'),
+            url: '/usage-logs/common',
+            icon: FileText,
+          },
+          {
+            title: t('Audit Logs'),
+            url: '/usage-logs/audit',
+            icon: ClipboardList,
+          },
+          {
+            title: t('Task Logs'),
+            url: '/usage-logs/task',
+            activeUrls: ['/usage-logs/drawing'],
+            configUrls: ['/usage-logs/drawing', '/usage-logs/task'],
+            icon: ListTodo,
+          },
+        ],
+      },
+      {
+        id: 'personal',
+        title: t('Personal'),
+        items: [
+          {
+            title: t('Profile'),
+            url: '/profile',
+            icon: User,
+          },
+          {
+            title: t('Security & Access'),
+            url: '/security',
+            icon: ShieldCheck,
+          },
+        ],
+      },
+      {
+        id: 'admin',
+        title: t('Admin'),
+        items: [
+          {
+            title: t('Channels'),
+            url: '/channels',
+            icon: Radio,
+          },
+          {
+            title: t('Models'),
+            url: '/models/metadata',
+            icon: Box,
+          },
+          {
+            title: t('Users'),
+            url: '/users',
+            icon: Users,
+          },
+          {
+            title: t('Model Groups'),
+            url: '/model-groups',
+            icon: Box,
+          },
+          {
+            title: t('System Info'),
+            url: '/system-info',
+            icon: ServerCog,
+            requiredRole: ROLE.SUPER_ADMIN,
+          },
+          {
+            title: t('Task Plugins'),
+            url: '/task-plugins',
+            icon: PlugZap,
+            requiredRole: ROLE.SUPER_ADMIN,
+          },
+          {
+            title: t('System Settings'),
+            url: '/system-settings/site',
+            activeUrls: ['/system-settings'],
+            icon: Settings,
+          },
+        ],
+      },
+    ],
+  }
+}

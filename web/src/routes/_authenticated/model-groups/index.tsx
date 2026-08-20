@@ -16,22 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useTranslation } from 'react-i18next'
+import { createFileRoute } from '@tanstack/react-router'
 
-import { SectionPageLayout } from '@/components/layout'
-import { ChannelAbilitiesTable } from './components/channel-abilities-table'
+import { ModelGroupsPage } from '@/features/model-groups'
 
-export function ChannelAbilities() {
-  const { t } = useTranslation()
-
-  return (
-    <SectionPageLayout fixedContent>
-      <SectionPageLayout.Title>
-        <span className='truncate'>{t('Channel Abilities')}</span>
-      </SectionPageLayout.Title>
-      <SectionPageLayout.Content>
-        <ChannelAbilitiesTable />
-      </SectionPageLayout.Content>
-    </SectionPageLayout>
-  )
-}
+export const Route = createFileRoute('/_authenticated/model-groups/')({
+  component: ModelGroupsPage,
+})

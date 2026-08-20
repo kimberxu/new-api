@@ -1,0 +1,1 @@
+export { ModelGroupsPage } from './components/model-groups-page'
