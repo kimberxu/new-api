@@ -16,12 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export type VerificationMethod = '2fa' | 'passkey'
+export type VerificationMethod = '2fa'
 
-export type SecurityProofScope =
-  | 'channel.key.read'
-  | 'passkey.register'
-  | 'passkey.delete'
+export type SecurityProofScope = 'channel.key.read'
 
 export interface SecurityProof {
   proof_token: string
