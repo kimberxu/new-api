@@ -731,7 +731,6 @@ describe('dashboard flow data', () => {
             : row.value,
         ])
     ).toEqual([
-      ['Quota', '100'],
       ['Tokens', '40'],
       ['Requests', '2'],
       ['Share', '100.0%'],
