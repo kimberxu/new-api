@@ -5130,6 +5130,20 @@
     "Select a model on the channel": "Select a model on the channel",
     "Toggle members": "Toggle members",
     "Weight (empty = inherit)": "Weight (empty = inherit)",
-    "{{count}} members": "{{count}} members"
+    "{{count}} members": "{{count}} members",
+    "Channel model": "Channel model",
+    "Failed to add group reference": "Failed to add group reference",
+    "Failed to remove group reference": "Failed to remove group reference",
+    "from {{group}}": "from {{group}}",
+    "Group reference added": "Group reference added",
+    "Group reference removed": "Group reference removed",
+    "Members are aggregated and updated live; duplicates with the direct members are merged.": "Members are aggregated and updated live; duplicates with the direct members are merged.",
+    "Reference group": "Reference group",
+    "Referenced group": "Referenced group",
+    "References": "References",
+    "Remove Group Reference": "Remove Group Reference",
+    "Remove reference": "Remove reference",
+    "Remove reference to {{ref}} from {{group}}? Its members will no longer be included.": "Remove reference to {{ref}} from {{group}}? Its members will no longer be included.",
+    "Select a group to include all its members": "Select a group to include all its members"
   }
 }

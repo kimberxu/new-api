@@ -42,6 +42,20 @@ type ModelGroupItem struct {
 	Weight    *uint  `json:"weight" gorm:"default:0"`
 	Enabled   bool   `json:"enabled"` // 组内成员级启用；默认 true 代码层设置
 	CreatedAt int64  `json:"created_at" gorm:"bigint;autoCreateTime"`
+	// SourceGroup is set during reference expansion (empty = direct member,
+	// non-empty = this member comes from the named referenced group). It is a
+	// transient display field, never persisted.
+	SourceGroup string `json:"source_group,omitempty" gorm:"-"`
+}
+
+// ModelGroupReference records a reference from one group to another:
+// the source group (GroupId) includes all members of the target group
+// (RefGroupId) during routing and display.
+type ModelGroupReference struct {
+	Id         int   `json:"id" gorm:"primaryKey"`
+	GroupId    int   `json:"group_id" gorm:"uniqueIndex:idx_ref_group_ref"`
+	RefGroupId int   `json:"ref_group_id" gorm:"uniqueIndex:idx_ref_group_ref"`
+	CreatedAt  int64 `json:"created_at" gorm:"bigint;autoCreateTime"`
 }
 
 func (g *ModelGroup) SetDefaults() {
@@ -139,10 +153,14 @@ func SetModelGroupEnabled(groupId int, enabled bool) error {
 	return DB.Model(&ModelGroup{}).Where("id = ?", groupId).Update("enabled", enabled).Error
 }
 
-// DeleteModelGroup removes a group and its members in one transaction.
+// DeleteModelGroup removes a group, its members, and its references
+// (both inbound and outbound) in one transaction.
 func DeleteModelGroup(groupId int) error {
 	return DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("group_id = ?", groupId).Delete(&ModelGroupItem{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("group_id = ? OR ref_group_id = ?", groupId, groupId).Delete(&ModelGroupReference{}).Error; err != nil {
 			return err
 		}
 		return tx.Delete(&ModelGroup{}, groupId).Error
@@ -256,24 +274,145 @@ func DeleteModelGroupItemsNotIn(channelId int, models []string) error {
 }
 
 // GetEnabledModelGroupsWithItems returns enabled groups mapped to their
-// enabled members (route-cache building). Full-table scan; fine at personal
-// scale.
+// enabled members (route-cache building), with reference members expanded and
+// deduplicated. Full-table scan; fine at personal scale.
 func GetEnabledModelGroupsWithItems() (map[string][]ModelGroupItem, error) {
 	var groups []*ModelGroup
 	if err := DB.Where("enabled = ?", true).Find(&groups).Error; err != nil {
 		return nil, err
 	}
-	var items []ModelGroupItem
-	if err := DB.Where("enabled = ?", true).Find(&items).Error; err != nil {
-		return nil, err
-	}
-	itemByGroup := make(map[int][]ModelGroupItem, len(groups))
-	for _, it := range items {
-		itemByGroup[it.GroupId] = append(itemByGroup[it.GroupId], it)
-	}
 	result := make(map[string][]ModelGroupItem, len(groups))
 	for _, g := range groups {
-		result[g.Name] = itemByGroup[g.Id]
+		items, err := ListModelGroupItemsExpanded(g.Id, 0, make(map[int]bool))
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range items {
+			// Only routable members: the direct member scan already filtered
+			// on enabled; referenced members must be filtered here too since
+			// ListModelGroupItemsExpanded returns whatever the referenced
+			// group holds (enabled or not).
+			if item.Enabled {
+				result[g.Name] = append(result[g.Name], *item)
+			}
+		}
 	}
 	return result, nil
+}
+
+// AddModelGroupReference records that groupId includes all members of
+// refGroupId. Both groups must exist and differ, and the new edge must not
+// create a reference cycle (checked from refGroupId back to groupId).
+func AddModelGroupReference(groupId, refGroupId int) error {
+	if groupId == refGroupId {
+		return errors.New("group cannot reference itself")
+	}
+	for _, id := range []int{groupId, refGroupId} {
+		g, err := GetModelGroupById(id)
+		if err != nil {
+			return err
+		}
+		if g == nil {
+			return fmt.Errorf("model group %d does not exist", id)
+		}
+	}
+	if checkModelGroupReferenceCycle(groupId, refGroupId, make(map[int]bool)) {
+		return errors.New("reference would create a cycle")
+	}
+	return DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&ModelGroupReference{
+		GroupId:    groupId,
+		RefGroupId: refGroupId,
+	}).Error
+}
+
+// DeleteModelGroupReference removes a reference from groupId to refGroupId.
+func DeleteModelGroupReference(groupId, refGroupId int) error {
+	return DB.Where("group_id = ? AND ref_group_id = ?", groupId, refGroupId).
+		Delete(&ModelGroupReference{}).Error
+}
+
+// ListModelGroupReferences returns all groups referenced by groupId.
+func ListModelGroupReferences(groupId int) ([]*ModelGroupReference, error) {
+	var refs []*ModelGroupReference
+	err := DB.Where("group_id = ?", groupId).Find(&refs).Error
+	return refs, err
+}
+
+// checkModelGroupReferenceCycle reports whether following references starting
+// from `to` can reach `from` — i.e. whether adding the edge from -> to would
+// create a cycle. The walk is bounded to 10 levels of indirection.
+func checkModelGroupReferenceCycle(from, to int, visited map[int]bool) bool {
+	if len(visited) >= 10 || visited[to] {
+		return false
+	}
+	visited[to] = true
+	defer delete(visited, to)
+
+	refs, err := ListModelGroupReferences(to)
+	if err != nil {
+		return false
+	}
+	for _, ref := range refs {
+		if ref.RefGroupId == from {
+			return true
+		}
+		if checkModelGroupReferenceCycle(from, ref.RefGroupId, visited) {
+			return true
+		}
+	}
+	return false
+}
+
+// ListModelGroupItemsExpanded returns direct members plus expanded reference
+// members (deduplicated by channel_id+model, with SourceGroup populated).
+func ListModelGroupItemsExpanded(groupId int, depth int, visited map[int]bool) ([]*ModelGroupItem, error) {
+	if depth > 5 || visited[groupId] {
+		return nil, nil
+	}
+	visited[groupId] = true
+	defer func() { delete(visited, groupId) }()
+
+	items, err := ListModelGroupItems(groupId)
+	if err != nil {
+		return nil, err
+	}
+
+	refs, err := ListModelGroupReferences(groupId)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]bool) // "channelId:model"
+	for _, item := range items {
+		key := fmt.Sprintf("%d:%s", item.ChannelId, item.Model)
+		seen[key] = true
+	}
+
+	for _, ref := range refs {
+		reffedItems, err := ListModelGroupItemsExpanded(ref.RefGroupId, depth+1, visited)
+		if err != nil {
+			return nil, err
+		}
+		var refGroupName string
+		for _, ri := range reffedItems {
+			key := fmt.Sprintf("%d:%s", ri.ChannelId, ri.Model)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			clone := *ri
+			if clone.SourceGroup == "" {
+				// 顶层引用成员：来源就是被引用组名
+				if refGroupName == "" {
+					if g, _ := GetModelGroupById(ref.RefGroupId); g != nil {
+						refGroupName = g.Name
+					}
+				}
+				clone.SourceGroup = refGroupName
+			}
+			items = append(items, &clone)
+		}
+	}
+
+	return items, nil
 }

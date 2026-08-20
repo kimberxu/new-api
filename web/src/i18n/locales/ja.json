@@ -5130,6 +5130,20 @@
     "Select a model on the channel": "チャネルのモデルを選択",
     "Toggle members": "メンバーを展開/折りたたみ",
     "Weight (empty = inherit)": "重み（空 = 継承）",
-    "{{count}} members": "{{count}} メンバー"
+    "{{count}} members": "{{count}} メンバー",
+    "Channel model": "チャンネルモデル",
+    "Failed to add group reference": "グループ参照の追加に失敗しました",
+    "Failed to remove group reference": "グループ参照の削除に失敗しました",
+    "from {{group}}": "{{group}} から",
+    "Group reference added": "グループ参照を追加しました",
+    "Group reference removed": "グループ参照を削除しました",
+    "Members are aggregated and updated live; duplicates with the direct members are merged.": "メンバーはリアルタイムで集約・更新され、直接メンバーとの重複は統合されます。",
+    "Reference group": "参照グループ",
+    "Referenced group": "参照先グループ",
+    "References": "参照",
+    "Remove Group Reference": "グループ参照を削除",
+    "Remove reference": "参照を削除",
+    "Remove reference to {{ref}} from {{group}}? Its members will no longer be included.": "{{group}} から {{ref}} への参照を削除しますか？そのメンバーは含まれなくなります。",
+    "Select a group to include all its members": "すべてのメンバーを含めるグループを選択"
   }
 }

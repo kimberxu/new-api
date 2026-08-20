@@ -5130,6 +5130,20 @@
     "Select a model on the channel": "Chọn mô hình trên kênh",
     "Toggle members": "Mở rộng/thu gọn thành viên",
     "Weight (empty = inherit)": "Trọng số (trống = kế thừa)",
-    "{{count}} members": "{{count}} thành viên"
+    "{{count}} members": "{{count}} thành viên",
+    "Channel model": "Mô hình kênh",
+    "Failed to add group reference": "Thêm tham chiếu nhóm thất bại",
+    "Failed to remove group reference": "Xóa tham chiếu nhóm thất bại",
+    "from {{group}}": "từ {{group}}",
+    "Group reference added": "Đã thêm tham chiếu nhóm",
+    "Group reference removed": "Đã xóa tham chiếu nhóm",
+    "Members are aggregated and updated live; duplicates with the direct members are merged.": "Các thành viên được tổng hợp và cập nhật trực tiếp; các mục trùng với thành viên trực tiếp được hợp nhất.",
+    "Reference group": "Nhóm tham chiếu",
+    "Referenced group": "Nhóm được tham chiếu",
+    "References": "Tham chiếu",
+    "Remove Group Reference": "Xóa tham chiếu nhóm",
+    "Remove reference": "Xóa tham chiếu",
+    "Remove reference to {{ref}} from {{group}}? Its members will no longer be included.": "Xóa tham chiếu đến {{ref}} khỏi {{group}}? Các thành viên của nó sẽ không còn được bao gồm.",
+    "Select a group to include all its members": "Chọn một nhóm để bao gồm tất cả thành viên của nó"
   }
 }

@@ -23,6 +23,7 @@ import {
   Plus,
   Save,
   Trash2,
+  X,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -63,8 +64,11 @@ import {
   updateGroupItem,
   deleteGroupItem,
   getChannelModelOptions,
+  addGroupReference,
+  deleteGroupReference,
   type ModelGroup,
   type ModelGroupItem,
+  type ModelGroupReference,
 } from '../lib/api'
 
 interface MemberEditState {
@@ -87,6 +91,12 @@ export function ModelGroupsPage() {
   const [addMemberGroup, setAddMemberGroup] = useState<ModelGroup | null>(null)
   const [addChannelId, setAddChannelId] = useState('')
   const [addModel, setAddModel] = useState('')
+  const [addRefMode, setAddRefMode] = useState<'channel' | 'group'>('channel')
+  const [addRefGroupId, setAddRefGroupId] = useState('')
+  const [deleteRefTarget, setDeleteRefTarget] = useState<{
+    group: ModelGroup
+    ref: ModelGroupReference
+  } | null>(null)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [edits, setEdits] = useState<Record<number, MemberEditState>>({})
 
@@ -205,6 +215,42 @@ export function ModelGroupsPage() {
         invalidate()
       } else {
         toast.error(res.message || t('Failed to add member'))
+      }
+    },
+  })
+
+  const addReferenceMutation = useMutation({
+    mutationFn: () =>
+      addGroupReference(addMemberGroup!.id, Number(addRefGroupId)),
+    onError: () => toast.error(t('Failed to add group reference')),
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success(t('Group reference added'))
+        setAddMemberGroup(null)
+        setAddRefGroupId('')
+        invalidate()
+      } else {
+        toast.error(res.message || t('Failed to add group reference'))
+      }
+    },
+  })
+
+  const deleteReferenceMutation = useMutation({
+    mutationFn: ({
+      groupId,
+      refGroupId,
+    }: {
+      groupId: number
+      refGroupId: number
+    }) => deleteGroupReference(groupId, refGroupId),
+    onError: () => toast.error(t('Failed to remove group reference')),
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success(t('Group reference removed'))
+        setDeleteRefTarget(null)
+        invalidate()
+      } else {
+        toast.error(res.message || t('Failed to remove group reference'))
       }
     },
   })
@@ -332,6 +378,34 @@ export function ModelGroupsPage() {
 
                   {isExpanded && (
                     <div className='border-border border-t p-3'>
+                      {(group.references ?? []).length > 0 && (
+                        <div className='mb-3 flex flex-wrap items-center gap-2'>
+                          <span className='text-muted-foreground text-xs'>
+                            {t('References')}:
+                          </span>
+                          {(group.references ?? []).map((ref) => (
+                            <div
+                              key={ref.id}
+                              className='bg-muted flex items-center gap-1 rounded-full px-2 py-0.5 text-xs'
+                            >
+                              <span className='font-medium'>
+                                {ref.ref_group_name}
+                              </span>
+                              <Button
+                                variant='ghost'
+                                size='icon-sm'
+                                className='h-4 w-4'
+                                onClick={() =>
+                                  setDeleteRefTarget({ group, ref })
+                                }
+                                title={t('Remove reference')}
+                              >
+                                <X className='h-3 w-3' />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {members.length === 0 ? (
                         <div className='text-muted-foreground py-4 text-center text-sm'>
                           {t('No members in this group yet')}
@@ -368,11 +442,18 @@ export function ModelGroupsPage() {
                                       {getChannelTypeLabel(item.channel_type)}
                                     </span>
                                   </TableCell>
-                                  <TableCell>{item.model}</TableCell>
+                                  <TableCell>{item.model}
+                                    {item.source_group && (
+                                      <StatusBadge variant='info' size='sm' className='ml-1 align-middle'>
+                                        {t('from {{group}}', { group: item.source_group })}
+                                      </StatusBadge>
+                                    )}
+                                  </TableCell>
                                   <TableCell>
                                     <Input
                                       type='number'
                                       className='h-8'
+                                      disabled={!!item.source_group}
                                       value={edit.priorityInput}
                                       placeholder={
                                         item.channel_priority
@@ -394,6 +475,7 @@ export function ModelGroupsPage() {
                                     <Input
                                       type='number'
                                       className='h-8'
+                                      disabled={!!item.source_group}
                                       value={edit.weightInput}
                                       placeholder={
                                         item.channel_weight
@@ -414,6 +496,7 @@ export function ModelGroupsPage() {
                                   <TableCell>
                                     <Switch
                                       checked={item.enabled}
+                                      disabled={!!item.source_group}
                                       onCheckedChange={(checked) =>
                                         itemToggleMutation.mutate({
                                           itemId: item.id,
@@ -427,7 +510,11 @@ export function ModelGroupsPage() {
                                       <Button
                                         variant='ghost'
                                         size='icon-sm'
-                                        disabled={!dirty || itemUpdateMutation.isPending}
+                                        disabled={
+                                          !!item.source_group ||
+                                          !dirty ||
+                                          itemUpdateMutation.isPending
+                                        }
                                         onClick={() =>
                                           itemUpdateMutation.mutate({
                                             itemId: item.id,
@@ -441,6 +528,7 @@ export function ModelGroupsPage() {
                                       <Button
                                         variant='ghost'
                                         size='icon-sm'
+                                        disabled={!!item.source_group}
                                         onClick={() =>
                                           setDeleteItemTarget({ group, item })
                                         }
@@ -463,6 +551,8 @@ export function ModelGroupsPage() {
                             setAddMemberGroup(group)
                             setAddChannelId('')
                             setAddModel('')
+                            setAddRefMode('channel')
+                            setAddRefGroupId('')
                           }}
                         >
                           <Plus className='mr-1 h-4 w-4' />
@@ -511,20 +601,81 @@ export function ModelGroupsPage() {
         title={`${t('Add Member')} — ${addMemberGroup?.name ?? ''}`}
         description={t('Add a real upstream model of an existing channel. Priority/weight empty = inherit the channel values.')}
         footer={
-          <Button
-            disabled={
-              !addChannelId ||
-              !addModel ||
-              addMemberMutation.isPending
-            }
-            onClick={() => addMemberMutation.mutate()}
-          >
-            {t('Add')}
-          </Button>
+          addRefMode === 'channel' ? (
+            <Button
+              disabled={
+                !addChannelId ||
+                !addModel ||
+                addMemberMutation.isPending
+              }
+              onClick={() => addMemberMutation.mutate()}
+            >
+              {t('Add')}
+            </Button>
+          ) : (
+            <Button
+              disabled={!addRefGroupId || addReferenceMutation.isPending}
+              onClick={() => addReferenceMutation.mutate()}
+            >
+              {t('Add')}
+            </Button>
+          )
         }
       >
         <div className='space-y-3'>
-          <div>
+          <div className='flex gap-2'>
+            <Button
+              type='button'
+              variant={addRefMode === 'channel' ? 'default' : 'outline'}
+              size='sm'
+              onClick={() => setAddRefMode('channel')}
+            >
+              {t('Channel model')}
+            </Button>
+            <Button
+              type='button'
+              variant={addRefMode === 'group' ? 'default' : 'outline'}
+              size='sm'
+              onClick={() => setAddRefMode('group')}
+            >
+              {t('Reference group')}
+            </Button>
+          </div>
+          {addRefMode === 'group' ? (
+            <div>
+              <label className='text-muted-foreground mb-1 block text-sm'>
+                {t('Referenced group')}
+              </label>
+              <Select
+                value={addRefGroupId}
+                onValueChange={setAddRefGroupId}
+              >
+                <SelectTrigger className='w-full'>
+                  <SelectValue placeholder={t('Select a group to include all its members')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(data?.items ?? [])
+                    .filter(
+                      (g) =>
+                        g.id !== addMemberGroup?.id &&
+                        !(g.references ?? []).some(
+                          (ref) => ref.ref_group_id === addMemberGroup?.id
+                        )
+                    )
+                    .map((g) => (
+                      <SelectItem key={g.id} value={String(g.id)}>
+                        {g.name} ({g.member_count ?? 0} members)
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className='text-muted-foreground mt-2 text-xs'>
+                {t('Members are aggregated and updated live; duplicates with the direct members are merged.')}
+              </p>
+            </div>
+          ) : (
+            <div className='space-y-3'>
+              <div>
             <label className='text-muted-foreground mb-1 block text-sm'>
               {t('Channel')}
             </label>
@@ -558,6 +709,8 @@ export function ModelGroupsPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
             </div>
           )}
         </div>
@@ -617,6 +770,26 @@ export function ModelGroupsPage() {
         handleConfirm={() => {
           if (deleteItemTarget) {
             itemDeleteMutation.mutate({ itemId: deleteItemTarget.item.id })
+          }
+        }}
+      />
+
+      {/* Delete group reference confirm */}
+      <ConfirmDialog
+        open={!!deleteRefTarget}
+        onOpenChange={() => setDeleteRefTarget(null)}
+        title={t('Remove Group Reference')}
+        desc={t('Remove reference to {{ref}} from {{group}}? Its members will no longer be included.', {
+          ref: deleteRefTarget?.ref.ref_group_name ?? '',
+          group: deleteRefTarget?.group.name ?? '',
+        })}
+        confirmText={t('Remove')}
+        handleConfirm={() => {
+          if (deleteRefTarget) {
+            deleteReferenceMutation.mutate({
+              groupId: deleteRefTarget.group.id,
+              refGroupId: deleteRefTarget.ref.ref_group_id,
+            })
           }
         }}
       />

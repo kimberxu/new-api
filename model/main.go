@@ -349,6 +349,7 @@ func migrateDB() error {
 		&ChannelDisabledModel{},
 		&ModelGroup{},
 		&ModelGroupItem{},
+		&ModelGroupReference{},
 		&Log{},
 		&Midjourney{},
 		&TopUp{},
