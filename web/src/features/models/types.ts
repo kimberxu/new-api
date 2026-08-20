@@ -283,11 +283,6 @@ export type NameRule = 0 | 1 | 2 | 3 // exact, prefix, contains, suffix
 export type ModelStatus = 0 | 1 // disabled, enabled
 
 /**
- * Quota type
- */
-export type QuotaType = 0 | 1 // usage-based, per-call
-
-/**
  * Sync locale
  */
 export type SyncLocale = 'zh' | 'en' | 'ja'
