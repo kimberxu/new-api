@@ -129,6 +129,11 @@ export function useSidebarData(): SidebarData {
             icon: Box,
           },
           {
+            title: t('Model Groups'),
+            url: '/model-groups',
+            icon: Box,
+          },
+          {
             title: t('Users'),
             url: '/users',
             icon: Users,
