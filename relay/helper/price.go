@@ -6,7 +6,6 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
-	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/types"
@@ -17,21 +16,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
-
-func modelPriceNotConfiguredError(modelName string, userId int) error {
-	if model.IsAdmin(userId) {
-		return fmt.Errorf(
-			"模型 %s 的价格未配置。请前往「系统设置 → 运营设置」开启自用模式，或在「系统设置 → 分组与模型定价设置」中为该模型配置价格；"+
-				"Model %s price not configured. Go to System Settings → Operation Settings to enable self-use mode, or configure the model price in System Settings → Group & Model Pricing.",
-			modelName, modelName,
-		)
-	}
-	return fmt.Errorf(
-		"模型 %s 的价格尚未由管理员配置，暂时无法使用，请联系站点管理员开启该模型；"+
-			"Model %s has not been priced by the administrator yet. Please contact the site administrator to enable this model.",
-		modelName, modelName,
-	)
-}
 
 // https://docs.claude.com/en/docs/build-with-claude/prompt-caching#1-hour-cache-duration
 const claudeCacheCreation1hMultiplier = 6 / 3.75
@@ -100,13 +84,10 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		var matchName string
 		modelRatio, success, matchName = ratio_setting.GetModelRatio(info.OriginModelName)
 		if !success {
-			acceptUnsetRatio := false
-			if info.UserSetting.AcceptUnsetRatioModel {
-				acceptUnsetRatio = true
-			}
-			if !acceptUnsetRatio {
-				return hosttypes.PriceData{}, modelPriceNotConfiguredError(matchName, info.UserId)
-			}
+			// [personal] 计费功能级移除：任意模型可路由，未定价模型按免费放行（不再报价格未配置）。
+			_ = matchName
+			acceptUnsetRatio := true
+			_ = acceptUnsetRatio
 		}
 		completionRatio = ratio_setting.GetCompletionRatio(info.OriginModelName)
 		cacheRatio, _ = ratio_setting.GetCacheRatio(info.OriginModelName)
@@ -198,15 +179,9 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (hostt
 			usePrice = true
 		} else {
 			var ratioSuccess bool
-			var matchName string
-			modelRatio, ratioSuccess, matchName = ratio_setting.GetModelRatio(info.OriginModelName)
-			acceptUnsetRatio := false
-			if info.UserSetting.AcceptUnsetRatioModel {
-				acceptUnsetRatio = true
-			}
-			if !ratioSuccess && !acceptUnsetRatio {
-				return hosttypes.PriceData{}, modelPriceNotConfiguredError(matchName, info.UserId)
-			}
+			modelRatio, ratioSuccess, _ = ratio_setting.GetModelRatio(info.OriginModelName)
+			// [personal] 计费功能级移除：任意模型可路由，未定价模型按免费放行。
+			_ = ratioSuccess
 		}
 	}
 
