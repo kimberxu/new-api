@@ -5097,6 +5097,19 @@
     "Manually Disabled": "手動無効化",
     "No Channel Abilities Found": "チャネル能力が見つかりません",
     "No channel abilities match your filters.": "フィルターに一致するチャネル能力はありません。",
-    "Route Table": "ルートテーブル"
+    "Route Table": "ルートテーブル",
+    "A model group name must match the routable model name.": "モデルグループ名はルーティング可能なモデル名と一致する必要があります。",
+    "Create Group": "グループを作成",
+    "Create Model Group": "モデルグループを作成",
+    "Delete Model Group": "モデルグループを削除",
+    "Delete group {{name}}? This will also remove all its members.": "グループ {{name}} を削除しますか？すべてのメンバーも削除されます。",
+    "Enter group name (model name)": "グループ名（モデル名）を入力",
+    "Failed to create model group": "モデルグループの作成に失敗しました",
+    "Failed to delete model group": "モデルグループの削除に失敗しました",
+    "Members": "メンバー",
+    "Model Groups": "モデルグループ",
+    "Model group created": "モデルグループを作成しました",
+    "Model group deleted": "モデルグループを削除しました",
+    "No Model Groups": "モデルグループがありません"
   }
 }

@@ -5097,6 +5097,19 @@
     "Manually Disabled": "手動停用",
     "No Channel Abilities Found": "未找到渠道路由",
     "No channel abilities match your filters.": "沒有符合篩選條件的渠道路由。",
-    "Route Table": "路由表"
+    "Route Table": "路由表",
+    "A model group name must match the routable model name.": "模型組名稱必須與可路由的模型名一致。",
+    "Create Group": "建立群組",
+    "Create Model Group": "建立模型組",
+    "Delete Model Group": "刪除模型組",
+    "Delete group {{name}}? This will also remove all its members.": "刪除群組 {{name}}？這將同時移除其全部成員。",
+    "Enter group name (model name)": "輸入群組名稱（模型名）",
+    "Failed to create model group": "建立模型組失敗",
+    "Failed to delete model group": "刪除模型組失敗",
+    "Members": "成員",
+    "Model Groups": "模型組",
+    "Model group created": "模型組已建立",
+    "Model group deleted": "模型組已刪除",
+    "No Model Groups": "暫無模型組"
   }
 }

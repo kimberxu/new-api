@@ -5097,6 +5097,19 @@
     "Manually Disabled": "Đã tắt thủ công",
     "No Channel Abilities Found": "Không tìm thấy khả năng kênh",
     "No channel abilities match your filters.": "Không có khả năng kênh nào khớp với bộ lọc của bạn.",
-    "Route Table": "Bảng định tuyến"
+    "Route Table": "Bảng định tuyến",
+    "A model group name must match the routable model name.": "Tên nhóm mô hình phải khớp với tên mô hình có thể định tuyến.",
+    "Create Group": "Tạo nhóm",
+    "Create Model Group": "Tạo nhóm mô hình",
+    "Delete Model Group": "Xóa nhóm mô hình",
+    "Delete group {{name}}? This will also remove all its members.": "Xóa nhóm {{name}}? Điều này cũng sẽ xóa tất cả thành viên của nó.",
+    "Enter group name (model name)": "Nhập tên nhóm (tên mô hình)",
+    "Failed to create model group": "Không tạo được nhóm mô hình",
+    "Failed to delete model group": "Không xóa được nhóm mô hình",
+    "Members": "Thành viên",
+    "Model Groups": "Nhóm mô hình",
+    "Model group created": "Đã tạo nhóm mô hình",
+    "Model group deleted": "Đã xóa nhóm mô hình",
+    "No Model Groups": "Không có nhóm mô hình"
   }
 }

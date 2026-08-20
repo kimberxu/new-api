@@ -5097,6 +5097,19 @@
     "Manually Disabled": "Désactivé manuellement",
     "No Channel Abilities Found": "Aucune capacité de canal trouvée",
     "No channel abilities match your filters.": "Aucune capacité de canal ne correspond à vos filtres.",
-    "Route Table": "Table de routage"
+    "Route Table": "Table de routage",
+    "A model group name must match the routable model name.": "Le nom du groupe de modèles doit correspondre au nom du modèle routable.",
+    "Create Group": "Créer un groupe",
+    "Create Model Group": "Créer un groupe de modèles",
+    "Delete Model Group": "Supprimer le groupe de modèles",
+    "Delete group {{name}}? This will also remove all its members.": "Supprimer le groupe {{name}} ? Cela supprimera également tous ses membres.",
+    "Enter group name (model name)": "Saisz le nom du groupe (nom du modèle)",
+    "Failed to create model group": "Échec de la création du groupe de modèles",
+    "Failed to delete model group": "Échec de la suppression du groupe de modèles",
+    "Members": "Membres",
+    "Model Groups": "Groupes de modèles",
+    "Model group created": "Groupe de modèles créé",
+    "Model group deleted": "Groupe de modèles supprimé",
+    "No Model Groups": "Aucun groupe de modèles"
   }
 }

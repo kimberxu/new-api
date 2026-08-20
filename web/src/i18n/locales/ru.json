@@ -5097,6 +5097,19 @@
     "Manually Disabled": "Отключено вручную",
     "No Channel Abilities Found": "Возможности каналов не найдены",
     "No channel abilities match your filters.": "Нет возможностей каналов, соответствующих фильтрам.",
-    "Route Table": "Таблица маршрутов"
+    "Route Table": "Таблица маршрутов",
+    "A model group name must match the routable model name.": "Имя группы моделей должно совпадать с маршрутизируемым именем модели.",
+    "Create Group": "Создать группу",
+    "Create Model Group": "Создать группу моделей",
+    "Delete Model Group": "Удалить группу моделей",
+    "Delete group {{name}}? This will also remove all its members.": "Удалить группу {{name}}? Это также удалит всех её участников.",
+    "Enter group name (model name)": "Введите имя группы (имя модели)",
+    "Failed to create model group": "Не удалось создать группу моделей",
+    "Failed to delete model group": "Не удалось удалить группу моделей",
+    "Members": "Участники",
+    "Model Groups": "Группы моделей",
+    "Model group created": "Группа моделей создана",
+    "Model group deleted": "Группа моделей удалена",
+    "No Model Groups": "Нет групп моделей"
   }
 }
