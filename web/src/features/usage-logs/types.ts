@@ -19,8 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 /**
  * Type definitions for usage logs
  */
-import type { RequestRuleTrace } from '@/features/pricing/lib/billing-expr'
-
 import type { UsageLog } from './data/schema'
 // ============================================================================
 // Log Category Types
@@ -196,7 +194,11 @@ export interface LogOtherData {
   billing_mode?: string
   expr_b64?: string
   matched_tier?: string
-  request_rules?: RequestRuleTrace[]
+  request_rules?: Array<{
+    rule_name?: string
+    matched?: boolean
+    [key: string]: unknown
+  }>
   reasoning_effort?: string
   image?: boolean
   image_ratio?: number

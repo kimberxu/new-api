@@ -29,7 +29,6 @@ import {
   Info,
   Loader2,
   Route,
-  WalletCards,
 } from 'lucide-react'
 import {
   Fragment,
@@ -84,7 +83,6 @@ import type {
   FlowOverflowMode,
   FlowRole,
 } from '@/features/dashboard/types'
-import { formatQuota } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
 import { computeTimeRange } from '@/lib/time'
 import { useChartTheme } from '@/lib/use-chart-theme'
@@ -101,13 +99,11 @@ interface FlowChartsProps {
 }
 
 const FLOW_METRIC_OPTIONS = [
-  { value: 'quota', labelKey: 'By quota', icon: WalletCards },
   { value: 'tokens', labelKey: 'By tokens', icon: Hash },
   { value: 'requests', labelKey: 'By requests', icon: Activity },
 ] as const
 
 const FLOW_METRIC_LABEL_KEYS: Record<FlowMetric, string> = {
-  quota: 'Quota',
   tokens: 'Tokens',
   requests: 'Requests',
 }
@@ -265,7 +261,7 @@ export function FlowCharts(props: FlowChartsProps) {
   } else if (isAdmin) {
     flowRole = 'admin'
   }
-  const [metric, setMetric] = useState<FlowMetric>('quota')
+  const [metric, setMetric] = useState<FlowMetric>('tokens')
   const [topNodeLimit, setTopNodeLimit] = useState(DEFAULT_FLOW_TOP_NODE_LIMIT)
   const [overflowMode, setOverflowMode] =
     useState<FlowOverflowMode>('aggregate')
@@ -393,9 +389,8 @@ export function FlowCharts(props: FlowChartsProps) {
   )
   const metricLabel = t(FLOW_METRIC_LABEL_KEYS[metric])
   const formatNodeMetricValue = useCallback(
-    (value: number) =>
-      metric === 'quota' ? formatQuota(value) : formatFlowMetricNumber(value),
-    [metric]
+    (value: number) => formatFlowMetricNumber(value),
+    []
   )
   // Explicit filters (the chips/dropdown control) narrow the rows that feed the
   // chart. They are intentionally independent from the click-to-highlight state
@@ -454,8 +449,7 @@ export function FlowCharts(props: FlowChartsProps) {
   const chartTitle = t('Flow')
   const flowSpec = useMemo(
     () =>
-      buildFlowSankeySpec(flowData.flow, chartTitle, formatQuota, {
-        quota: t('Quota'),
+      buildFlowSankeySpec(flowData.flow, chartTitle, undefined, {
         tokens: t('Tokens'),
         requests: t('Requests'),
         share: t('Share'),

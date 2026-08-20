@@ -55,7 +55,6 @@ import type {
   DashboardChartPreferences,
   DashboardFilters,
   QuotaDataItem,
-  UserChartsFilters,
 } from './types'
 
 const route = getRouteApi('/_authenticated/dashboard/$section')
@@ -89,21 +88,9 @@ const LazyModelCharts = lazy(() =>
   }))
 )
 
-const LazyConsumptionDistributionChart = lazy(() =>
-  import('./components/models/consumption-distribution-chart').then((m) => ({
-    default: m.ConsumptionDistributionChart,
-  }))
-)
-
 const LazyPerformanceOverview = lazy(() =>
   import('./components/models/performance-overview').then((m) => ({
     default: m.PerformanceOverview,
-  }))
-)
-
-const LazyUserCharts = lazy(() =>
-  import('./components/users/user-charts').then((m) => ({
-    default: m.UserCharts,
   }))
 )
 
@@ -186,9 +173,6 @@ const SECTION_META: Record<DashboardSectionId, { titleKey: string }> = {
   flow: {
     titleKey: 'Flow',
   },
-  users: {
-    titleKey: 'User Analytics',
-  },
 }
 
 export function Dashboard() {
@@ -205,16 +189,6 @@ export function Dashboard() {
     useState<DashboardChartPreferences>(() => getSavedChartPreferences())
   const [modelFilters, setModelFilters] = useState<DashboardFilters>(() =>
     buildDefaultDashboardFilters(getSavedChartPreferences())
-  )
-  const [userChartsFilters, setUserChartsFilters] = useState<UserChartsFilters>(
-    () => {
-      const granularity = getSavedGranularity()
-      return {
-        timeGranularity: granularity,
-        selectedRange: getDefaultDays(granularity),
-        topUserLimit: 10,
-      }
-    }
   )
   const [flowSensitiveVisible, setFlowSensitiveVisible] = useState(true)
 
@@ -248,7 +222,7 @@ export function Dashboard() {
   const visibleSections = useMemo(
     () =>
       DASHBOARD_SECTION_IDS.filter(
-        (section) => section !== 'overview' && (section !== 'users' || isAdmin)
+        (section) => section !== 'overview'
       ),
     [isAdmin]
   )
@@ -362,20 +336,6 @@ export function Dashboard() {
                   </Suspense>
                 </FadeIn>
               )}
-              <FadeIn delay={0.1}>
-                <Suspense fallback={<ModelChartsFallback />}>
-                  <LazyConsumptionDistributionChart
-                    data={modelData}
-                    loading={dataLoading}
-                    defaultChartType={
-                      chartPreferences.consumptionDistributionChart
-                    }
-                    timeGranularity={
-                      modelFilters.time_granularity || DEFAULT_TIME_GRANULARITY
-                    }
-                  />
-                </Suspense>
-              </FadeIn>
               <FadeIn delay={0.15}>
                 <Suspense fallback={<ModelChartsFallback />}>
                   <LazyModelCharts
@@ -389,16 +349,6 @@ export function Dashboard() {
                 </Suspense>
               </FadeIn>
             </>
-          )}
-          {activeSection === 'users' && (
-            <FadeIn>
-              <Suspense fallback={<ModelChartsFallback />}>
-                <LazyUserCharts
-                  filters={userChartsFilters}
-                  onFiltersChange={setUserChartsFilters}
-                />
-              </Suspense>
-            </FadeIn>
           )}
           {activeSection === 'flow' && (
             <FadeIn>

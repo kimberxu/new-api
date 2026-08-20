@@ -45,7 +45,6 @@ type FlowMetrics = {
 }
 
 type FlowSankeyLabels = {
-  quota: string
   tokens: string
   requests: string
   share: string
@@ -92,7 +91,6 @@ const DEFAULT_FLOW_ROLE: FlowRole = 'user'
 const DEFAULT_FLOW_OVERFLOW_MODE: FlowOverflowMode = 'aggregate'
 
 const DEFAULT_FLOW_SANKEY_LABELS: FlowSankeyLabels = {
-  quota: 'Quota',
   tokens: 'Tokens',
   requests: 'Requests',
   share: 'Share',
@@ -1091,11 +1089,6 @@ function tooltipMetricLines(
     metricValue(datum, key) > 0
 
   return [
-    {
-      key: labels.quota,
-      value: (datum: Record<string, unknown>) =>
-        valueFormatter(metricValue(datum, 'quota')),
-    },
     {
       key: labels.tokens,
       value: (datum: Record<string, unknown>) =>
