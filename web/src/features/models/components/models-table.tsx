@@ -162,7 +162,6 @@ export function ModelsTable() {
     initialColumnVisibility: {
       description: false,
       bound_channels: false,
-      quota_types: false,
     },
     columnFilters,
     pagination,
