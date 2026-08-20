@@ -67,7 +67,7 @@ var ChannelBaseURLs = []string{
 	"https://api.openai.com",              // 1
 	"https://oa.api2d.net",                // 2
 	"",                                    // 3
-	"http://localhost:11434",              // 4
+	"",                                    // 4 (Ollama removed)
 	"https://api.openai-sb.com",           // 5
 	"https://api.openaimax.com",           // 6
 	"https://api.ohmygpt.com",             // 7

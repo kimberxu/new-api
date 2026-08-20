@@ -25,7 +25,6 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/mokaai"
 	"github.com/QuantumNous/new-api/relay/channel/moonshot"
 	"github.com/QuantumNous/new-api/relay/channel/newapi"
-	"github.com/QuantumNous/new-api/relay/channel/ollama"
 	"github.com/QuantumNous/new-api/relay/channel/openai"
 	"github.com/QuantumNous/new-api/relay/channel/palm"
 	"github.com/QuantumNous/new-api/relay/channel/perplexity"
@@ -75,8 +74,6 @@ func GetAdaptor(apiType int) channel.Adaptor {
 		return &zhipu.Adaptor{}
 	case constant.APITypeZhipuV4:
 		return &zhipu_4v.Adaptor{}
-	case constant.APITypeOllama:
-		return &ollama.Adaptor{}
 	case constant.APITypePerplexity:
 		return &perplexity.Adaptor{}
 	case constant.APITypeAws:

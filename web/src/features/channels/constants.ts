@@ -28,7 +28,6 @@ export const CHANNEL_TYPES = {
   1: 'OpenAI',
   2: 'MjProxy',
   3: 'Azure',
-  4: 'Ollama',
   5: 'MjProxyPlus',
   // 6: 'OpenAIMax',
   7: 'OhMyGPT',
