@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -49,7 +50,7 @@ func setupModelListControllerTestDB(t *testing.T) *gorm.DB {
 	model.DB = db
 	model.LOG_DB = db
 
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Channel{}, &model.Ability{}, &model.ChannelDisabledModel{}, &model.Model{}, &model.Vendor{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Channel{}, &model.Ability{}, &model.ChannelDisabledModel{}, &model.Model{}, &model.Vendor{}, &model.ModelGroup{}, &model.ModelGroupItem{}))
 
 	t.Cleanup(func() {
 		sqlDB, err := db.DB()
@@ -59,6 +60,45 @@ func setupModelListControllerTestDB(t *testing.T) *gorm.DB {
 	})
 
 	return db
+}
+
+// createModelGroupFixture 创建启用渠道 + 手动模型组 + 启用成员。
+// 组名即路由模型名；成员 Model 沿用组名（上游映射由渠道 model_mapping 负责）。
+// 若同名组已存在则仅追加成员（同一路由模型可挂多个渠道）。
+func createModelGroupFixture(t *testing.T, db *gorm.DB, channelID int, channelGroup string, modelName string, memberEnabled bool) {
+	t.Helper()
+
+	channel := &model.Channel{
+		Id:     channelID,
+		Type:   constant.ChannelTypeOpenAI,
+		Key:    "test-key",
+		Status: common.ChannelStatusEnabled,
+		Name:   fmt.Sprintf("channel-%d", channelID),
+		Group:  channelGroup,
+		Models: modelName,
+	}
+	require.NoError(t, db.Create(channel).Error)
+	var group model.ModelGroup
+	err := db.Where("name = ?", modelName).First(&group).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		group = model.ModelGroup{Name: modelName, Source: model.GroupSourceManual, Enabled: true}
+		require.NoError(t, db.Create(&group).Error)
+	} else {
+		require.NoError(t, err)
+	}
+	require.NoError(t, db.Create(&model.ModelGroupItem{
+		GroupId:   group.Id,
+		ChannelId: channelID,
+		Model:     modelName,
+		Enabled:   memberEnabled,
+	}).Error)
+	// 渠道同步时 abilities 与模型组并行维护，pricing 数据源仍读 abilities
+	require.NoError(t, db.Create(&model.Ability{
+		Group:     channelGroup,
+		Model:     modelName,
+		ChannelId: channelID,
+		Enabled:   memberEnabled,
+	}).Error)
 }
 
 func initModelListColumnNames(t *testing.T) {
@@ -190,10 +230,8 @@ func TestGetUserModelsFiltersByRequestedGroup(t *testing.T) {
 		Group:    "default",
 		Status:   common.UserStatusEnabled,
 	}).Error)
-	require.NoError(t, db.Create(&[]model.Ability{
-		{Group: "default", Model: "zz-default-only-model", ChannelId: 1, Enabled: true},
-		{Group: "default", Model: "zz-disabled-model", ChannelId: 1, Enabled: false},
-	}).Error)
+	createModelGroupFixture(t, db, 1, "default", "zz-default-only-model", true)
+	createModelGroupFixture(t, db, 2, "default", "zz-disabled-model", false)
 
 	defaultRecorder := httptest.NewRecorder()
 	defaultContext, _ := gin.CreateTestContext(defaultRecorder)
@@ -244,13 +282,11 @@ func TestGetUserModelsExpandsAutoGroupsInConfiguredOrder(t *testing.T) {
 		Group:    "default",
 		Status:   common.UserStatusEnabled,
 	}).Error)
-	require.NoError(t, db.Create(&[]model.Ability{
-		{Group: "vip", Model: "zz-vip-model", ChannelId: 1, Enabled: true},
-		{Group: "vip", Model: "zz-shared-model", ChannelId: 1, Enabled: true},
-		{Group: "default", Model: "zz-default-model", ChannelId: 1, Enabled: true},
-		{Group: "default", Model: "zz-shared-model", ChannelId: 2, Enabled: true},
-		{Group: "unavailable", Model: "zz-unavailable-model", ChannelId: 1, Enabled: true},
-	}).Error)
+	createModelGroupFixture(t, db, 1, "vip", "zz-vip-model", true)
+	createModelGroupFixture(t, db, 2, "vip", "zz-shared-model", true)
+	createModelGroupFixture(t, db, 3, "default", "zz-default-model", true)
+	createModelGroupFixture(t, db, 4, "default", "zz-shared-model", true)
+	createModelGroupFixture(t, db, 5, "unavailable", "zz-unavailable-model", true)
 
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -284,12 +320,10 @@ func TestListModelsIncludesTieredBillingModel(t *testing.T) {
 		Group:    "default",
 		Status:   common.UserStatusEnabled,
 	}).Error)
-	require.NoError(t, db.Create(&[]model.Ability{
-		{Group: "default", Model: "zz-tiered-visible-model", ChannelId: 1, Enabled: true},
-		{Group: "default", Model: "zz-tiered-empty-expr-model", ChannelId: 1, Enabled: true},
-		{Group: "default", Model: "zz-tiered-missing-expr-model", ChannelId: 1, Enabled: true},
-		{Group: "default", Model: "zz-unpriced-model", ChannelId: 1, Enabled: true},
-	}).Error)
+	createModelGroupFixture(t, db, 1, "default", "zz-tiered-visible-model", true)
+	createModelGroupFixture(t, db, 2, "default", "zz-tiered-empty-expr-model", true)
+	createModelGroupFixture(t, db, 3, "default", "zz-tiered-missing-expr-model", true)
+	createModelGroupFixture(t, db, 4, "default", "zz-unpriced-model", true)
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -403,12 +437,10 @@ func TestListModelsTokenLimitIncludesTieredBillingModel(t *testing.T) {
 		"zz-token-tiered-empty-expr-model": "",
 	})
 	db := setupModelListControllerTestDB(t)
-	require.NoError(t, db.Create(&[]model.Ability{
-		{Group: "default", Model: "zz-token-tiered-visible-model", ChannelId: 1, Enabled: true},
-		{Group: "default", Model: "zz-token-tiered-empty-expr-model", ChannelId: 1, Enabled: true},
-		{Group: "default", Model: "zz-token-tiered-missing-expr-model", ChannelId: 1, Enabled: true},
-		{Group: "default", Model: "zz-token-unpriced-model", ChannelId: 1, Enabled: true},
-	}).Error)
+	createModelGroupFixture(t, db, 1, "default", "zz-token-tiered-visible-model", true)
+	createModelGroupFixture(t, db, 2, "default", "zz-token-tiered-empty-expr-model", true)
+	createModelGroupFixture(t, db, 3, "default", "zz-token-tiered-missing-expr-model", true)
+	createModelGroupFixture(t, db, 4, "default", "zz-token-unpriced-model", true)
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -446,11 +478,9 @@ func TestListModelsTokenLimitUsesResolvedCustomAutoGroups(t *testing.T) {
 	})
 
 	db := setupModelListControllerTestDB(t)
-	require.NoError(t, db.Create(&[]model.Ability{
-		{Group: "vip", Model: "zz-vip-allowed", ChannelId: 1, Enabled: true},
-		{Group: "vip", Model: "zz-vip-denied", ChannelId: 1, Enabled: true},
-		{Group: "default", Model: "zz-default-outside-snapshot", ChannelId: 1, Enabled: true},
-	}).Error)
+	createModelGroupFixture(t, db, 1, "vip", "zz-vip-allowed", true)
+	createModelGroupFixture(t, db, 2, "vip", "zz-vip-denied", true)
+	createModelGroupFixture(t, db, 3, "default", "zz-default-outside-snapshot", true)
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
