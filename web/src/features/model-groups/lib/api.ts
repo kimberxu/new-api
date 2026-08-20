@@ -30,11 +30,22 @@ export interface ModelGroupItem {
   enabled: boolean
   channel_priority: number
   channel_weight: number
+  // source_group is set when this member came from a referenced group
+  // (empty = direct member of this group).
+  source_group?: string
   disabled?: {
     source: string
     reason: string
     banned_until: number
   } | null
+}
+
+export interface ModelGroupReference {
+  id: number
+  group_id: number
+  ref_group_id: number
+  ref_group_name: string
+  created_at: number
 }
 
 export interface ModelGroup {
@@ -46,6 +57,7 @@ export interface ModelGroup {
   created_at: number
   members?: ModelGroupItem[]
   member_count?: number
+  references?: ModelGroupReference[]
 }
 
 export interface ListModelGroupsResponse {
@@ -105,4 +117,14 @@ export async function setModelGroupParamOverride(id: number, paramOverride: stri
 export async function getChannelModelOptions(channelId: number): Promise<string[]> {
   const res = await api.get(`/api/model-groups/channels/${channelId}/models`)
   return res.data?.data?.models ?? []
+}
+
+export async function addGroupReference(groupId: number, refGroupId: number): Promise<{ success: boolean; message?: string }> {
+  const res = await api.post(`/api/model-groups/${groupId}/references`, { ref_group_id: refGroupId }, { skipBusinessError: true, skipErrorHandler: true })
+  return res.data
+}
+
+export async function deleteGroupReference(groupId: number, refGroupId: number): Promise<{ success: boolean; message?: string }> {
+  const res = await api.delete(`/api/model-groups/${groupId}/references/${refGroupId}`, { skipBusinessError: true, skipErrorHandler: true })
+  return res.data
 }
