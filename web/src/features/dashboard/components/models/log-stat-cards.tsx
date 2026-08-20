@@ -33,7 +33,7 @@ import type {
   DashboardFilters,
 } from '@/features/dashboard/types'
 import { toIntlLocale } from '@/i18n/languages'
-import { formatCompactNumber, formatNumber, formatQuota } from '@/lib/format'
+import { formatCompactNumber, formatNumber } from '@/lib/format'
 import { computeTimeRange } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
@@ -117,20 +117,13 @@ export function LogStatCards(props: LogStatCardsProps) {
 
   const adaptedStats = {
     rpm: stats?.totalCount ?? 0,
-    quota: stats?.totalQuota ?? 0,
     tpm: stats?.totalTokens ?? 0,
   }
 
   const items = statCardsConfig.map((config) => {
     const rawValue = config.getValue(adaptedStats, timeRangeMinutes)
     const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
-    const formatted =
-      config.key === 'quota'
-        ? {
-            displayValue: formatQuota(rawValue),
-            fullValue: formatQuota(rawValue),
-          }
-        : formatStatNumber(rawValue, locale)
+    const formatted = formatStatNumber(rawValue, locale)
 
     return {
       title: config.title,

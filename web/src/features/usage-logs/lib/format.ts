@@ -17,19 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { StatusBadgeProps } from '@/components/status-badge'
-import {
-  BILLING_PRICING_VARS,
-  normalizeTierLabel,
-  parseTiersFromExpr,
-  splitBillingExprAndRequestRules,
-  type ParsedTier,
-} from '@/features/pricing/lib/billing-expr'
 
 import type { UsageLog } from '../data/schema'
 import type { LogOtherData } from '../types'
-import { buildQuotaAuditOperation } from './quota-audit-operation'
-
-export { normalizeTierLabel }
 
 const PARAM_OVERRIDE_ACTION_MAP: Record<string, string> = {
   set: 'Set',
@@ -80,79 +70,6 @@ export function parseAuditLine(
     action: line.slice(0, firstSpace),
     content: line.slice(firstSpace + 1),
   }
-}
-
-/**
- * Check if the log is a violation fee log
- */
-export function isViolationFeeLog(other: LogOtherData | null): boolean {
-  if (!other) return false
-  return (
-    other.violation_fee === true ||
-    Boolean(other.violation_fee_code) ||
-    Boolean(other.violation_fee_marker)
-  )
-}
-
-function isPositiveFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0
-}
-
-function hasLegacySearchSurcharge(
-  enabled: boolean | undefined,
-  count: number | undefined,
-  price: number | undefined
-): boolean {
-  return (
-    enabled === true &&
-    isPositiveFiniteNumber(count) &&
-    isPositiveFiniteNumber(price)
-  )
-}
-
-/**
- * Check whether a consume log includes an actual tool-call surcharge.
- * Structured surcharge items cover current logs, while the legacy fields keep
- * historical Web Search, File Search, and Image Generation logs visible.
- */
-export function hasToolSurcharge(other: LogOtherData | null): boolean {
-  if (!other) return false
-
-  const hasStructuredSurcharge =
-    Array.isArray(other.tool_surcharges) &&
-    other.tool_surcharges.some(
-      (item) =>
-        typeof item?.name === 'string' &&
-        item.name.trim() !== '' &&
-        isPositiveFiniteNumber(item.count) &&
-        isPositiveFiniteNumber(item.price)
-    )
-  if (hasStructuredSurcharge) return true
-
-  if (
-    hasLegacySearchSurcharge(
-      other.web_search,
-      other.web_search_call_count,
-      other.web_search_price
-    )
-  ) {
-    return true
-  }
-
-  if (
-    hasLegacySearchSurcharge(
-      other.file_search,
-      other.file_search_call_count,
-      other.file_search_price
-    )
-  ) {
-    return true
-  }
-
-  return (
-    other.image_generation_call === true &&
-    isPositiveFiniteNumber(other.image_generation_call_price)
-  )
 }
 
 /**
@@ -255,115 +172,6 @@ export function formatModelName(log: UsageLog): {
 }
 
 /**
- * Decode a base64-encoded billing expression. Safely returns an empty string
- * when the input is missing or malformed (e.g. legacy logs without expr_b64).
- */
-export function decodeBillingExprB64(exprB64: string | undefined): string {
-  if (!exprB64) return ''
-  try {
-    const binaryString =
-      typeof window !== 'undefined'
-        ? window.atob(exprB64)
-        : Buffer.from(exprB64, 'base64').toString('binary')
-    const bytes = new Uint8Array(binaryString.length)
-
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-
-    if (typeof TextDecoder !== 'undefined') {
-      return new TextDecoder().decode(bytes)
-    }
-
-    return decodeURIComponent(
-      Array.prototype.map
-        .call(bytes, (byte: number) => `%${byte.toString(16).padStart(2, '0')}`)
-        .join('')
-    )
-  } catch {
-    return ''
-  }
-}
-
-/**
- * Resolve which parsed tier corresponds to the matched_tier label in a log
- * entry. Missing or unknown labels do not fall back to another tier because
- * that would display guessed unit prices.
- */
-export function resolveMatchedTier(
-  tiers: ParsedTier[],
-  matchedLabel: string | undefined
-): ParsedTier | null {
-  if (tiers.length === 0) return null
-  if (!matchedLabel) return null
-  const found = tiers.find((tier) => {
-    const l1 = normalizeTierLabel(tier.label)
-    const l2 = normalizeTierLabel(matchedLabel)
-    return l1 === l2 && l1 !== ''
-  })
-  return found || null
-}
-
-/**
- * Tiered pricing summary derived from an `other` log payload using the
- * billing-expression library. Returns null when the entry is not a tiered
- * billing log or the expression failed to parse.
- */
-export interface TieredBillingSummary {
-  tiers: ParsedTier[]
-  tier: ParsedTier
-  priceEntries: Array<{ field: string; shortLabel: string; price: number }>
-}
-
-/**
- * Whether the request payload reports any cache-related token usage. Used to
- * suppress cache pricing rows from the tiered breakdown when the request did
- * not exercise the cache path.
- */
-export function hasAnyCacheTokens(
-  other: LogOtherData | null | undefined
-): boolean {
-  if (!other) return false
-  return (
-    (other.cache_tokens || 0) > 0 ||
-    (other.cache_creation_tokens || 0) > 0 ||
-    (other.cache_creation_tokens_5m || 0) > 0 ||
-    (other.cache_creation_tokens_1h || 0) > 0
-  )
-}
-
-export function getTieredBillingSummary(
-  other: LogOtherData | null
-): TieredBillingSummary | null {
-  if (!other || other.billing_mode !== 'tiered_expr') return null
-  const exprStr = decodeBillingExprB64(other.expr_b64)
-  if (!exprStr) return null
-  const tiers = parseTiersFromExpr(
-    splitBillingExprAndRequestRules(exprStr).billingExpr
-  )
-  const tier = resolveMatchedTier(tiers, other.matched_tier)
-  if (!tier) return null
-
-  const cacheTokensPresent = hasAnyCacheTokens(other)
-
-  const priceEntries: TieredBillingSummary['priceEntries'] = []
-  for (const v of BILLING_PRICING_VARS) {
-    if (!v.field) continue
-    if (v.group === 'cache' && !cacheTokensPresent) continue
-    const raw = tier[v.field as keyof ParsedTier]
-    const price = Number(raw)
-    if (Number.isFinite(price) && price > 0) {
-      priceEntries.push({
-        field: v.field,
-        shortLabel: v.shortLabel,
-        price,
-      })
-    }
-  }
-  return { tiers, tier, priceEntries }
-}
-
-/**
  * Calculate duration and return formatted result with color variant
  * @param submitTime - Submit timestamp
  * @param finishTime - Finish timestamp
@@ -393,32 +201,11 @@ export function formatDuration(
  * translatable instead of being frozen to whatever language was written to DB.
  */
 const AUDIT_TEMPLATES: Record<string, string> = {
-  'token.create': 'API token creation',
-  'token.update': 'API token configuration update',
-  'token.status_update': 'API token status update',
-  'token.delete': 'API token deletion',
-  'token.delete_batch': 'API token batch deletion',
-  'token.key_view': 'API token key access',
-  'token.key_view_batch': 'API token batch key access',
-  'access_token.generate': 'Generated a system access token',
-  'access_token.revoke': 'Revoked the system access token',
-  'user.2fa_setup': 'Started two-factor authentication setup',
-  'user.2fa_enable': 'Enabled two-factor authentication',
-  'user.2fa_disable_self': 'Disabled two-factor authentication',
-  'user.2fa_backup_codes': 'Regenerated two-factor backup codes',
-  'user.security_verify': 'Completed security verification',
-  'user.password_change': 'Account password change',
-  'user.binding_start': 'Account binding request',
-  'user.binding_bind': 'Account binding',
-  'user.binding_unbind': 'Account unlinking',
-  'user.email_binding_resend': 'Email confirmation code resend',
-
   login: 'Logged in successfully via {{method}}',
   // User management
   'user.create': 'Created user {{username}} (role {{role}})',
   'user.update': 'Updated user {{username}} (ID: {{id}})',
   'user.delete': 'Deleted user {{username}} (ID: {{id}})',
-  'user.account_delete': 'Account deletion',
   'user.manage': 'Performed {{action}} on user {{username}} (ID: {{id}})',
   'user.quota_add': 'Increased user quota by {{quota}}',
   'user.quota_subtract': 'Decreased user quota by {{quota}}',
@@ -446,9 +233,6 @@ const AUDIT_TEMPLATES: Record<string, string> = {
   // Channel
   'channel.create': 'Created channel {{name}} (type {{type}}, count {{count}})',
   'channel.update': 'Updated channel {{name}} (ID: {{id}})',
-  'channel.status_update': 'Updated channel status (ID: {{id}})',
-  'channel.status_update_batch':
-    'Batch updated channel status ({{count}}/{{total}} changed)',
   'channel.delete': 'Deleted channel {{name}} (ID: {{id}})',
   'channel.delete_batch': 'Batch deleted {{count}} channels',
   'channel.delete_disabled': 'Deleted all disabled channels ({{count}})',
@@ -500,7 +284,7 @@ const AUDIT_TEMPLATES: Record<string, string> = {
 }
 
 /**
- * Render the localized content of an operation log from its structured
+ * Render the localized content of an audit/login log from its structured
  * `other.op` descriptor. Returns null when the log has no recognized action,
  * letting callers fall back to the raw `content` field.
  */
@@ -510,35 +294,7 @@ export function renderAuditContent(
 ): string | null {
   const op = other?.op
   if (!op?.action) return null
-  if (
-    op.action === 'redemption.delete_batch' ||
-    (op.action === 'redemption.delete' &&
-      other?.audit_info?.route === '/api/redemption/batch')
-  ) {
-    if (other?.audit_info?.success === false) {
-      return t('Failed to batch delete redemption codes')
-    }
-    const count = op.params?.count
-    if (
-      typeof count === 'number' &&
-      Number.isSafeInteger(count) &&
-      count >= 0
-    ) {
-      return t('Batch deleted {{count}} redemption codes', { count })
-    }
-    return t('Batch deleted redemption codes (count not recorded)')
-  }
   const template = AUDIT_TEMPLATES[op.action]
   if (!template) return null
-  const quotaOperation = buildQuotaAuditOperation(
-    op.action,
-    op.params ?? {},
-    other?.audit_info?.success !== false,
-    t
-  )
-  if (quotaOperation) {
-    return `${quotaOperation.summary} · ${quotaOperation.description}`
-  }
-  const params = { ...op.params }
-  return t(template, params)
+  return t(template, (op.params ?? {}) as Record<string, unknown>)
 }

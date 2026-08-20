@@ -191,23 +191,12 @@ export interface DashboardFilters {
   username?: string
 }
 
-export type ConsumptionDistributionChartType = 'bar' | 'area'
-
 export type ModelAnalyticsChartTab = 'trend' | 'proportion' | 'top'
 
 export interface DashboardChartPreferences {
-  consumptionDistributionChart: ConsumptionDistributionChartType
   modelAnalyticsChart: ModelAnalyticsChartTab
   defaultTimeRangeDays: number
   defaultTimeGranularity: TimeGranularity
-}
-
-// User analytics selections are held by the dashboard parent so they survive
-// switching between dashboard sub-sections, matching the model/flow filters.
-export interface UserChartsFilters {
-  timeGranularity: TimeGranularity
-  selectedRange: number
-  topUserLimit: number
 }
 
 // ============================================================================
@@ -238,17 +227,9 @@ type VChartSpec = Record<string, any>
 
 export interface ProcessedChartData {
   spec_pie: VChartSpec
-  spec_line: VChartSpec
-  spec_area: VChartSpec
   spec_model_line: VChartSpec
   spec_rank_bar: VChartSpec
-  totalQuotaDisplay: string
   totalCountDisplay: string
-}
-
-export interface ProcessedUserChartData {
-  spec_user_rank: VChartSpec
-  spec_user_trend: VChartSpec
 }
 
 // ============================================================================
