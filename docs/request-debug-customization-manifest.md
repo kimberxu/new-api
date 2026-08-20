@@ -555,3 +555,76 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 - `service/channel_model_disable_test.go` - `IsModelLevelError` 表驱动（404 宽松档/400/422 关键词/非 404-400-422 不判/nil）+ 模型维度窗口（模型/状态码/渠道独立、threshold 0/1）
 - `model/channel_disabled_model_test.go` - DB 路径排除、缓存路径排除、Add 幂等、按 source 清除、渠道清理
 - `model/task_cas_test.go` - 测试 DB AutoMigrate 注册新表
+
+---
+
+# personal 分支半重构登记（模型组路由 + 计费/Ollama/订阅/OAuth/注册移除）
+
+> 对应分支：`personal`（基于 `deploy-model` @ `7e6415e7`，2026-08-20 更新）
+> 本小节登记 `personal` 相对 `deploy-model` 的半重构（`git log deploy-model..personal` 核对）。
+> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型管理页计费 UI 清理）。
+
+## 模型组路由表（一等公民）
+
+### 功能概述
+
+将「模型路由表」升级为一等公民的**模型组管理**：组名 = 路由模型名，成员 = 渠道上的真实上游模型，按成员优先级/权重路由。支持手动建组/调参/启用禁用、组级参数覆盖。渠道级 `model_mapping` 继续负责路由名→上游名翻译，relay 零改动。
+
+### 文件清单
+
+**新增：**
+- `model/model_group.go` - `ModelGroup`/`ModelGroupItem` 表模型 + `ParamOverride` 字段 + `SetModelGroupParamOverride`/`GetModelGroupByNameMap`/`DeleteModelGroupItemsNotIn`/`GetEnabledModelGroupsWithItems`
+- `model/model_group_sync.go` - `SyncModelGroupForChannel`/`SyncAllModelGroups`（幂等）
+- `model/model_group_select.go` - DB 兜底 `GetRandomSatisfiedChannelFromGroups`（selectAll=true 取全字段含 key）
+- `controller/model_group.go` - 组/成员 CRUD + `SetModelGroupParamOverride` handler
+- `controller/model_ban_recovery.go` - `recoverExpiredModelBans`/`decideModelBanRecovery`
+- `router/model-group-router.go` - `/api/model-groups` 路由（AdminAuth + ChannelRead/Write 权限）
+- `web/src/features/model-groups/` - 前端页面（组列表 + 创建/启用禁用/删除）
+- `web/src/routes/_authenticated/model-groups/index.tsx` - 路由 `/model-groups`
+
+**改动（挂载点/最小插入）：**
+- `model/main.go` - AutoMigrate 注册 `&ModelGroup{}`/`&ModelGroupItem{}`
+- `model/channel_cache.go` - 路由索引数据源改模型组成员；`modelGroupItemOverrides`/`modelGroupParamOverride` 缓存；`effectivePriority`/`effectiveWeight`
+- `model/ability.go` - `GetGroupEnabledModels`/`GetEnabledModels` 数据源改模型组（/v1/models）
+- `middleware/distributor.go` - 组级参数覆盖逐 key 覆盖渠道级
+- `controller/relay.go` - `processChannelError` 渠道级判定优先于模型级
+- `service/channel_model_disable.go` - `IsChannelLevelError` + `BannedUntil` 到期 + `ExtendChannelModelBan`
+- `model/channel_disabled_model.go` - `BannedUntil` 字段
+- `controller/channel-test.go` - 开头接入到期恢复
+- `web/src/hooks/use-sidebar-data.ts` - Admin 组「Model Groups」菜单项
+- `web/src/features/channels/index.tsx` - 路由表入口改指 `/model-groups`
+
+## 计费功能级移除
+
+预扣/结算/扣费/额度限制全部短路（永不扣费、永不限额）；**DB 表与字段保留（零迁移）**。任务平台渠道（Midjourney/Suno/Kling）免费放行。abilities 表保留同步但不再参与选路。
+
+- `service/billing.go` - `PreConsumeBilling`/`SettleBilling` 短路
+- `service/tiered_settle.go` - `PrepareTieredBillingForSelectedGroup` 短路（消模型价格门槛）
+- `service/quota.go` - `PostConsumeQuota`/`postConsumeQuotaWithResult`/`PreWssConsumeQuota` 短路
+- `relay/mjproxy_handler.go` - 删用户额度硬检查
+- 删除：`controller/topup*.go`、`redemption.go`、`subscription*.go`、`service/subscription_reset_task.go`、`service/waffo_pancake.go`、`controller/payment_webhook_availability.go` 及前端 wallet/redemption-codes/subscriptions/pricing feature
+- `model/topup.go`/`redemption.go`/`subscription.go` 保留为惰性桩（migrateDB 引用 + 表保留零迁移）
+
+## 移除 Ollama 渠道
+
+- 删 `relay/channel/ollama/` 目录、controller Ollama 4 handlers、`/ollama/*` 路由、前端 ollama-models-dialog/ollama-utils
+- **枚举值保留**：`ChannelTypeOllama`/`APITypeOllama` 与 `ChannelBaseURLs` 索引 4 保留（DB 持久化渠道 type，删除会 shift 后续值损坏存量数据），仅清空索引 4 与展示名
+- `controller/model.go` init 循环跳过 `APITypeOllama`（适配器已删，防 nil 解引用）
+
+## 移除订阅后端残留
+
+- `controller/audit.go` 删 redemption/subscription 审计模板
+- 删 `service/waffo_pancake.go`、`controller/payment_webhook_availability.go`(+test)
+- `setting/payment_*.go` 配置变量保留（option 表映射，零迁移）
+
+## 移除 OAuth/Passkey 登录
+
+- 删 `oauth/` 目录、`controller/oauth.go`/`custom_oauth.go`/`passkey.go`/`telegram.go`/`wechat.go`、`service/passkey/`
+- 删 `/oauth/*`、`/passkey/*`、`/custom-oauth-provider` 路由
+- `model` 桩保留（`CustomOAuthProvider`/`UserOAuthBinding`/`PasskeyCredential` 表零迁移）
+- 前端删 sign-up/oauth/passkey feature，登录页仅保留密码登录 + 2FA
+
+## 移除开放注册
+
+- 删 `/api/user/register` 路由与 `controller.Register`
+- 前端删 sign-up/register 路由与注册入口
