@@ -300,7 +300,7 @@ export async function deleteDisabledChannels(): Promise<{
 }
 
 /**
- * Get channel key (requires 2FA verification)
+ * Get channel key (Root admin; secure verification removed on deploy branch)
  */
 export async function getChannelKey(
   id: number,
