@@ -37,7 +37,6 @@ import { getLobeIcon } from '@/lib/lobe-icon'
 import {
   getModelStatusConfig,
   getNameRuleConfig,
-  getQuotaTypeConfig,
 } from '../constants'
 import { parseModelTags, formatEndpointsDisplay } from '../lib'
 import type { Model, Vendor } from '../types'
@@ -59,7 +58,6 @@ export function useModelsColumns(vendors: Vendor[] = []): ColumnDef<Model>[] {
   // Get translated configs
   const NAME_RULE_CONFIG = getNameRuleConfig(t)
   const MODEL_STATUS_CONFIG = getModelStatusConfig(t)
-  const QUOTA_TYPE_CONFIG = getQuotaTypeConfig(t)
 
   const vendorMap: Record<number, Vendor> = {}
   vendors.forEach((v) => {
@@ -365,40 +363,6 @@ export function useModelsColumns(vendors: Vendor[] = []): ColumnDef<Model>[] {
         )
       },
       size: 200,
-      enableSorting: false,
-    },
-
-    // Quota Types column
-    {
-      accessorKey: 'quota_types',
-      header: t('Quota Types'),
-      meta: { mobileHidden: true },
-      cell: ({ row }) => {
-        const quotaTypes = row.getValue('quota_types') as number[]
-        return (
-          <BadgeListCell
-            items={(quotaTypes ?? []).map((qt) => {
-              const config = QUOTA_TYPE_CONFIG[qt]
-              return (
-                <StatusBadge
-                  key={qt}
-                  label={config?.label || String(qt)}
-                  variant={
-                    (config?.color === 'error' ? 'danger' : config?.color) as
-                      | 'neutral'
-                      | 'success'
-                      | 'warning'
-                      | 'danger'
-                      | 'info'
-                  }
-                  size='sm'
-                />
-              )
-            })}
-          />
-        )
-      },
-      size: 150,
       enableSorting: false,
     },
 
