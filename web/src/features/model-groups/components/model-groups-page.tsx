@@ -112,6 +112,7 @@ export function ModelGroupsPage() {
 
   const createMutation = useMutation({
     mutationFn: () => createModelGroup(newName.trim()),
+    onError: () => toast.error(t('Failed to create model group')),
     onSuccess: (res) => {
       if (res.success) {
         toast.success(t('Model group created'))
@@ -145,6 +146,7 @@ export function ModelGroupsPage() {
 
   const itemDeleteMutation = useMutation({
     mutationFn: ({ itemId }: { itemId: number }) => deleteGroupItem(itemId),
+    onError: () => toast.error(t('Failed to remove member')),
     onSuccess: (res, { itemId }) => {
       if (res.success) {
         toast.success(t('Member removed'))
@@ -168,6 +170,7 @@ export function ModelGroupsPage() {
       weight?: number | null
       enabled?: boolean
     }) => updateGroupItem(itemId, { priority, weight, enabled }),
+    onError: () => toast.error(t('Failed to update member')),
     onSuccess: (res, vars) => {
       if (res.success) {
         toast.success(t('Member updated'))
@@ -192,6 +195,7 @@ export function ModelGroupsPage() {
   const addMemberMutation = useMutation({
     mutationFn: () =>
       addGroupItem(addMemberGroup!.id, Number(addChannelId), addModel),
+    onError: () => toast.error(t('Failed to add member')),
     onSuccess: (res) => {
       if (res.success) {
         toast.success(t('Member added'))
@@ -243,10 +247,11 @@ export function ModelGroupsPage() {
   }
 
   return (
-    <SectionPageLayout>
-      <SectionPageLayout.Title>
-        <span className='truncate'>{t('Model Groups')}</span>
-      </SectionPageLayout.Title>
+    <>
+      <SectionPageLayout>
+        <SectionPageLayout.Title>
+          <span className='truncate'>{t('Model Groups')}</span>
+        </SectionPageLayout.Title>
       <SectionPageLayout.Actions>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className='mr-2 h-4 w-4' />
@@ -472,6 +477,7 @@ export function ModelGroupsPage() {
           </div>
         )}
       </SectionPageLayout.Content>
+      </SectionPageLayout>
 
       {/* Create group dialog */}
       <Dialog
@@ -614,6 +620,6 @@ export function ModelGroupsPage() {
           }
         }}
       />
-    </SectionPageLayout>
+    </>
   )
 }

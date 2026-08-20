@@ -58,7 +58,7 @@ export interface GetChannelModelOptionsResponse {
 }
 
 export async function listModelGroups(withItems = false): Promise<ListModelGroupsResponse> {
-  const res = await api.get('/api/model-groups', { params: { with_items: withItems ? '1' : '0' } })
+  const res = await api.get('/api/model-groups/', { params: { with_items: withItems ? '1' : '0' } })
   return res.data?.data ?? { items: [], total: 0 }
 }
 
@@ -68,7 +68,7 @@ export async function getModelGroup(id: number): Promise<ModelGroup> {
 }
 
 export async function createModelGroup(name: string): Promise<{ success: boolean; message?: string; data?: ModelGroup }> {
-  const res = await api.post('/api/model-groups', { name }, { skipBusinessError: true, skipErrorHandler: true })
+  const res = await api.post('/api/model-groups/', { name }, { skipBusinessError: true, skipErrorHandler: true })
   return res.data
 }
 
