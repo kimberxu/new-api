@@ -21,7 +21,6 @@ import { getRouteApi } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatLogQuota } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { getLogStats, getUserLogStats } from '../api'
@@ -87,11 +86,6 @@ export function CommonLogsStats() {
 
   return (
     <div className='flex flex-wrap items-center gap-2'>
-      <StatBadge
-        label={t('Usage')}
-        value={sensitiveVisible ? formatLogQuota(stats?.quota || 0) : '••••'}
-        accent='bg-sky-500/70'
-      />
       <StatBadge
         label={t('RPM')}
         value={stats?.rpm || 0}
