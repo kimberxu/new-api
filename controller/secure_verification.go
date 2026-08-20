@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	secureVerificationMethod2FA     = "2fa"
-	secureVerificationMethodPasskey = "passkey"
+	secureVerificationMethod2FA = "2fa"
 )
+
+const securityProofScopeChannelKeyRead = "channel.key.read"
 
 type UniversalVerifyRequest struct {
 	Method string `json:"method"`
@@ -80,7 +81,7 @@ func UniversalVerify(c *gin.Context) {
 
 func isAllowedSecurityProofScope(scope string) bool {
 	switch scope {
-	case securityProofScopeChannelKeyRead, securityProofScopePasskeyRegister, securityProofScopePasskeyDelete:
+	case securityProofScopeChannelKeyRead:
 		return true
 	default:
 		return false

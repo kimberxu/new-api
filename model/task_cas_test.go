@@ -49,6 +49,8 @@ func TestMain(m *testing.M) {
 		&QuotaData{},
 		&Ability{},
 		&ChannelDisabledModel{},
+		&ModelGroup{},
+		&ModelGroupItem{},
 		&TopUp{},
 		&SubscriptionPlan{},
 		&SubscriptionOrder{},

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"net/http/httptest"
 	"strings"
@@ -32,7 +33,7 @@ func setupChannelSelectAutoGroupsTest(t *testing.T) *gorm.DB {
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&model.Channel{}, &model.Ability{}))
+	require.NoError(t, db.AutoMigrate(&model.Channel{}, &model.Ability{}, &model.ModelGroup{}, &model.ModelGroupItem{}))
 	model.DB = db
 	common.MemoryCacheEnabled = true
 	common.RetryTimes = 0
@@ -86,6 +87,22 @@ func createChannelSelectAutoGroupsChannel(t *testing.T, db *gorm.DB, id int, gro
 		Enabled:   true,
 		Priority:  &priority,
 		Weight:    weight,
+	}).Error)
+	var modelGroup model.ModelGroup
+	err := db.Where("name = ?", modelName).First(&modelGroup).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		modelGroup = model.ModelGroup{Name: modelName, Source: model.GroupSourceManual, Enabled: true}
+		require.NoError(t, db.Create(&modelGroup).Error)
+	} else {
+		require.NoError(t, err)
+	}
+	require.NoError(t, db.Create(&model.ModelGroupItem{
+		GroupId:   modelGroup.Id,
+		ChannelId: id,
+		Model:     modelName,
+		Enabled:   true,
+		Priority:  &priority,
+		Weight:    &weight,
 	}).Error)
 }
 
