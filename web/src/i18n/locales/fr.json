@@ -5130,6 +5130,20 @@
     "Select a model on the channel": "Sélectionner un modèle sur le canal",
     "Toggle members": "Afficher/masquer les membres",
     "Weight (empty = inherit)": "Poids (vide = hérité)",
-    "{{count}} members": "{{count}} membres"
+    "{{count}} members": "{{count}} membres",
+    "Channel model": "Modèle de canal",
+    "Failed to add group reference": "Échec de l'ajout de la référence de groupe",
+    "Failed to remove group reference": "Échec de la suppression de la référence de groupe",
+    "from {{group}}": "depuis {{group}}",
+    "Group reference added": "Référence de groupe ajoutée",
+    "Group reference removed": "Référence de groupe supprimée",
+    "Members are aggregated and updated live; duplicates with the direct members are merged.": "Les membres sont agrégés et mis à jour en direct ; les doublons avec les membres directs sont fusionnés.",
+    "Reference group": "Groupe de référence",
+    "Referenced group": "Groupe référencé",
+    "References": "Références",
+    "Remove Group Reference": "Supprimer la référence de groupe",
+    "Remove reference": "Supprimer la référence",
+    "Remove reference to {{ref}} from {{group}}? Its members will no longer be included.": "Supprimer la référence à {{ref}} de {{group}} ? Ses membres ne seront plus inclus.",
+    "Select a group to include all its members": "Sélectionner un groupe pour inclure tous ses membres"
   }
 }

@@ -24,6 +24,9 @@ type GroupMemberView struct {
 	Priority     *int64 `json:"priority"`
 	Weight       *uint  `json:"weight"`
 	Enabled      bool   `json:"enabled"`
+	// [personal] SourceGroup marks a member that came from a referenced group
+	// (empty = direct member of this group, non-empty = referenced group name).
+	SourceGroup string `json:"source_group,omitempty"`
 	ChannelPrio  int64  `json:"channel_priority"`
 	ChannelWt    int    `json:"channel_weight"`
 	// [personal] Disabled carries the model-level disable record (auto/manual)
@@ -34,8 +37,9 @@ type GroupMemberView struct {
 // GroupView is a model group plus its member list.
 type GroupView struct {
 	*model.ModelGroup
-	Members []GroupMemberView `json:"members,omitempty"`
-	MemberCount int `json:"member_count"`
+	Members     []GroupMemberView     `json:"members,omitempty"`
+	MemberCount int                   `json:"member_count"`
+	References  []GroupReferenceView  `json:"references,omitempty"`
 }
 
 // getGroupMemberViews resolves members with channel metadata.
@@ -62,13 +66,14 @@ func getGroupMemberViews(groupId int, items []*model.ModelGroupItem) []GroupMemb
 	}
 	for _, it := range items {
 		view := GroupMemberView{
-			Id:        it.Id,
-			GroupId:   it.GroupId,
-			ChannelId: it.ChannelId,
-			Model:     it.Model,
-			Priority:  it.Priority,
-			Weight:    it.Weight,
-			Enabled:   it.Enabled,
+			Id:          it.Id,
+			GroupId:     it.GroupId,
+			ChannelId:   it.ChannelId,
+			Model:       it.Model,
+			Priority:    it.Priority,
+			Weight:      it.Weight,
+			Enabled:     it.Enabled,
+			SourceGroup: it.SourceGroup,
 		}
 		if ch, err := model.GetChannelById(it.ChannelId, false); err == nil && ch != nil {
 			view.ChannelName = ch.Name
@@ -95,20 +100,16 @@ func ListModelGroups(c *gin.Context) {
 	views := make([]GroupView, 0, len(groups))
 	for _, g := range groups {
 		v := GroupView{ModelGroup: g}
-		if withItems {
-			items, err := model.ListModelGroupItems(g.Id)
-			if err != nil {
-				common.ApiError(c, err)
-				return
-			}
-			v.Members = getGroupMemberViews(g.Id, items)
-		}
-		items, err := model.ListModelGroupItems(g.Id)
+		items, err := model.ListModelGroupItemsExpanded(g.Id, 0, map[int]bool{})
 		if err != nil {
 			common.ApiError(c, err)
 			return
 		}
+		if withItems {
+			v.Members = getGroupMemberViews(g.Id, items)
+		}
 		v.MemberCount = len(items)
+		v.References = resolveGroupReferenceViews(g.Id)
 		views = append(views, v)
 	}
 	common.ApiSuccess(c, gin.H{
@@ -129,7 +130,7 @@ func GetModelGroup(c *gin.Context) {
 		common.ApiError(c, fmt.Errorf("model group #%d not found", id))
 		return
 	}
-	items, err := model.ListModelGroupItems(g.Id)
+	items, err := model.ListModelGroupItemsExpanded(g.Id, 0, map[int]bool{})
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -138,6 +139,7 @@ func GetModelGroup(c *gin.Context) {
 		ModelGroup:  g,
 		Members:     getGroupMemberViews(g.Id, items),
 		MemberCount: len(items),
+		References:  resolveGroupReferenceViews(g.Id),
 	})
 }
 
@@ -376,4 +378,93 @@ func SetModelGroupParamOverride(c *gin.Context) {
 	}
 	model.InitChannelCache()
 	common.ApiSuccess(c, gin.H{"param_override": req.ParamOverride})
+}
+// GroupReferenceView is the API shape of a group reference with the target
+// group's name resolved for display.
+type GroupReferenceView struct {
+	Id          int    `json:"id"`
+	GroupId     int    `json:"group_id"`
+	RefGroupId  int    `json:"ref_group_id"`
+	RefGroupName string `json:"ref_group_name"`
+	CreatedAt   int64  `json:"created_at"`
+}
+
+// resolveGroupReferenceViews loads reference rows for a group and resolves
+// the referenced group names for display.
+func resolveGroupReferenceViews(groupId int) []GroupReferenceView {
+	refs, err := model.ListModelGroupReferences(groupId)
+	if err != nil {
+		return nil
+	}
+	views := make([]GroupReferenceView, 0, len(refs))
+	for _, ref := range refs {
+		v := GroupReferenceView{
+			Id:         ref.Id,
+			GroupId:    ref.GroupId,
+			RefGroupId: ref.RefGroupId,
+			CreatedAt:  ref.CreatedAt,
+		}
+		if g, err := model.GetModelGroupById(ref.RefGroupId); err == nil && g != nil {
+			v.RefGroupName = g.Name
+		}
+		views = append(views, v)
+	}
+	return views
+}
+
+// ListGroupReferences returns the groups referenced by a model group.
+func ListGroupReferences(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		common.ApiError(c, fmt.Errorf("invalid group id"))
+		return
+	}
+	views := resolveGroupReferenceViews(id)
+	common.ApiSuccess(c, gin.H{"items": views, "total": len(views)})
+}
+
+// AddGroupReference makes a group include all members of another group.
+func AddGroupReference(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		common.ApiError(c, fmt.Errorf("invalid group id"))
+		return
+	}
+	var req struct {
+		RefGroupId int `json:"ref_group_id"`
+	}
+	if err := common.UnmarshalBodyReusable(c, &req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if req.RefGroupId <= 0 {
+		common.ApiError(c, fmt.Errorf("ref_group_id is required"))
+		return
+	}
+	if err := model.AddModelGroupReference(id, req.RefGroupId); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	model.InitChannelCache()
+	common.ApiSuccess(c, gin.H{"added": true})
+}
+
+// DeleteGroupReference removes a group reference.
+func DeleteGroupReference(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		common.ApiError(c, fmt.Errorf("invalid group id"))
+		return
+	}
+	refGroupId, err := strconv.Atoi(c.Param("refGroupId"))
+	if err != nil || refGroupId <= 0 {
+		common.ApiError(c, fmt.Errorf("invalid reference group id"))
+		return
+	}
+	if err := model.DeleteModelGroupReference(id, refGroupId); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	model.InitChannelCache()
+	common.ApiSuccess(c, gin.H{"deleted": true})
 }

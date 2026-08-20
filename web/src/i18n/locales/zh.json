@@ -5130,6 +5130,20 @@
     "Select a model on the channel": "选择该渠道上的模型",
     "Toggle members": "展开/收起成员",
     "Weight (empty = inherit)": "权重（空 = 继承）",
-    "{{count}} members": "{{count}} 个成员"
+    "{{count}} members": "{{count}} 个成员",
+    "Channel model": "渠道模型",
+    "Failed to add group reference": "添加组引用失败",
+    "Failed to remove group reference": "移除组引用失败",
+    "from {{group}}": "来自 {{group}}",
+    "Group reference added": "组引用已添加",
+    "Group reference removed": "组引用已移除",
+    "Members are aggregated and updated live; duplicates with the direct members are merged.": "成员是实时聚合更新的；与直接成员重复的会被合并。",
+    "Reference group": "引用组",
+    "Referenced group": "被引用组",
+    "References": "引用",
+    "Remove Group Reference": "移除组引用",
+    "Remove reference": "移除引用",
+    "Remove reference to {{ref}} from {{group}}? Its members will no longer be included.": "移除对 {{ref}} 的引用？其成员将不再包含在 {{group}} 中。",
+    "Select a group to include all its members": "选择要包含其所有成员的组"
   }
 }

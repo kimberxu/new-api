@@ -5130,6 +5130,20 @@
     "Select a model on the channel": "Выберите модель на канале",
     "Toggle members": "Развернуть/свернуть участников",
     "Weight (empty = inherit)": "Вес (пусто = наследование)",
-    "{{count}} members": "{{count}} участников"
+    "{{count}} members": "{{count}} участников",
+    "Channel model": "Модель канала",
+    "Failed to add group reference": "Не удалось добавить ссылку на группу",
+    "Failed to remove group reference": "Не удалось удалить ссылку на группу",
+    "from {{group}}": "из {{group}}",
+    "Group reference added": "Ссылка на группу добавлена",
+    "Group reference removed": "Ссылка на группу удалена",
+    "Members are aggregated and updated live; duplicates with the direct members are merged.": "Участники собираются и обновляются в реальном времени; дубли с прямыми участниками объединяются.",
+    "Reference group": "Ссылочная группа",
+    "Referenced group": "Ссылаемая группа",
+    "References": "Ссылки",
+    "Remove Group Reference": "Удалить ссылку на группу",
+    "Remove reference": "Удалить ссылку",
+    "Remove reference to {{ref}} from {{group}}? Its members will no longer be included.": "Удалить ссылку на {{ref}} из {{group}}? Её участники больше не будут включены.",
+    "Select a group to include all its members": "Выберите группу для включения всех её участников"
   }
 }
