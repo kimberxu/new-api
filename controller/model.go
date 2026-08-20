@@ -35,7 +35,7 @@ var channelId2Models map[int][]string
 func init() {
 	// https://platform.openai.com/docs/models/model-endpoint-compatibility
 	for i := range constant.APITypeDummy {
-		if i == constant.APITypeAIProxyLibrary {
+		if i == constant.APITypeAIProxyLibrary || i == constant.APITypeOllama {
 			continue
 		}
 		adaptor := relay.GetAdaptor(i)
