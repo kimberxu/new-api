@@ -4831,6 +4831,19 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "A model group name must match the routable model name.": "模型组名称必须与可路由的模型名一致。",
+    "Create Group": "创建分组",
+    "Create Model Group": "创建模型组",
+    "Delete Model Group": "删除模型组",
+    "Delete group {{name}}? This will also remove all its members.": "删除分组 {{name}}？这将同时移除其全部成员。",
+    "Enter group name (model name)": "输入分组名称（模型名）",
+    "Failed to create model group": "创建模型组失败",
+    "Failed to delete model group": "删除模型组失败",
+    "Members": "成员",
+    "Model Groups": "模型组",
+    "Model group created": "模型组已创建",
+    "Model group deleted": "模型组已删除",
+    "No Model Groups": "暂无模型组"
   }
 }

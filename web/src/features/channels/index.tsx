@@ -97,7 +97,7 @@ export function Channels() {
         <SectionPageLayout.Actions>
           <ChannelsPrimaryButtons />
           <Button asChild variant='outline' size='default'>
-            <Link to='/channel-abilities'>
+            <Link to='/model-groups'>
               <Table2 className='size-4' />
               <span className='max-sm:hidden'>{t('Route Table')}</span>
             </Link>

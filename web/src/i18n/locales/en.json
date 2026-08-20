@@ -4831,6 +4831,19 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "A model group name must match the routable model name.": "A model group name must match the routable model name.",
+    "Create Group": "Create Group",
+    "Create Model Group": "Create Model Group",
+    "Delete Model Group": "Delete Model Group",
+    "Delete group {{name}}? This will also remove all its members.": "Delete group {{name}}? This will also remove all its members.",
+    "Enter group name (model name)": "Enter group name (model name)",
+    "Failed to create model group": "Failed to create model group",
+    "Failed to delete model group": "Failed to delete model group",
+    "Members": "Members",
+    "Model Groups": "Model Groups",
+    "Model group created": "Model group created",
+    "Model group deleted": "Model group deleted",
+    "No Model Groups": "No Model Groups"
   }
 }
