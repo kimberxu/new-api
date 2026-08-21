@@ -19,7 +19,7 @@ deploy 线作业约定：
 - **改动最小化（合并上游的硬约束）**：新增魔改功能时，独立逻辑**优先用新增文件承载**（新 service/controller/middleware/组件/API 客户端），避免改动既有文件；必须改动既有文件时，限制为**最小必要 diff**——只做纯追加/局部插入，不修改、不删除、不重排已有代码，能不改就不改。改动文件越少、越偏向新增文件，后续合并 `upstream/main` 冲突越少、越轻松。任何改动方案先按此原则审查：先问「这个文件能不能不动」，再问「改动能不能再小」。**「扩展点织入」：魔改逻辑优先进入新增文件，既有文件只保留最小挂载点调用（详见 manifest「魔改开发约定」）；与本上游的同步采用 rebase 线性重放（见 docs/local-github-workflow.md）**。
 - 魔改功能**必须**登记进 `docs/request-debug-customization-manifest.md`（功能总览表 + 详情章节，deploy 线功能登记在 deploy 小节、personal 专属改动登记在「personal 分支半重构登记」小节），并更新其头部 `对应分支` commit 标记与魔改提交序列；`docs/local-github-workflow.md`、`docs/request-debug-logging-guide.md` 头部 commit 标记同步刷新。`personal` 分支的改动相对其基线 `7e6415e7`（原 deploy-model，已退役）登记（`git log 7e6415e7..personal` 核对）。
 - 涉及 `controller/relay.go`、`relay/common/relay_info.go`、`web/src/features/usage-logs/components/dialogs/details-dialog.tsx` 等已知高风险冲突文件时，遵循 `docs/local-github-workflow.md` 的冲突处理原则（保留魔改 + 采纳上游语义）。
-- 构建/发布（强约束，**仅适用 `deploy` 分支**）：**仅当用户明确要求触发构建/发布时才执行** tag 推送流程。纯文档改动（`docs/`、`AGENTS.md`、manifest 登记、说明性提交）**禁止触发构建**——只提交推送对应分支即可，不推送任何 `deploy*` tag。触发方式：按 `docs/local-github-workflow.md` 打 `deploy*` tag（滚动 `deploy-image` / 留档 `deploy-image-<short_sha>`）。无 GitHub token 时，用公开 API 定时轮询确认构建状态（方法见该文档「确认构建状态」）。`personal` 不构建 GHCR 镜像，不打 tag。
+- 构建/发布（强约束）：**仅当用户明确要求触发构建/发布时才执行** tag 推送流程。纯文档改动（`docs/`、`AGENTS.md`、manifest 登记、说明性提交）**禁止触发构建**——只提交推送对应分支即可，不推送任何 `deploy*` / `personal*` tag。触发方式见 `docs/local-github-workflow.md`：`deploy*` / `personal*` git tag（滚动 `-image` / 留档 `-image-<short_sha>`）或 Actions 页面手动 `workflow_dispatch`。无 GitHub token 时，用公开 API 定时轮询确认构建状态（方法见该文档「确认构建状态」）。
 
 ## Overview
 
