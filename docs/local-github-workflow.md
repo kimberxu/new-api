@@ -1,6 +1,6 @@
 # 本地 GitHub Fork 工作流
 
-> 对应分支:`deploy` @ `702be7eb`(2026-08-19 更新)
+> 对应分支:`deploy-model` @ `702be7eb`(2026-08-19 更新;`personal` 线同步流程见「同步上游」节)
 
 ## 标准触发短语
 
@@ -16,11 +16,28 @@
 |------|------|------|
 | `main` | 贴近上游 | 仅保留少量本地改动（如 GHCR workflow 文件），几乎与上游同步 |
 | `deploy` | 部署分支 | 承载全部魔改功能；GHCR 部署镜像由它构建 |
-| `local/<feature>` | 本地定制功能分支 | 开发完成后合并进 `deploy` |
+| `deploy-re` | 历史基线 | `ab4d296e`，deploy 与 deploy-model 的共同祖先（分叉点） |
+| `deploy-model` | 模型组改造基线 | 在 deploy-re 之上叠加：deploy 同步战略改造、模型级路由表前台化、model group 管理接口（7 提交） |
+| `personal` | 个人开发线 | 基于 `deploy-model`：模型组路由全套 + 计费/Ollama/订阅/OAuth/开放注册移除；不构建镜像、不打 tag |
+| `local/<feature>` | 本地定制功能分支 | 开发完成后合并进目标魔改分支 |
 
-魔改功能清单见 `request-debug-customization-manifest.md`；魔改功能不在 `main` 上。
+魔改功能清单见 `request-debug-customization-manifest.md`；魔改功能不在 `main` 上。`deploy` 与 `personal` 线已分叉，各自独立维护与同步上游；manifest 中 deploy 线功能登记以 `deploy-model` 为基准，personal 改动单独登记在「personal 分支半重构登记」小节。
 
 ## 同步上游
+
+### personal / deploy-model（rebase 原则同 deploy）
+
+```bash
+git fetch upstream
+git checkout personal
+git rebase upstream/main        # 或先 rebase 到 deploy-model 保持基线关系，按需选择
+# 冲突处理原则与下方 deploy 相同；完成后 force-with-lease 推送
+git push --force-with-lease origin personal
+```
+
+- personal 线的魔改提交序列是自包含线性链，逐提交重放原则与 deploy 一致。
+- 若希望保持「personal 基于 deploy-model」的层级关系，可先将 `deploy-model` rebase 到 `upstream/main`，再把 `personal` rebase 到新的 `deploy-model`。
+- personal 不触发 GHCR 构建，无需打 tag。
 
 ### main（一般无冲突，直接合并）
 
