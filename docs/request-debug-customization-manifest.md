@@ -558,9 +558,9 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 # personal 分支半重构登记（模型组路由 + 计费/Ollama/订阅/OAuth/注册移除）
 
-> 对应分支：`personal`（基于 `deploy-model` @ `7e6415e7`，2026-08-20 更新）
+> 对应分支：`personal`（基于 `deploy-model` @ `7e6415e7`，2026-08-21 更新）
 > 本小节登记 `personal` 相对 `deploy-model` 的半重构（`git log deploy-model..personal` 核对）。
-> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型管理页计费 UI 清理）。
+> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模...）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）
 
 ## 模型组路由表（一等公民）
 
@@ -598,6 +598,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 - `router/model-group-router.go` - 注册 `POST /api/model-groups/rebuild`（权限 ChannelWrite）
 - `web/src/features/model-groups/lib/api.ts` - `rebuildModelGroups()` 函数
 - `web/src/features/model-groups/components/model-groups-page.tsx` - 页面顶部添加「Rebuild Model Routing」按钮（带旋转 loading 动画）
+- `web/src/features/model-groups/components/model-groups-page.tsx` - 新增列表工具栏：关键词筛选（匹配组名或成员模型名）+ 排序（默认「手动组在前」，可选「名称」「成员数量」，支持升降序切换）
 
 ## 计费功能级移除
 
