@@ -56,7 +56,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getChannelTypeLabel, parseModelsList } from '@/features/channels/lib'
+import {
+  formatSeconds,
+  getChannelTypeLabel,
+  parseModelsList,
+} from '@/features/channels/lib'
 import { getChannels } from '@/features/channels/api'
 import type { Channel } from '@/features/channels/types'
 
@@ -484,6 +488,7 @@ export function ModelGroupsPage() {
               visibleGroups.map((group) => {
               const isExpanded = expanded.has(group.id)
               const members = group.members ?? []
+              const bannedCount = members.filter((m) => m.disabled).length
               return (
                 <div
                   key={group.id}
@@ -511,6 +516,11 @@ export function ModelGroupsPage() {
                         >
                           {group.source === 'auto' ? t('Auto') : t('Manual')}
                         </StatusBadge>
+                        {bannedCount > 0 && (
+                          <StatusBadge variant='warning' size='sm' showDot>
+                            {t('{{count}} banned', { count: bannedCount })}
+                          </StatusBadge>
+                        )}
                       </div>
                       <div className='text-muted-foreground text-xs'>
                         {t('{{count}} members', { count: members.length })}
@@ -583,8 +593,8 @@ export function ModelGroupsPage() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>{t('Channel')}</TableHead>
                               <TableHead>{t('Model')}</TableHead>
+                              <TableHead>{t('Channel')}</TableHead>
                               <TableHead className='w-32'>
                                 {t('Priority (empty = inherit)')}
                               </TableHead>
@@ -605,18 +615,44 @@ export function ModelGroupsPage() {
                                   (item.weight != null ? String(item.weight) : '')
                               return (
                                 <TableRow key={item.id}>
-                                  <TableCell className='font-medium'>
-                                    {item.channel_name || `#${item.channel_id}`}
-                                    <span className='text-muted-foreground ml-1 text-xs'>
-                                      {getChannelTypeLabel(item.channel_type)}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell>{item.model}
+                                  <TableCell>
+                                    {item.model}
                                     {item.source_group && (
                                       <StatusBadge variant='info' size='sm' className='ml-1 align-middle'>
                                         {t('from {{group}}', { group: item.source_group })}
                                       </StatusBadge>
                                     )}
+                                    {item.disabled && (
+                                      <StatusBadge
+                                        variant={
+                                          item.disabled.source === 'manual'
+                                            ? 'danger'
+                                            : 'warning'
+                                        }
+                                        size='sm'
+                                        showDot
+                                        className='ml-1 align-middle'
+                                        title={item.disabled.reason || undefined}
+                                      >
+                                        {item.disabled.source === 'manual'
+                                          ? t('Disabled')
+                                          : item.disabled.banned_until >
+                                              Date.now() / 1000
+                                            ? t('Banned ({{time}})', {
+                                                time: formatSeconds(
+                                                  item.disabled.banned_until -
+                                                    Date.now() / 1000
+                                                ),
+                                              })
+                                            : t('Banned')}
+                                      </StatusBadge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className='font-medium'>
+                                    {item.channel_name || `#${item.channel_id}`}
+                                    <span className='text-muted-foreground ml-1 text-xs'>
+                                      {getChannelTypeLabel(item.channel_type)}
+                                    </span>
                                   </TableCell>
                                   <TableCell>
                                     <Input
