@@ -31,6 +31,9 @@ var channelSyncLock sync.RWMutex
 type modelGroupItemOverride struct {
 	priority *int64
 	weight   *uint
+	// model is the member's real upstream model; empty means it equals the
+	// group name (auto groups), so no upstream rewrite is needed.
+	model string
 }
 
 // [personal] modelGroupItemOverrides caches member-level overrides for the
@@ -120,6 +123,7 @@ func InitChannelCache() {
 			newModelGroupItemOverrides[groupName][item.Model][item.ChannelId] = modelGroupItemOverride{
 				priority: item.Priority,
 				weight:   item.Weight,
+				model:    item.Model,
 			}
 			groups := strings.Split(channel.Group, ",")
 			for _, group := range groups {

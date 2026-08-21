@@ -477,7 +477,11 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 		common.SetContextKey(c, constant.ContextKeyChannelOrganization, *channel.OpenAIOrganization)
 	}
 	common.SetContextKey(c, constant.ContextKeyChannelAutoBan, channel.GetAutoBan())
-	common.SetContextKey(c, constant.ContextKeyChannelModelMapping, channel.GetModelMapping())
+	// [personal] The routable model-group name may not exist upstream; merge
+	// the selected member's real upstream model into the channel mapping so
+	// ModelMappedHelper rewrites the request model as usual.
+	common.SetContextKey(c, constant.ContextKeyChannelModelMapping,
+		model.ApplyModelGroupMemberMapping(channel.GetModelMapping(), modelName, channel.Id))
 	common.SetContextKey(c, constant.ContextKeyChannelStatusCodeMapping, channel.GetStatusCodeMapping())
 
 	key, index, newAPIError := channel.GetNextEnabledKey()
