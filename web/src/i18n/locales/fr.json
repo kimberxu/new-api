@@ -4428,7 +4428,6 @@
     "Total Usage": "Utilisation totale",
     "Total:": "Total :",
     "TPM": "TPM",
-    "TPM (Tokens Per Minute)": "TPM (tokens par minute)",
     "Track per-request consumption to power usage analytics. Keeping this on increases database writes.": "Suivre la consommation par requête pour l'analyse de l'utilisation. Garder ceci activé augmente les écritures en base de données.",
     "Tracked apps": "Applications suivies",
     "Tracks current account base limits and additional metered usage on Codex upstream.": "Affiche les limites de base et l’utilisation supplémentaire (metered) du compte auprès de Codex en amont.",

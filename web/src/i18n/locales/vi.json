@@ -4428,7 +4428,6 @@
     "Total Usage": "Tổng Mức Sử dụng",
     "Total:": "Tổng cộng:",
     "TPM": "TPM",
-    "TPM (Tokens Per Minute)": "TPM (token mỗi phút)",
     "Track per-request consumption to power usage analytics. Keeping this on increases database writes.": "Theo dõi mức tiêu thụ theo từng yêu cầu để phục vụ phân tích mức độ sử dụng. Việc bật tính năng này làm tăng số lượt ghi vào cơ sở dữ liệu.",
     "Tracked apps": "Ứng dụng được theo dõi",
     "Tracks current account base limits and additional metered usage on Codex upstream.": "Theo dõi hạn cơ bản và mức dùng tính phí bổ sung của tài khoản ở phía upstream Codex.",
