@@ -16,8 +16,7 @@
 |------|------|------|
 | `main` | 贴近上游 | 仅保留少量本地改动（如 GHCR workflow 文件），几乎与上游同步 |
 | `deploy` | 部署分支 | 承载全部魔改功能；GHCR 部署镜像由它构建 |
-| `deploy-re` | 历史基线 | `ab4d296e`，deploy 与 personal 线的共同祖先（分叉点） |
-| `personal` | 个人开发线 | 历史前段（至 `7e6415e7`，原 deploy-model 中间态分支，已退役并入）承载：deploy 同步战略改造、模型级路由表前台化、model group 管理接口；其后叠加模型组路由全套 + 计费/Ollama/订阅/OAuth/开放注册移除。不构建镜像、不打 tag |
+| `personal` | 个人开发线 | 历史前段（至 `7e6415e7`，原 deploy-model 中间态分支，已退役并入）承载：deploy 同步战略改造、模型级路由表前台化、model group 管理接口；其后叠加：模型组路由全套 + 计费/Ollama/订阅/OAuth/开放注册移除。与 `deploy` 共同祖先为 `ab4d296e`（原 deploy-re，已退役）。不构建镜像、不打 tag |
 | `local/<feature>` | 本地定制功能分支 | 开发完成后合并进目标魔改分支 |
 
 魔改功能清单见 `request-debug-customization-manifest.md`；魔改功能不在 `main` 上。`deploy` 与 `personal` 线已分叉，各自独立维护与同步上游；manifest 中 deploy 线功能登记以 personal 基线 `7e6415e7`（原 deploy-model，已退役）为基准，personal 改动单独登记在「personal 分支半重构登记」小节。
