@@ -37,9 +37,10 @@ import { Dialog } from '@/components/dialog'
 import { SectionPageLayout } from '@/components/layout'
 import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
-import { ComboboxInput, type ComboboxInputOption } from '@/components/ui/combobox-input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -94,8 +95,8 @@ export function ModelGroupsPage() {
   const [paramOverrideTarget, setParamOverrideTarget] = useState<ModelGroup | null>(null)
   const [paramOverrideDraft, setParamOverrideDraft] = useState('')
   const [addMemberGroup, setAddMemberGroup] = useState<ModelGroup | null>(null)
-  const [addChannelId, setAddChannelId] = useState('')
-  const [addModel, setAddModel] = useState('')
+  const [addSelected, setAddSelected] = useState<Set<string>>(new Set())
+  const [memberSearch, setMemberSearch] = useState('')
   const [addRefMode, setAddRefMode] = useState<'channel' | 'group'>('channel')
   const [addRefGroupId, setAddRefGroupId] = useState('')
   const [deleteRefTarget, setDeleteRefTarget] = useState<{
@@ -231,18 +232,30 @@ export function ModelGroupsPage() {
   })
 
   const addMemberMutation = useMutation({
-    mutationFn: () =>
-      addGroupItem(addMemberGroup!.id, Number(addChannelId), addModel),
+    mutationFn: async () => {
+      const failures: string[] = []
+      for (const value of addSelected) {
+        const sep = value.indexOf('|')
+        const channelId = value.slice(0, sep)
+        const model = value.slice(sep + 1)
+        const res = await addGroupItem(addMemberGroup!.id, Number(channelId), model)
+        if (!res.success) {
+          failures.push(`${model} (#${channelId})`)
+        }
+      }
+      return failures
+    },
     onError: () => toast.error(t('Failed to add member')),
-    onSuccess: (res) => {
-      if (res.success) {
-        toast.success(t('Member added'))
+    onSuccess: (failures) => {
+      if (failures.length === 0) {
+        toast.success(t('{{count}} members added', { count: addSelected.size }))
         setAddMemberGroup(null)
-        setAddChannelId('')
-        setAddModel('')
         invalidate()
       } else {
-        toast.error(res.message || t('Failed to add member'))
+        toast.error(
+          `${t('Failed to add member')}: ${failures.join(', ')}`
+        )
+        setAddSelected(new Set(failures))
       }
     },
   })
@@ -337,8 +350,8 @@ export function ModelGroupsPage() {
 
   // All (channel, model) pairs across every channel, listed at once with
   // client-side search in the add-member dialog.
-  const memberOptions = useMemo<ComboboxInputOption[]>(() => {
-    const options: ComboboxInputOption[] = []
+  const memberOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = []
     for (const ch of channelsData ?? []) {
       const name = ch.name || `#${ch.id}`
       for (const m of parseModelsList(ch.models || '')) {
@@ -350,12 +363,23 @@ export function ModelGroupsPage() {
     }
     return options
   }, [channelsData])
-  const memberSelection = addChannelId && addModel ? `${addChannelId}|${addModel}` : ''
-  const handleMemberSelect = (value: string) => {
-    if (!value) return
-    const sep = value.indexOf('|')
-    setAddChannelId(value.slice(0, sep))
-    setAddModel(value.slice(sep + 1))
+
+  const visibleMemberOptions = useMemo(() => {
+    const kw = memberSearch.trim().toLowerCase()
+    if (!kw) return memberOptions
+    return memberOptions.filter((o) => o.label.toLowerCase().includes(kw))
+  }, [memberOptions, memberSearch])
+
+  const toggleMemberOption = (value: string, checked: boolean) => {
+    setAddSelected((prev) => {
+      const next = new Set(prev)
+      if (checked) {
+        next.add(value)
+      } else {
+        next.delete(value)
+      }
+      return next
+    })
   }
 
   const getEdit = (item: ModelGroupItem): MemberEditState => {
@@ -688,8 +712,8 @@ export function ModelGroupsPage() {
                             size='sm'
                             onClick={() => {
                               setAddMemberGroup(group)
-                              setAddChannelId('')
-                              setAddModel('')
+                              setAddSelected(new Set())
+                              setMemberSearch('')
                               setAddRefMode('channel')
                               setAddRefGroupId('')
                             }}
@@ -740,13 +764,12 @@ export function ModelGroupsPage() {
         open={!!addMemberGroup}
         onOpenChange={(open) => !open && setAddMemberGroup(null)}
         title={`${t('Add Member')} — ${addMemberGroup?.name ?? ''}`}
-        description={t('Add a real upstream model of an existing channel. Priority/weight empty = inherit the channel values.')}
+        description={t('Add real upstream models from any channel. Priority/weight empty = inherit the channel values.')}
         footer={
           addRefMode === 'channel' ? (
             <Button
               disabled={
-                !addChannelId ||
-                !addModel ||
+                addSelected.size === 0 ||
                 addMemberMutation.isPending
               }
               onClick={() => addMemberMutation.mutate()}
@@ -815,17 +838,47 @@ export function ModelGroupsPage() {
               </p>
             </div>
           ) : (
-            <div>
-              <label className='text-muted-foreground mb-1 block text-sm'>
-                {t('Channel model')}
-              </label>
-              <ComboboxInput
-                options={memberOptions}
-                value={memberSelection}
-                onValueChange={handleMemberSelect}
-                placeholder={t('Search all channel models...')}
-                emptyText='No matching channel model.'
-              />
+            <div className='space-y-2'>
+              <div className='relative'>
+                <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2' />
+                <Input
+                  className='pl-8'
+                  placeholder={t('Search all channel models...')}
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                />
+              </div>
+              <div className='border-border max-h-64 overflow-y-auto rounded-md border p-1'>
+                {visibleMemberOptions.length === 0 ? (
+                  <div className='text-muted-foreground py-6 text-center text-sm'>
+                    {t('No matching channel model.')}
+                  </div>
+                ) : (
+                  visibleMemberOptions.map((option) => (
+                    <div
+                      key={option.value}
+                      className='hover:bg-accent flex items-center gap-2 rounded-sm px-2 py-1.5'
+                    >
+                      <Checkbox
+                        id={`member-option-${option.value}`}
+                        checked={addSelected.has(option.value)}
+                        onCheckedChange={(checked) =>
+                          toggleMemberOption(option.value, !!checked)
+                        }
+                      />
+                      <Label
+                        htmlFor={`member-option-${option.value}`}
+                        className='flex-1 cursor-pointer truncate text-sm font-normal'
+                      >
+                        {option.label}
+                      </Label>
+                    </div>
+                  ))
+                )}
+              </div>
+              <p className='text-muted-foreground text-xs'>
+                {t('{{count}} selected', { count: addSelected.size })}
+              </p>
             </div>
           )}
         </div>
