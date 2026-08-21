@@ -1,15 +1,16 @@
-name: Build deploy image (GHCR)
+name: Build branch image (GHCR)
 
 on:
   push:
     tags:
       - 'deploy*'
+      - 'personal*'
   workflow_dispatch:
     inputs:
       branch:
-        description: "Branch to build"
+        description: "Branch to build (deploy / personal)"
         required: true
-        default: "deploy"
+        default: "personal"
         type: string
 
 permissions:
@@ -30,14 +31,29 @@ jobs:
 
       - name: Resolve image tags
         id: tags
+        env:
+          DISPATCH_BRANCH: ${{ inputs.branch }}
         run: |
           OWNER=$(printf '%s' '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
           SHORT_SHA=$(git rev-parse --short HEAD)
           IMAGE="ghcr.io/${OWNER}/new-api"
+          # 镜像 tag 前缀来源：手动触发用 branch 输入；tag 触发用 tag 名去 -image 后缀
+          # （deploy-image → deploy，personal-image → personal），deploy 线历史镜像 tag 不变
+          if [ -n "$DISPATCH_BRANCH" ]; then
+            RAW_PREFIX="$DISPATCH_BRANCH"
+          else
+            RAW_PREFIX="${GITHUB_REF_NAME%-image}"
+          fi
+          PREFIX=$(printf '%s' "$RAW_PREFIX" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_.-]+/-/g; s/^[.-]+//; s/[.-]+$//')
+          if [ -z "$PREFIX" ]; then
+            echo "::error::无法推导合法镜像 tag 前缀（来源: $RAW_PREFIX）"
+            exit 1
+          fi
+          echo "prefix=${PREFIX}" >> "$GITHUB_OUTPUT"
           echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
-          echo "deploy_tag=${IMAGE}:deploy" >> "$GITHUB_OUTPUT"
-          echo "sha_tag=${IMAGE}:deploy-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "version=deploy-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "rolling_tag=${IMAGE}:${PREFIX}" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${IMAGE}:${PREFIX}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "version=${PREFIX}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Write VERSION
         run: echo "${{ steps.tags.outputs.version }}" > VERSION
@@ -64,7 +80,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ steps.tags.outputs.deploy_tag }}
+            ${{ steps.tags.outputs.rolling_tag }}
             ${{ steps.tags.outputs.sha_tag }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -74,7 +90,7 @@ jobs:
         run: |
           echo "### Published image" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "${{ steps.tags.outputs.deploy_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.tags.outputs.rolling_tag }}" >> "$GITHUB_STEP_SUMMARY"
           echo "${{ steps.tags.outputs.sha_tag }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
@@ -82,6 +98,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          IMAGE_PREFIX: ${{ steps.tags.outputs.prefix }}
         run: |
           set -euo pipefail
           IMAGE="new-api"
@@ -95,20 +112,21 @@ jobs:
             }
           fi
           # 每次构建在 GHCR 产生 1 个带 tag 的主 digest + 2 个无 tag 的平台辅助 digest。
-          # 只有带 deploy* tag 的 version 才是可回滚版本；无 tag 辅助 digest 不占名额。
-          # 带 tag 版本独立编号，按创建时间倒序保留最近 KEEP 个（deploy 滚动 tag holder 恒为最新，
+          # 只有带本次构建前缀（IMAGE_PREFIX，如 deploy/personal）tag 的 version 才是可回滚版本；
+          # 无 tag 辅助 digest 不占名额。各分支前缀家族独立计数、互不挤占。
+          # 带 tag 版本独立编号，按创建时间倒序保留最近 KEEP 个（滚动 tag holder 恒为最新，
           # 必在被保留之列；仍显式保护以防异常）。
           # 注意：无 tag 平台辅助 digest 是被带 tag index 引用的子 manifest（amd64 平台 manifest、
           # attestation manifest）。删除它们会让 index 悬空，docker pull 报 manifest unknown
           # （2026-08-15 事故根因，见 docs/request-debug-customization-manifest.md「GHCR 镜像自动清理」）。
           # 因此一律跳过，只清理带 tag 版本；孤儿 manifest 仅数 KB，可忽略。
-          jq -r '
+          jq -r --arg p "$IMAGE_PREFIX" '
             sort_by(.created_at) | reverse
-            | [.[] | select((.metadata.container.tags // []) | any(startswith("deploy")))] as $tagged
+            | [.[] | select((.metadata.container.tags // []) | any(startswith($p)))] as $tagged
             | ($tagged | to_entries | map(
                 .value as $v
                 | ($v.metadata.container.tags // []) as $tags
-                | (if (.key + 1) <= '"$KEEP"' or ($tags | index("deploy") != null)
+                | (if (.key + 1) <= '"$KEEP"' or ($tags | index($p) != null)
                    then "KEEP" else "DELETE" end) as $a
                 | "\($a)|\($v.id)|\($tags | join(","))|\($v.created_at)"
               ))
@@ -118,9 +136,9 @@ jobs:
             exit 0
           }
           total=$(wc -l < /tmp/prune_plan.tsv)
-          echo "发现 ${total} 个带 deploy tag 的镜像版本"
-          echo "### Prune old image versions (keep newest ${KEEP} tagged)" >> "$SUMMARY"
-          echo "共 ${total} 个带 tag 镜像版本（按创建时间倒序）" >> "$SUMMARY"
+          echo "发现 ${total} 个带 ${IMAGE_PREFIX} tag 的镜像版本"
+          echo "### Prune old image versions (prefix ${IMAGE_PREFIX}, keep newest ${KEEP} tagged)" >> "$SUMMARY"
+          echo "共 ${total} 个带 ${IMAGE_PREFIX} tag 的镜像版本（按创建时间倒序）" >> "$SUMMARY"
           echo '```' >> "$SUMMARY"
           cat /tmp/prune_plan.tsv >> "$SUMMARY"
           deleted=0
