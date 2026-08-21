@@ -518,6 +518,9 @@ export function ModelGroupsPage() {
                               </Button>
                             </div>
                           ))}
+                          <span className='text-muted-foreground text-xs'>
+                            {t('Edits to referenced members also apply to their source group')}
+                          </span>
                         </div>
                       )}
                       {members.length === 0 ? (
@@ -567,7 +570,6 @@ export function ModelGroupsPage() {
                                     <Input
                                       type='number'
                                       className='h-8'
-                                      disabled={!!item.source_group}
                                       value={edit.priorityInput}
                                       placeholder={
                                         item.channel_priority
@@ -589,7 +591,6 @@ export function ModelGroupsPage() {
                                     <Input
                                       type='number'
                                       className='h-8'
-                                      disabled={!!item.source_group}
                                       value={edit.weightInput}
                                       placeholder={
                                         item.channel_weight
@@ -610,7 +611,6 @@ export function ModelGroupsPage() {
                                   <TableCell>
                                     <Switch
                                       checked={item.enabled}
-                                      disabled={!!item.source_group}
                                       onCheckedChange={(checked) =>
                                         itemToggleMutation.mutate({
                                           itemId: item.id,
@@ -624,11 +624,7 @@ export function ModelGroupsPage() {
                                       <Button
                                         variant='ghost'
                                         size='icon-sm'
-                                        disabled={
-                                          !!item.source_group ||
-                                          !dirty ||
-                                          itemUpdateMutation.isPending
-                                        }
+                                        disabled={!dirty || itemUpdateMutation.isPending}
                                         onClick={() =>
                                           itemUpdateMutation.mutate({
                                             itemId: item.id,

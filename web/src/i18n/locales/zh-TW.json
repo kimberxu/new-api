@@ -1440,6 +1440,7 @@
     "edit_this": "edit_this",
     "Edited channels with tag {{tag}}": "編輯標籤為 {{tag}} 的渠道",
     "Editor mode": "編輯器模式",
+    "Edits to referenced members also apply to their source group": "對引用成員的修改會同步作用於其來源組",
     "Education": "教育",
     "Elapsed": "已耗時",
     "Email": "電郵",
