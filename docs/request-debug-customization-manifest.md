@@ -592,6 +592,12 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 - `web/src/hooks/use-sidebar-data.ts` - Admin 组「Model Groups」菜单项
 - `web/src/features/channels/index.tsx` - 路由表入口改指 `/model-groups`
 
+**新增（自动重建路由）：**
+- `controller/model_group_rebuild.go` - `RebuildModelGroups` handler：遍历所有已启用渠道，对 auto_sync=true 的渠道应用 pending 上游变更（add/remove）后同步模型组，对 auto_sync=false 的渠道直接同步（不触发检测、不改动 channel.Models），最后 `model.InitChannelCache()`；前端 `/model-groups` 页面「Rebuild Model Routing」按钮触发
+- `router/model-group-router.go` - 注册 `POST /api/model-groups/rebuild`（权限 ChannelWrite）
+- `web/src/features/model-groups/lib/api.ts` - `rebuildModelGroups()` 函数
+- `web/src/features/model-groups/components/model-groups-page.tsx` - 页面顶部添加「Rebuild Model Routing」按钮（带旋转 loading 动画）
+
 ## 计费功能级移除
 
 预扣/结算/扣费/额度限制全部短路（永不扣费、永不限额）；**DB 表与字段保留（零迁移）**。任务平台渠道（Midjourney/Suno/Kling）免费放行。abilities 表保留同步但不再参与选路。
