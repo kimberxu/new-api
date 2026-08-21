@@ -427,9 +427,17 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 				})
 			}
 		} else if service.IsModelLevelError(err) {
-			if service.CheckAndRecordDisableModel(channelError.ChannelId, relayInfo.OriginModelName, err.StatusCode, true) {
+			// [personal] The ban key must be the routing-entry model: under
+			// model-group routing the requested name is the group name, while
+			// cache exclusion and the groups page key on the member's real
+			// upstream model. Resolve it so the ban actually excludes routing.
+			banModel := relayInfo.OriginModelName
+			if upstream := model.ResolveModelGroupUpstreamModel(relayInfo.OriginModelName, channelError.ChannelId); upstream != "" {
+				banModel = upstream
+			}
+			if service.CheckAndRecordDisableModel(channelError.ChannelId, banModel, err.StatusCode, true) {
 				gopool.Go(func() {
-					_ = service.DisableChannelModel(channelError.ChannelId, relayInfo.OriginModelName, err.ErrorWithStatusCode())
+					_ = service.DisableChannelModel(channelError.ChannelId, banModel, err.ErrorWithStatusCode())
 				})
 			}
 		} else {
