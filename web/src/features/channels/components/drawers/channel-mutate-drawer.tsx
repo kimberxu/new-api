@@ -4109,69 +4109,37 @@ export function ChannelMutateDrawer({
                               )}
                             />
                             {rateLimitEnabled && (
-                              <div className='grid gap-4 sm:grid-cols-2'>
-                                <FormField
-                                  control={form.control}
-                                  name='rate_limit_rpm'
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>
-                                        {t('RPM (Requests Per Minute)')}
-                                      </FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          type='number'
-                                          min={0}
-                                          step='any'
-                                          placeholder='0'
-                                          {...field}
-                                          onChange={(e) =>
-                                            field.onChange(
-                                              Number(e.target.value)
-                                            )
-                                          }
-                                        />
-                                      </FormControl>
-                                      <FormDescription>
-                                        {t(
-                                          '0 uses the global default setting'
-                                        )}
-                                      </FormDescription>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name='rate_limit_tpm'
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>
-                                        {t('TPM (Tokens Per Minute)')}
-                                      </FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          type='number'
-                                          min={0}
-                                          placeholder='0'
-                                          {...field}
-                                          onChange={(e) =>
-                                            field.onChange(
-                                              Number(e.target.value)
-                                            )
-                                          }
-                                        />
-                                      </FormControl>
-                                      <FormDescription>
-                                        {t(
-                                          '0 uses the global default setting'
-                                        )}
-                                      </FormDescription>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
+                              <FormField
+                                control={form.control}
+                                name='rate_limit_rpm'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t('RPM (Requests Per Minute)')}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type='number'
+                                        min={0}
+                                        step='any'
+                                        placeholder='0'
+                                        {...field}
+                                        onChange={(e) =>
+                                          field.onChange(
+                                            Number(e.target.value)
+                                          )
+                                        }
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t(
+                                        '0 uses the global default setting'
+                                      )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
                             )}
                           </div>
                         </div>

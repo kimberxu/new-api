@@ -4428,7 +4428,6 @@
     "Total Usage": "总用量",
     "Total:": "总计：",
     "TPM": "TPM",
-    "TPM (Tokens Per Minute)": "TPM（每分钟令牌数）",
     "Track per-request consumption to power usage analytics. Keeping this on increases database writes.": "跟踪每个请求的消耗，以支持使用情况分析。保持开启会增加数据库写入。",
     "Tracked apps": "已跟踪的应用",
     "Tracks current account base limits and additional metered usage on Codex upstream.": "跟踪当前账号在 Codex 上游的基础限额与附加计费用量。",
