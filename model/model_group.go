@@ -38,8 +38,8 @@ type ModelGroupItem struct {
 	Model     string `json:"model" gorm:"type:varchar(128);uniqueIndex:idx_group_channel_model"`
 	// Priority/Weight are pointers: nil = inherit channel value at read time,
 	// non-nil = explicit override that auto-sync must not rewrite.
-	Priority  *int64 `json:"priority" gorm:"bigint;default:0"`
-	Weight    *uint  `json:"weight" gorm:"default:0"`
+	Priority  *int64 `json:"priority" gorm:"bigint"`
+	Weight    *uint  `json:"weight"`
 	Enabled   bool   `json:"enabled"` // 组内成员级启用；默认 true 代码层设置
 	CreatedAt int64  `json:"created_at" gorm:"bigint;autoCreateTime"`
 	// SourceGroup is set during reference expansion (empty = direct member,
