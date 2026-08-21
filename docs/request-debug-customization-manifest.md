@@ -561,7 +561,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 > 对应分支：`personal`（基于基线 `7e6415e7`，原 deploy-model 分支已退役，2026-08-21 更新）
 > 本小节登记 `personal` 相对基线 `7e6415e7` 的半重构（`git log 7e6415e7..personal` 核对）。
-> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）
+> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `c9148fb6`（修复成员优先级/权重继承失效）
 
 ## 模型组路由表（一等公民）
 
@@ -580,10 +580,10 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 - `router/model-group-router.go` - `/api/model-groups` 路由（AdminAuth + ChannelRead/Write 权限）
 - `web/src/features/model-groups/` - 前端页面（组列表 + 创建/启用禁用/删除）
 - `web/src/routes/_authenticated/model-groups/index.tsx` - 路由 `/model-groups`
+- `model/model_group_repair.go` - 一次性数据修复 `repairModelGroupItemInheritance`：成员 Priority/Weight 曾带 gorm `default:0`，GORM 对 nil 指针省列并回填 0，把「继承渠道值」（NULL）落库成显式 0 覆盖；修复去掉 tag 并把存量 0 值重置为 NULL（options 表 flag 保证只跑一次，修复后的显式 0 覆盖不受影响）
 
 **改动（挂载点/最小插入）：**
-- `model/main.go` - AutoMigrate 注册 `&ModelGroup{}`/`&ModelGroupItem{}`
-- `model/channel_cache.go` - 路由索引数据源改模型组成员；`modelGroupItemOverrides`/`modelGroupParamOverride` 缓存；`effectivePriority`/`effectiveWeight`
+- `model/main.go` - AutoMigrate 注册 `&ModelGroup{}`/`&ModelGroupItem{}`；`migrateDB` 挂载 `repairModelGroupItemInheritance`
 - `model/ability.go` - `GetGroupEnabledModels`/`GetEnabledModels` 数据源改模型组（/v1/models）
 - `middleware/distributor.go` - 组级参数覆盖逐 key 覆盖渠道级
 - `controller/relay.go` - `processChannelError` 渠道级判定优先于模型级
