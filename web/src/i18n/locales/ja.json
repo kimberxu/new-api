@@ -1440,6 +1440,7 @@
     "edit_this": "edit_this",
     "Edited channels with tag {{tag}}": "タグ {{tag}} のチャネルを編集しました",
     "Editor mode": "エディターモード",
+    "Edits to referenced members also apply to their source group": "参照メンバーへの変更は元のグループにも適用されます",
     "Education": "教育",
     "Elapsed": "経過時間",
     "Email": "メールアドレス",
