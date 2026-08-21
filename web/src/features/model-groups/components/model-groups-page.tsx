@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronRight,
   Plus,
+  RefreshCw,
   Save,
   Trash2,
   X,
@@ -66,6 +67,7 @@ import {
   getChannelModelOptions,
   addGroupReference,
   deleteGroupReference,
+  rebuildModelGroups,
   type ModelGroup,
   type ModelGroupItem,
   type ModelGroupReference,
@@ -99,6 +101,7 @@ export function ModelGroupsPage() {
   } | null>(null)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [edits, setEdits] = useState<Record<number, MemberEditState>>({})
+  const [rebuilding, setRebuilding] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ['model-groups'],
@@ -119,6 +122,21 @@ export function ModelGroupsPage() {
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['model-groups'] })
+
+  const rebuildMutation = useMutation({
+    mutationFn: () => rebuildModelGroups(),
+    onMutate: () => setRebuilding(true),
+    onSettled: () => setRebuilding(false),
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success(t('Model routing rebuilt'))
+      } else {
+        toast.error(res.message || t('Failed to rebuild model routing'))
+      }
+      invalidate()
+    },
+    onError: () => toast.error(t('Failed to rebuild model routing')),
+  })
 
   const createMutation = useMutation({
     mutationFn: () => createModelGroup(newName.trim()),
@@ -299,6 +317,15 @@ export function ModelGroupsPage() {
           <span className='truncate'>{t('Model Groups')}</span>
         </SectionPageLayout.Title>
       <SectionPageLayout.Actions>
+        <Button
+          onClick={() => rebuildMutation.mutate()}
+          disabled={rebuilding}
+        >
+          <RefreshCw
+            className={`mr-2 h-4 w-4 ${rebuilding ? 'animate-spin' : ''}`}
+          />
+          {rebuilding ? t('Rebuilding') : t('Rebuild Model Routing')}
+        </Button>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className='mr-2 h-4 w-4' />
           {t('Create Group')}

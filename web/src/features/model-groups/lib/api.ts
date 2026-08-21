@@ -128,3 +128,8 @@ export async function deleteGroupReference(groupId: number, refGroupId: number):
   const res = await api.delete(`/api/model-groups/${groupId}/references/${refGroupId}`, { skipBusinessError: true, skipErrorHandler: true })
   return res.data
 }
+
+export async function rebuildModelGroups(): Promise<{ success: boolean; message?: string }> {
+  const res = await api.post('/api/model-groups/rebuild', {}, { skipBusinessError: true, skipErrorHandler: true })
+  return res.data
+}
