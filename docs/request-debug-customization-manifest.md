@@ -1,6 +1,6 @@
 # 定制功能清单（deploy / personal 分支）
 
-> 对应分支：`personal` 基线 `7e6415e7`（2026-08-21 刷新至 `2e2acbe5`；deploy 线功能部分，可用 `git diff upstream/main...7e6415e7` 核对。注意：`deploy` 分支自分叉点 `ab4d296e`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
+> 对应分支：`personal` 基线 `7e6415e7`（2026-08-22 刷新至 `aa882479`；deploy 线功能部分，可用 `git diff upstream/main...7e6415e7` 核对。注意：`deploy` 分支自分叉点 `ab4d296e`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
 > 以下功能均为魔改线相对 `upstream/main` 的定制；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `7e6415e7` 的改动。
 > 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ `62830da3`（流式结束原因分类与中断流语义）→ `3a1279f1`（实时连接追踪）→ `8119f0ac`（manifest 登记实时连接追踪）→ `e024c98c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `977d2d5a`（实时连接表格优化）→ `15e56fb6`（尾部随机请求 ID + 下游/上游双模型列）→ `fe1cc018`（三文档头部标记刷新至 629d15cf）→ `5704e700`（滑动窗口渠道自动禁用）→ `4f52c010`（partial_failure length 收尾 + 异常流记错误日志）→ `d03a4c73`（实时连接侧边栏入口迁至 general 组）→ `e4da650b`（日志 t/s 计算排除 TTFT）→ `021771ae`（渠道流速率降级） → `4dc6823b`（慢流式降级配置 UI + 排除渠道 + 默认开启） → `214f874f`（首字延迟 TTFT 降级源） → `54d85b26`（TTFT 采样 min_input_tokens 门槛） → `385a17b2`（降级改固定数量窗口 ring buffer） → `35b1dc11`（渠道列表降级/限流图标）→ `822c1f85`（渠道测试请求随机化问句池与 max_tokens）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `8726fe30`（cherry-pick deploy 渠道密钥查看放开安全验证）
 
@@ -577,7 +577,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 > 对应分支：`personal`（基于基线 `7e6415e7`，原 deploy-model 分支已退役，2026-08-21 更新）
 > 本小节登记 `personal` 相对基线 `7e6415e7` 的半重构（`git log 7e6415e7..personal` 核对）。
-> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `c9148fb6`（修复成员优先级/权重继承失效）→ `6deec7b4`（上游请求改用成员真实上游模型）→ `6702a043`（移除系统设置 Billing 页残留）→ `e9456b25`（模型组引用成员开放编辑）→ `3711a3b6`（添加成员界面全量列表化 + 搜索）→ `2e2acbe5`（勾选多选批量添加）
+> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `c9148fb6`（修复成员优先级/权重继承失效）→ `6deec7b4`（上游请求改用成员真实上游模型）→ `6702a043`（移除系统设置 Billing 页残留）→ `e9456b25`（模型组引用成员开放编辑）→ `3711a3b6`（添加成员界面全量列表化 + 搜索）→ `2e2acbe5`（勾选多选批量添加）→ `aa882479`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）
 
 ## 模型组路由表（一等公民）
 
@@ -588,6 +588,8 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 **引用成员编辑放开（2026-08-21）**：手动组内来自引用组的展开成员此前只读；现开放优先级/权重/启停编辑。语义为**全局生效**——被编辑的就是来源组的成员记录，所有引用方与来源组同步变化（后端 `UpdateGroupItem` 本就按 itemId 更新、无组属校验，零后端改动）；前端仅移除三处 `disabled={!!item.source_group}` 并在 References 区追加影响范围提示文案（七语言）；成员删除仍仅限来源组操作。
 
 **添加成员界面全量列表化 + 勾选批量添加（2026-08-21）**：手动组「Add Member」对话框的渠道模式下，不再「先选渠道、再选该渠道模型」级联选择，改为一次列出**全部渠道的全部（渠道, 模型）组合**（数据源为分页拉取的全量渠道 `models` 字段）：关键词框（`ComboboxInput` 惯例样式，模型名/渠道名均可搜）+ 复选框勾选列表（`max-h-64` 滚动），支持**一次勾选多个、单击 Add 批量提交**——逐项调用既有 `POST /items`，全部成功才关对话框并 toast 成功数；部分失败时保留失败项勾选、toast 列出失败明细。顺带退役只为级联服务的 `GET /api/model-groups/channels/:id/models` 接口（controller/router/前端 api 函数三处删除）。
+
+**成员级封禁显示与模型级禁用键修正（2026-08-22）**：`processChannelError` 的模型级自动禁用此前以请求模型名（= 组名）作禁用键，而缓存排除、DB 排除与页面匹配均按 `channel_disabled_models.model` = 成员真实上游模型——手动组（组名≠成员模型，如 ox→real-model）的禁用记录永远无法命中，被封成员仍参与选路。现记录前经 `ResolveModelGroupUpstreamModel` 把禁用键解析为路由条目模型（auto 组同名成员解析为空、回落组名，行为不变）。`/model-groups` 页面首次消费后端既有 `GroupItemView.Disabled` 字段：组头显示「N banned」警告徽章；成员行模型列显示封禁徽章——auto 来源显示剩余时长（tooltip 为 reason，已过期显示「Banned」），manual 来源显示「Disabled」；成员表 Model/Channel 列互换（Model 在前）。i18n 新增 3 键七语言。
 
 ### 文件清单
 
@@ -607,12 +609,14 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 - `model/main.go` - AutoMigrate 注册 `&ModelGroup{}`/`&ModelGroupItem{}`；`migrateDB` 挂载 `repairModelGroupItemInheritance`
 - `model/ability.go` - `GetGroupEnabledModels`/`GetEnabledModels` 数据源改模型组（/v1/models）
 - `model/channel_cache.go` - 路由索引数据源改模型组成员；`modelGroupItemOverrides`/`modelGroupParamOverride` 缓存（override 结构含成员上游模型）；`effectivePriority`/`effectiveWeight`
-- `controller/relay.go` - `processChannelError` 渠道级判定优先于模型级
+- `controller/relay.go` - `processChannelError` 渠道级判定优先于模型级；模型级分支禁用键经 `ResolveModelGroupUpstreamModel` 解析为成员真实上游模型
 - `middleware/distributor.go` - 组级参数覆盖逐 key 覆盖渠道级；`SetupContextForSelectedChannel` 织入成员上游模型映射
 - `model/channel_disabled_model.go` - `BannedUntil` 字段
 - `controller/channel-test.go` - 开头接入到期恢复
 - `web/src/hooks/use-sidebar-data.ts` - Admin 组「Model Groups」菜单项
 - `web/src/features/channels/index.tsx` - 路由表入口改指 `/model-groups`
+- `web/src/features/model-groups/components/model-groups-page.tsx` - 组头「N banned」徽章 + 成员行封禁徽章（剩余时长/reason tooltip）+ Model/Channel 列互换
+- `web/src/i18n/locales/*.json` - 新增 3 键（`Banned` / `Banned ({{time}})` / `{{count}} banned`）七语言
 
 **新增（自动重建路由）：**
 - `controller/model_group_rebuild.go` - `RebuildModelGroups` handler：遍历所有已启用渠道，对 auto_sync=true 的渠道应用 pending 上游变更（add/remove）后同步模型组，对 auto_sync=false 的渠道直接同步（不触发检测、不改动 channel.Models）；随后 `model.DeleteEmptyAutoModelGroups()` 清理成员清空的 auto 组（连带悬空引用，manual 组不触碰），删除组名记 SysLog 并以 `removed_groups` 返回；最后 `model.InitChannelCache()`；前端 `/model-groups` 页面「Rebuild Model Routing」按钮触发
