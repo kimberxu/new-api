@@ -92,7 +92,6 @@ type ChannelOtherSettings struct {
 	ToolLossPolicy string `json:"tool_loss_policy,omitempty"`
 	RateLimitEnabled                      bool                  `json:"rate_limit_enabled,omitempty"`
 	RateLimitRPM                          float64               `json:"rate_limit_rpm,omitempty"`
-	RateLimitTPM                          int                   `json:"rate_limit_tpm,omitempty"`
 }
 
 func (s *ChannelOtherSettings) IsOpenRouterEnterprise() bool {

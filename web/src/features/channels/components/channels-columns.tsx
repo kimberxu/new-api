@@ -704,8 +704,7 @@ export function useChannelsColumns(
           const otherSettings = parseChannelOtherSettings(channel.settings)
           const hasRateLimit =
             otherSettings.rate_limit_enabled === true &&
-            ((otherSettings.rate_limit_rpm ?? 0) > 0 ||
-              (otherSettings.rate_limit_tpm ?? 0) > 0)
+            (otherSettings.rate_limit_rpm ?? 0) > 0
           const demotedInfos = demoted.get(channel.id)
 
           return (
@@ -785,9 +784,6 @@ export function useChannelsColumns(
                               {t('Rate limit configured')}
                               {otherSettings.rate_limit_rpm
                                 ? ` · ${t('RPM')} ${otherSettings.rate_limit_rpm}`
-                                : ''}
-                              {otherSettings.rate_limit_tpm
-                                ? ` · ${t('TPM')} ${otherSettings.rate_limit_tpm}`
                                 : ''}
                             </span>
                           )}

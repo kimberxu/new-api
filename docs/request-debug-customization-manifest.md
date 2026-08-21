@@ -2,7 +2,7 @@
 
 > 对应分支：`deploy` @ `702be7eb`（2026-08-19 更新）
 > 以下功能均为 `deploy` 相对 `upstream/main` 的定制（可用 `git diff upstream/main...deploy` 核对）。
-> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM/TPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ `62830da3`（流式结束原因分类与中断流语义）→ `3a1279f1`（实时连接追踪）→ `8119f0ac`（manifest 登记实时连接追踪）→ `e024c98c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `977d2d5a`（实时连接表格优化）→ `15e56fb6`（尾部随机请求 ID + 下游/上游双模型列）→ `fe1cc018`（三文档头部标记刷新至 629d15cf）→ `5704e700`（滑动窗口渠道自动禁用）→ `4f52c010`（partial_failure length 收尾 + 异常流记错误日志）→ `d03a4c73`（实时连接侧边栏入口迁至 general 组）→ `e4da650b`（日志 t/s 计算排除 TTFT）→ `021771ae`（渠道流速率降级） → `4dc6823b`（慢流式降级配置 UI + 排除渠道 + 默认开启） → `214f874f`（首字延迟 TTFT 降级源） → `54d85b26`（TTFT 采样 min_input_tokens 门槛） → `385a17b2`（降级改固定数量窗口 ring buffer） → `35b1dc11`（渠道列表降级/限流图标）→ `822c1f85`（渠道测试请求随机化问句池与 max_tokens）
+> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ `62830da3`（流式结束原因分类与中断流语义）→ `3a1279f1`（实时连接追踪）→ `8119f0ac`（manifest 登记实时连接追踪）→ `e024c98c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `977d2d5a`（实时连接表格优化）→ `15e56fb6`（尾部随机请求 ID + 下游/上游双模型列）→ `fe1cc018`（三文档头部标记刷新至 629d15cf）→ `5704e700`（滑动窗口渠道自动禁用）→ `4f52c010`（partial_failure length 收尾 + 异常流记错误日志）→ `d03a4c73`（实时连接侧边栏入口迁至 general 组）→ `e4da650b`（日志 t/s 计算排除 TTFT）→ `021771ae`（渠道流速率降级） → `4dc6823b`（慢流式降级配置 UI + 排除渠道 + 默认开启） → `214f874f`（首字延迟 TTFT 降级源） → `54d85b26`（TTFT 采样 min_input_tokens 门槛） → `385a17b2`（降级改固定数量窗口 ring buffer） → `35b1dc11`（渠道列表降级/限流图标）→ `822c1f85`（渠道测试请求随机化问句池与 max_tokens）
 
 ## 魔改开发约定（合并上游友好）
 
@@ -26,7 +26,7 @@
 | 实时连接追踪 | `3a1279f1`、`977d2d5a`、`15e56fb6` | 中（`controller/relay.go`、`router/api-router.go`、`service/inflight_tracker.go`） | `独立文件`（service/inflight_tracker.go）+ `挂载点`（relay.go） | 否 |
 | GHCR 部署镜像构建 | `bfa99ad6` | 低 | `挂载点`+`独立文件`（workflow 文件独立） | 否 |
 | GHCR 镜像自动清理 | `ae34ad6a` | 低（`.github/workflows/deploy-image-ghcr.yml`） | `挂载点`+`独立文件`（workflow 步骤独立） | 否 |
-| 渠道请求频率限制（RPM/TPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） | `内联` → 待迁移 | 否 |
+| 渠道请求频率限制（RPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） | `内联` → 待迁移 | 否 |
 | 渠道测试请求文案定制 | `d0fdb047` | 低（`controller/channel-test.go`） | `内联`（channel-test.go）→ 待迁移 | 否 |
 | 加权模型映射（1 对多） | `9a20e660`、`c6c4bcf8`、`83329f48` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） | `内联`（relay/helper/model_mapped.go）→ 待迁移 | 否 |
 | 额度显示模式切换修复 | `d8378ee7` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
@@ -186,7 +186,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 ### 功能概述
 
-每渠道独立配置 RPM（每分钟请求数）、TPM（每分钟 Token 数），在分发时检查，超限返回 429。支持 Redis 和内存两种模式，全局开关 + 默认值。
+每渠道独立配置 RPM（每分钟请求数），在分发时检查，超限返回 429。支持 Redis 和内存两种模式，全局开关 + 默认值。
 
 ### 全局配置
 
@@ -196,7 +196,6 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 |------|--------|------|
 | `enabled` | `false` | 全局开关 |
 | `default_rpm` | `60` | 默认每分钟请求数限制 |
-| `default_tpm` | `100000` | 默认每分钟 Token 数限制 |
 
 ### 每渠道配置
 
@@ -206,7 +205,6 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 |------|------|------|
 | `rate_limit_enabled` | bool | 是否启用该渠道的限流 |
 | `rate_limit_rpm` | float | 每分钟最大请求数（0 = 使用全局默认值；支持小数） |
-| `rate_limit_tpm` | int | 每分钟最大 Token 数（0 = 使用全局默认值） |
 
 ### 限流行为
 
@@ -215,14 +213,14 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - 单渠道超限：跳过该渠道并排除出重试候选，继续尝试同优先级其他渠道
 - 全渠道均被限流：HTTP 429 + `Retry-After: 60`，错误码 `channel:rate_limited`，客户端可据此退避
 - 回退行为：Redis 不可用时自动切到内存模式；Redis 或内存均出错时放行
-- 演进：`26271295` 引入基础 RPM/TPM；`e09babdf` 改为上下文感知（仅对当前请求生效）+ RPM 支持小数；`102747fd` 前端 RPM 输入框加 `step='any'`；2026-08-17 前端 UI 迁移：限流配置从「API 访问设置」移入「高级设置」→「Routing & Overrides」子节（新增 nav 跳转项、已配置状态高亮与自动展开）
+- 演进：`26271295` 引入基础 RPM；`e09babdf` 改为上下文感知（仅对当前请求生效）+ RPM 支持小数；`102747fd` 前端 RPM 输入框加 `step='any'`；2026-08-17 前端 UI 迁移：限流配置从「API 访问设置」移入「高级设置」→「Routing & Overrides」子节（新增 nav 跳转项、已配置状态高亮与自动展开）
 
 ### 文件清单
 
 **后端：**
 - `setting/operation_setting/channel_rate_limit_setting.go` - 全局配置定义
 - `service/channel_rate_limit.go` - 核心限流逻辑
-- `relaykit/dto/channel_settings.go` - `ChannelOtherSettings` 新增 `RateLimitEnabled`、`RateLimitRPM`、`RateLimitTPM`
+- `relaykit/dto/channel_settings.go` - `ChannelOtherSettings` 新增 `RateLimitEnabled`、`RateLimitRPM`
 - `middleware/distributor.go` - 分发时插入 `CheckChannelRateLimit` 检查
 - `controller/relay.go` - 限流渠道排除重试 + 全渠道限流 429 兜底
 - `constant/context_key.go` - `ContextKeyAllChannelsRateLimited`、`ContextKeyChannelRateLimitRetryAfter`
@@ -234,7 +232,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 **前端 (web/src/features/channels/):**
 - `types.ts` - `ChannelOtherSettings` 接口新增字段
 - `lib/channel-form.ts` - Schema、默认值、transform、buildSettingsJSON
-- `components/drawers/channel-mutate-drawer.tsx` - 限流开关 + RPM/TPM 输入框 UI（位于「高级设置」→「Routing & Overrides」子节，nav 可跳转、已配置自动展开）
+- `components/drawers/channel-mutate-drawer.tsx` - 限流开关 + RPM 输入框 UI（位于「高级设置」→「Routing & Overrides」子节，nav 可跳转、已配置自动展开）
 
 ---
 
@@ -447,7 +445,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 **2026-08-18 增强（固定数量窗口 / ring buffer）**：判定从「时间窗口内连续慢」改为「最近 `sample_size` 次采样中慢事件达 `threshold` 次即触发」。快慢结果都入队，快结果只挤掉最旧样本、不洗白历史慢记录（容错更高，针对持续慢的渠道）；长请求不再受影响——3-5 分钟甚至更长的请求结束后才采样，但窗口按样本数量判定而非时间，不会因采样延迟导致窗口过期。`window_seconds`/`ttft_window_seconds` 废弃不再生效（保留字段兼容旧配置）。`threshold` 默认从 `1` 调至 `3`（1 次波动即降级容错太低）。
 
-**2026-08-18 增强（渠道页图标展示）**：渠道列表名称旁新增两个图标——降级中（`GET /api/channel/demoted` 轮询，显示降级模型与剩余恢复时长，5s 刷新）与渠道级速率限制已配置（`rate_limit_enabled` 且 rpm/tpm > 0）。图标仅展示，不影响渠道行为。
+**2026-08-18 增强（渠道页图标展示）**：渠道列表名称旁新增两个图标——降级中（`GET /api/channel/demoted` 轮询，显示降级模型与剩余恢复时长，5s 刷新）与渠道级速率限制已配置（`rate_limit_enabled` 且 rpm > 0）。图标仅展示，不影响渠道行为。
 
 ### 判定与降级语义
 
@@ -501,7 +499,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - `controller/channel-demoted.go` - `GET /api/channel/demoted` 降级状态查询（新文件）
 - `router/channel-router.go` - 注册 /demoted 路由（ChannelRead 权限）
 - `web/src/features/channels/components/channels-provider.tsx` - 5s 轮询降级状态注入 context
-- `web/src/features/channels/components/channels-columns.tsx` - 名称列降级图标 + 速率限制图标（tooltip 显示模型/剩余时长/RPM/TPM）
+- `web/src/features/channels/components/channels-columns.tsx` - 名称列降级图标 + 速率限制图标（tooltip 显示模型/剩余时长/RPM）
 - `web/src/features/channels/lib/channel-utils.ts` - `formatSeconds` 剩余时长格式化
 - `web/src/features/system-settings/models/routing-reliability-section.tsx` - Routing Reliability 下新增 Slow stream demotion 表单块（生成速率 8 项 + 首字延迟 4 项 + 排除渠道输入）
 - `web/src/features/system-settings/models/utils.ts` - 排除渠道显示/提交格式转换（`parseExcludeChannelIds` / `serializeExcludeChannelIds`）

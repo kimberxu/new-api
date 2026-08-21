@@ -294,7 +294,6 @@ export const channelFormSchema = z
     disable_task_polling_sleep: z.boolean().optional(),
     rate_limit_enabled: z.boolean().optional(),
     rate_limit_rpm: z.number().min(0).optional(),
-    rate_limit_tpm: z.number().int().min(0).optional(),
     // Upstream model update settings (stored in settings JSON)
     upstream_model_update_check_enabled: z.boolean().optional(),
     upstream_model_update_auto_sync_enabled: z.boolean().optional(),
@@ -478,7 +477,6 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   disable_task_polling_sleep: false,
   rate_limit_enabled: false,
   rate_limit_rpm: 0,
-  rate_limit_tpm: 0,
   upstream_model_update_check_enabled: false,
   upstream_model_update_auto_sync_enabled: false,
   upstream_model_update_ignored_models: '',
@@ -590,7 +588,6 @@ export function transformChannelToFormDefaults(
   let upstreamModelUpdateIgnoredModels = ''
   let rateLimitEnabled = false
   let rateLimitRPM = 0
-  let rateLimitTPM = 0
   let advancedCustom = ''
 
   if (channel.settings) {
@@ -619,7 +616,6 @@ export function transformChannelToFormDefaults(
         : ''
       rateLimitEnabled = parsed.rate_limit_enabled === true
       rateLimitRPM = parsed.rate_limit_rpm || 0
-      rateLimitTPM = parsed.rate_limit_tpm || 0
       if (parsed.advanced_custom) {
         advancedCustom = stringifyAdvancedCustomConfig(parsed.advanced_custom)
       }
@@ -671,7 +667,6 @@ export function transformChannelToFormDefaults(
     disable_task_polling_sleep: disableTaskPollingSleep,
     rate_limit_enabled: rateLimitEnabled,
     rate_limit_rpm: rateLimitRPM,
-    rate_limit_tpm: rateLimitTPM,
     allow_safety_identifier: allowSafetyIdentifier,
     upstream_model_update_check_enabled: upstreamModelUpdateCheckEnabled,
     upstream_model_update_auto_sync_enabled: upstreamModelUpdateAutoSyncEnabled,
@@ -840,13 +835,9 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
   settingsObj.rate_limit_enabled = formData.rate_limit_enabled === true
   if (formData.rate_limit_enabled) {
     settingsObj.rate_limit_rpm = formData.rate_limit_rpm || 0
-    settingsObj.rate_limit_tpm = formData.rate_limit_tpm || 0
   } else {
     if ('rate_limit_rpm' in settingsObj) {
       delete settingsObj.rate_limit_rpm
-    }
-    if ('rate_limit_tpm' in settingsObj) {
-      delete settingsObj.rate_limit_tpm
     }
   }
 
