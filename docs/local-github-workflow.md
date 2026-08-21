@@ -1,6 +1,6 @@
 # 本地 GitHub Fork 工作流
 
-> 对应分支:`personal` 基线 `7e6415e7`(2026-08-19 更新;`personal` 线同步流程见「同步上游」节)
+> 对应分支:`personal` 基线 `7e6415e7`(2026-08-21 刷新至 `22c4cc90`；`personal` 线同步流程见「同步上游」节)
 
 ## 标准触发短语
 
@@ -99,32 +99,48 @@ cd web && bun run build                                          # 前端
 
 ## 部署
 
-> **强约束：只有用户明确要求触发构建/发布时才执行本流程。** 纯文档改动（`docs/`、`AGENTS.md`、manifest 登记、说明性提交）不触发构建——只 `git push origin deploy` 即可，不推送任何 `deploy*` tag。判断依据：改动是否影响运行产物（Go 源码、前端源码、Dockerfile、依赖清单等）；仅文档/注释变更视为不触发。
+> **强约束：只有用户明确要求触发构建/发布时才执行本流程。** 纯文档改动（`docs/`、`AGENTS.md`、manifest 登记、说明性提交）不触发构建——只 `git push origin <branch>` 即可，不推送任何 `deploy*` / `personal*` tag。判断依据：改动是否影响运行产物（Go 源码、前端源码、Dockerfile、依赖清单等）；仅文档/注释变更视为不触发。
 
-`deploy` 分支的镜像构建**不是每次 push 自动触发**。`.github/workflows/deploy-image-ghcr.yml` 支持两种触发：
+`.github/workflows/deploy-image-ghcr.yml` 统一服务 deploy / personal 两条线，镜像 tag 由构建来源动态推导：
 
-- **自动（推荐）**：推送以 `deploy` 开头的 git tag（如 `deploy-image`、`deploy-image-<short_sha>`）即触发构建；
-- **手动兜底**：`workflow_dispatch`，在 GitHub → **Actions** → **Build deploy image (GHCR)** → **Run workflow**（branch 输入默认 `deploy`）。
+| 构建来源 | 推导规则 | 镜像滚动 tag | 镜像留档 tag |
+|---------|---------|-------------|-------------|
+| tag `deploy-image` | 去 `-image` 尾缀 | `:deploy` | `:deploy-<short_sha>` |
+| tag `personal-image` | 去 `-image` 尾缀 | `:personal` | `:personal-<short_sha>` |
+| dispatch `branch=deploy` | 直接用输入 | 同上 | 同上 |
+| dispatch `branch=personal` | 直接用输入 | 同上 | 同上 |
 
-日常发布流程（**每次发布只打一个滚动 tag**，单次构建即同时产出滚动与留档镜像 tag）：
+### personal（主力线）
 
 ```bash
-git push origin deploy                    # 推送代码（不触发构建）
-git tag -f deploy-image && git push -f origin deploy-image    # 覆盖滚动 tag → 自动构建
+git push origin personal                                       # 推送代码（不触发构建）
+git tag -f personal-image && git push -f origin personal-image # 覆盖滚动 tag → 自动构建
 ```
 
-> 滚动 tag 用 `deploy-image` 而非 `deploy`，避免与部署分支同名引发 git refspec 歧义。**不要额外打 `deploy-image-<short_sha>` 等留档 git tag**——workflow 单次构建已同时推送 `:deploy`（滚动）与 `:deploy-<short_sha>`（留档）两个镜像 tag（见下「构建产物」），多打 git tag 只会多触发一次重复构建。再次发布直接 `git tag -f` 覆盖滚动 tag 即可；回滚用已知良好的 `:deploy-<short_sha>` 镜像 tag。
+> 与 deploy 线完全对称：滚动 tag 用 `personal-image`（避免与分支同名歧义），单次构建同时产出 `:personal`（滚动）与 `:personal-<short_sha>`（留档）。重复发布直接 `git tag -f` 覆盖；回滚用已知良好的 `:personal-<short_sha>`。Prune 只对带 `personal*` tag 版本计数（保留最近 3 个），不与 `deploy` 线互相挤占。
 
-1. 推送 `deploy*` tag 后，GitHub Actions 自动构建，无需进网页
+也可通过 Actions UI 手动触发：GitHub → **Actions** → **Build branch image (GHCR)** → **Run workflow** → branch 输入 `personal`（默认值）。
+
+### deploy（兼容历史）
+
+```bash
+git push origin deploy                                         # 推送代码（不触发构建）
+git tag -f deploy-image && git push -f origin deploy-image     # 覆盖滚动 tag → 自动构建
+```
+
+> 逻辑与 personal 线完全对称；镜像 tag 前缀推导结果不变（`:deploy` / `:deploy-<short_sha>`），deploy 线历史镜像地址完全兼容。
+
+### 通用说明
+
+1. 推送 `deploy*` / `personal*` tag 后，GitHub Actions 自动构建，无需进网页
 2. 构建产物（`<owner>` 为仓库属主小写）：
-   - `ghcr.io/<owner>/new-api:deploy` — 滚动 tag，始终指向最新构建
-   - `ghcr.io/<owner>/new-api:deploy-<short_sha>` — 不可变 tag，对应具体提交
-   - 镜像内 `VERSION` 文件 = `deploy-<short_sha>`
+   - `ghcr.io/<owner>/new-api:<prefix>` — 滚动 tag，始终指向最新构建
+   - `ghcr.io/<owner>/new-api:<prefix>-<short_sha>` — 不可变 tag，对应具体提交
+   - 镜像内 `VERSION` 文件 = `<prefix>-<short_sha>`
 3. 部署机只从 GHCR 拉取镜像，不从 Git 仓库构建：
-   - 日常更新：拉 `:deploy`
-   - 回滚：拉上一个已知良好的 `:deploy-<short_sha>`
-
-> 注意：tag 触发构建时，镜像 tag 的 `<short_sha>` 取自该 tag 指向的提交，与 git tag 名无关。
+   - 日常更新：拉 `:<prefix>`
+   - 回滚：拉上一个已知良好的 `:<prefix>-<short_sha>`
+4. 两条线 Prune 独立：deploy 构建只清理带 `deploy*` tag 的历史版本，personal 构建只清理带 `personal*` tag 的历史版本，各保留最近 3 个
 
 ### 确认构建状态（无需 GitHub token）
 
@@ -148,4 +164,13 @@ git checkout deploy
 git merge local/<feature>
 git push origin deploy              # 推送代码本身不触发构建
 git tag -f deploy-image && git push -f origin deploy-image    # 覆盖滚动 tag 触发 GHCR 构建
+```
+
+personal 线同理：
+
+```bash
+git checkout personal
+git merge local/<feature>
+git push origin personal            # 推送代码本身不触发构建
+git tag -f personal-image && git push -f origin personal-image    # 覆盖滚动 tag 触发 GHCR 构建
 ```
