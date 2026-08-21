@@ -248,6 +248,13 @@ func AddGroupItem(c *gin.Context) {
 		common.ApiError(c, fmt.Errorf("model group #%d not found", id))
 		return
 	}
+	// [personal] Auto groups are system-managed: members are added/removed
+	// only by channel init and the rebuild-routing action. Manual edits to an
+	// auto group are limited to priority/weight/enabled (see UpdateGroupItem).
+	if g.Source == model.GroupSourceAuto {
+		common.ApiError(c, fmt.Errorf("auto group members are managed by the system; adjust priority/weight/enabled instead"))
+		return
+	}
 	var req AddGroupItemRequest
 	if err := common.UnmarshalBodyReusable(c, &req); err != nil {
 		common.ApiError(c, err)
@@ -318,6 +325,15 @@ func DeleteGroupItem(c *gin.Context) {
 	itemId, err := strconv.Atoi(c.Param("itemId"))
 	if err != nil || itemId <= 0 {
 		common.ApiError(c, fmt.Errorf("invalid item id"))
+		return
+	}
+	g, err := model.GetModelGroupByItemId(itemId)
+	if err != nil || g == nil {
+		common.ApiError(c, fmt.Errorf("group item #%d not found", itemId))
+		return
+	}
+	if g.Source == model.GroupSourceAuto {
+		common.ApiError(c, fmt.Errorf("auto group members are managed by the system; adjust priority/weight/enabled instead"))
 		return
 	}
 	if err := model.DeleteModelGroupItem(itemId); err != nil {
