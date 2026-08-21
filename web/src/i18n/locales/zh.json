@@ -5143,6 +5143,10 @@
     "Remove Group Reference": "移除组引用",
     "Remove reference": "移除引用",
     "Remove reference to {{ref}} from {{group}}? Its members will no longer be included.": "移除对 {{ref}} 的引用？其成员将不再包含在 {{group}} 中。",
-    "Select a group to include all its members": "选择要包含其所有成员的组"
+    "Select a group to include all its members": "选择要包含其所有成员的组",
+    "Ascending": "升序",
+    "Descending": "降序",
+    "Manual first": "手动组在前",
+    "Member count": "成员数量"
   }
 }

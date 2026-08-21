@@ -5143,6 +5143,10 @@
     "Remove Group Reference": "Удалить ссылку на группу",
     "Remove reference": "Удалить ссылку",
     "Remove reference to {{ref}} from {{group}}? Its members will no longer be included.": "Удалить ссылку на {{ref}} из {{group}}? Её участники больше не будут включены.",
-    "Select a group to include all its members": "Выберите группу для включения всех её участников"
+    "Select a group to include all its members": "Выберите группу для включения всех её участников",
+    "Ascending": "По возрастанию",
+    "Descending": "По убыванию",
+    "Manual first": "Сначала ручные",
+    "Member count": "Кол-во участников"
   }
 }

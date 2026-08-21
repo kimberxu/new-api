@@ -5143,6 +5143,10 @@
     "Remove Group Reference": "Xóa tham chiếu nhóm",
     "Remove reference": "Xóa tham chiếu",
     "Remove reference to {{ref}} from {{group}}? Its members will no longer be included.": "Xóa tham chiếu đến {{ref}} khỏi {{group}}? Các thành viên của nó sẽ không còn được bao gồm.",
-    "Select a group to include all its members": "Chọn một nhóm để bao gồm tất cả thành viên của nó"
+    "Select a group to include all its members": "Chọn một nhóm để bao gồm tất cả thành viên của nó",
+    "Ascending": "Tăng dần",
+    "Descending": "Giảm dần",
+    "Manual first": "Thủ công trước",
+    "Member count": "Số thành viên"
   }
 }
