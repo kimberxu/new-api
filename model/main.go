@@ -378,6 +378,9 @@ func migrateDB() error {
 	if err != nil {
 		return err
 	}
+	if err := repairModelGroupItemInheritance(); err != nil {
+		return err
+	}
 	if err := InitializeUserAuthVersions(); err != nil {
 		return err
 	}

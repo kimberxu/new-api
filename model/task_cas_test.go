@@ -53,6 +53,7 @@ func TestMain(m *testing.M) {
 		&ChannelDisabledModel{},
 		&ModelGroup{},
 		&ModelGroupItem{},
+		&ModelGroupReference{},
 		&TopUp{},
 		&SubscriptionPlan{},
 		&SubscriptionOrder{},
