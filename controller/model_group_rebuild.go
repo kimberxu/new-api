@@ -65,12 +65,22 @@ func RebuildModelGroups(c *gin.Context) {
 		}
 		onCount++
 	}
+	// Drop auto groups whose members all disappeared (model no longer served
+	// by any channel); dangling references go with them via DeleteModelGroup.
+	removed, rerr := model.DeleteEmptyAutoModelGroups()
+	if rerr != nil {
+		common.SysLog(fmt.Sprintf("rebuild: failed to clean up empty auto groups: %v", rerr))
+	}
+	if len(removed) > 0 {
+		common.SysLog(fmt.Sprintf("rebuild: removed %d empty auto group(s): %v", len(removed), removed))
+	}
 
 	model.InitChannelCache()
 
 	common.ApiSuccess(c, gin.H{
-		"rebuilt":      true,
-		"on_channels":  onCount,
-		"off_channels": offCount,
+		"rebuilt":        true,
+		"on_channels":    onCount,
+		"off_channels":   offCount,
+		"removed_groups": removed,
 	})
 }
