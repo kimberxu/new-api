@@ -344,22 +344,6 @@ func DeleteGroupItem(c *gin.Context) {
 	common.ApiSuccess(c, gin.H{"deleted": true})
 }
 
-// GetChannelModelOptions lists which models of a channel could be added to
-// groups — simply the channel's Models list (real upstream models).
-func GetChannelModelOptions(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil || id <= 0 {
-		common.ApiError(c, fmt.Errorf("invalid channel id"))
-		return
-	}
-	ch, err := model.GetChannelById(id, false)
-	if err != nil || ch == nil {
-		common.ApiError(c, fmt.Errorf("channel #%d not found", id))
-		return
-	}
-	common.ApiSuccess(c, gin.H{"models": ch.GetModels()})
-}
-
 // SetModelGroupParamOverride validates the group-level param override JSON
 // (same schema as the channel-level param_override) and stores it on the
 // group. An empty string clears the override.

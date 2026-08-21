@@ -65,10 +65,6 @@ export interface ListModelGroupsResponse {
   total: number
 }
 
-export interface GetChannelModelOptionsResponse {
-  models: string[]
-}
-
 export async function listModelGroups(withItems = false): Promise<ListModelGroupsResponse> {
   const res = await api.get('/api/model-groups/', { params: { with_items: withItems ? '1' : '0' } })
   return res.data?.data ?? { items: [], total: 0 }
@@ -112,11 +108,6 @@ export async function deleteGroupItem(itemId: number): Promise<{ success: boolea
 export async function setModelGroupParamOverride(id: number, paramOverride: string): Promise<{ success: boolean; message?: string }> {
   const res = await api.put(`/api/model-groups/${id}/param-override`, { param_override: paramOverride })
   return res.data
-}
-
-export async function getChannelModelOptions(channelId: number): Promise<string[]> {
-  const res = await api.get(`/api/model-groups/channels/${channelId}/models`)
-  return res.data?.data?.models ?? []
 }
 
 export async function addGroupReference(groupId: number, refGroupId: number): Promise<{ success: boolean; message?: string }> {

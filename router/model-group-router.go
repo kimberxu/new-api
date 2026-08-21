@@ -36,7 +36,6 @@ var modelGroupPermissionRoutes = []permissionRoute{
 	{method: http.MethodPost, path: "/:id/items", permission: authz.ChannelWrite, handler: controller.AddGroupItem},
 	{method: http.MethodPatch, path: "/items/:itemId", permission: authz.ChannelWrite, handler: controller.UpdateGroupItem},
 	{method: http.MethodDelete, path: "/items/:itemId", permission: authz.ChannelWrite, handler: controller.DeleteGroupItem},
-	{method: http.MethodGet, path: "/channels/:id/models", permission: authz.ChannelRead, handler: controller.GetChannelModelOptions},
 	{method: http.MethodGet, path: "/:id/references", permission: authz.ChannelRead, handler: controller.ListGroupReferences},
 	{method: http.MethodPost, path: "/:id/references", permission: authz.ChannelWrite, handler: controller.AddGroupReference},
 	{method: http.MethodDelete, path: "/:id/references/:refGroupId", permission: authz.ChannelWrite, handler: controller.DeleteGroupReference},

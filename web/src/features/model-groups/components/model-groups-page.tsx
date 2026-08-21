@@ -37,6 +37,7 @@ import { Dialog } from '@/components/dialog'
 import { SectionPageLayout } from '@/components/layout'
 import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
+import { ComboboxInput, type ComboboxInputOption } from '@/components/ui/combobox-input'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -54,8 +55,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getChannelTypeLabel } from '@/features/channels/lib'
+import { getChannelTypeLabel, parseModelsList } from '@/features/channels/lib'
 import { getChannels } from '@/features/channels/api'
+import type { Channel } from '@/features/channels/types'
 
 import {
   listModelGroups,
@@ -66,7 +68,6 @@ import {
   addGroupItem,
   updateGroupItem,
   deleteGroupItem,
-  getChannelModelOptions,
   addGroupReference,
   deleteGroupReference,
   rebuildModelGroups,
@@ -115,14 +116,18 @@ export function ModelGroupsPage() {
 
   const { data: channelsData } = useQuery({
     queryKey: ['model-groups-channels'],
-    queryFn: () => getChannels({ p: 1, page_size: 100 }),
+    queryFn: async () => {
+      const items: Channel[] = []
+      for (let p = 1; p <= 50; p++) {
+        const res = await getChannels({ p, page_size: 100 })
+        const pageItems = res.data?.items ?? []
+        items.push(...pageItems)
+        const total = res.data?.total ?? items.length
+        if (pageItems.length === 0 || items.length >= total) break
+      }
+      return items
+    },
     enabled: !!addMemberGroup,
-  })
-
-  const { data: channelModels } = useQuery({
-    queryKey: ['model-group-channel-models', addChannelId],
-    queryFn: () => getChannelModelOptions(Number(addChannelId)),
-    enabled: !!addChannelId && Number(addChannelId) > 0,
   })
 
   const invalidate = () =>
@@ -329,6 +334,29 @@ export function ModelGroupsPage() {
       return diff !== 0 ? diff : a.name.localeCompare(b.name) * dir
     })
   }, [allGroups, keyword, sortBy, sortDir])
+
+  // All (channel, model) pairs across every channel, listed at once with
+  // client-side search in the add-member dialog.
+  const memberOptions = useMemo<ComboboxInputOption[]>(() => {
+    const options: ComboboxInputOption[] = []
+    for (const ch of channelsData ?? []) {
+      const name = ch.name || `#${ch.id}`
+      for (const m of parseModelsList(ch.models || '')) {
+        options.push({
+          value: `${ch.id}|${m}`,
+          label: `${m} · ${name} (#${ch.id})`,
+        })
+      }
+    }
+    return options
+  }, [channelsData])
+  const memberSelection = addChannelId && addModel ? `${addChannelId}|${addModel}` : ''
+  const handleMemberSelect = (value: string) => {
+    if (!value) return
+    const sep = value.indexOf('|')
+    setAddChannelId(value.slice(0, sep))
+    setAddModel(value.slice(sep + 1))
+  }
 
   const getEdit = (item: ModelGroupItem): MemberEditState => {
     const existing = edits[item.id]
@@ -787,43 +815,17 @@ export function ModelGroupsPage() {
               </p>
             </div>
           ) : (
-            <div className='space-y-3'>
-              <div>
-            <label className='text-muted-foreground mb-1 block text-sm'>
-              {t('Channel')}
-            </label>
-            <Select value={addChannelId} onValueChange={(v) => { setAddChannelId(v); setAddModel('') }}>
-              <SelectTrigger className='w-full'>
-                <SelectValue placeholder={t('Select a channel')} />
-              </SelectTrigger>
-              <SelectContent>
-                {(channelsData?.data?.items ?? []).map((ch: { id: number; name: string }) => (
-                  <SelectItem key={ch.id} value={String(ch.id)}>
-                    {ch.name} (#{ch.id})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {addChannelId && (
             <div>
               <label className='text-muted-foreground mb-1 block text-sm'>
-                {t('Model')}
+                {t('Channel model')}
               </label>
-              <Select value={addModel} onValueChange={setAddModel}>
-                <SelectTrigger className='w-full'>
-                  <SelectValue placeholder={t('Select a model on the channel')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {(channelModels ?? []).map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+              <ComboboxInput
+                options={memberOptions}
+                value={memberSelection}
+                onValueChange={handleMemberSelect}
+                placeholder={t('Search all channel models...')}
+                emptyText='No matching channel model.'
+              />
             </div>
           )}
         </div>
