@@ -594,6 +594,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 **新增（自动重建路由）：**
 - `controller/model_group_rebuild.go` - `RebuildModelGroups` handler：遍历所有已启用渠道，对 auto_sync=true 的渠道应用 pending 上游变更（add/remove）后同步模型组，对 auto_sync=false 的渠道直接同步（不触发检测、不改动 channel.Models），最后 `model.InitChannelCache()`；前端 `/model-groups` 页面「Rebuild Model Routing」按钮触发
+- **自动组成员增删权限收归系统**：`controller/model_group.go` `AddGroupItem`/`DeleteGroupItem` 对 `source=auto` 组返回错误（成员只由渠道初始化/重建路由增删），自动组仅允许手动改优先级/权重/启停；前端隐藏自动组「Add Member」按钮并禁用成员删除按钮
 - `router/model-group-router.go` - 注册 `POST /api/model-groups/rebuild`（权限 ChannelWrite）
 - `web/src/features/model-groups/lib/api.ts` - `rebuildModelGroups()` 函数
 - `web/src/features/model-groups/components/model-groups-page.tsx` - 页面顶部添加「Rebuild Model Routing」按钮（带旋转 loading 动画）
