@@ -57,6 +57,12 @@ func RebuildModelGroups(c *gin.Context) {
 			common.SysLog(fmt.Sprintf("rebuild: failed to apply upstream for channel #%d: %v", ch.Id, aerr))
 			continue
 		}
+		// applyChannelUpstreamModelUpdates only syncs groups when models
+		// actually changed; reconcile unconditionally so a rebuild always
+		// repairs group membership even with empty pending lists.
+		if serr := model.SyncModelGroupForChannel(ch); serr != nil {
+			common.SysLog(fmt.Sprintf("rebuild: failed to sync channel #%d: %v", ch.Id, serr))
+		}
 		onCount++
 	}
 
