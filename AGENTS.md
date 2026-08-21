@@ -2,28 +2,28 @@
 
 DO NOT send optional commentary
 
-## deploy 分支特有指引
+## 分支体系与魔改文档指引
 
-`deploy` 分支相对 `upstream/main` 存在**独有魔改功能与文档**。开始作业前，**必须先读取**以下分支独有文档并遵循其约定：
+本仓库多条分支承载魔改：`deploy`（部署线，GHCR 镜像由它构建）、`deploy-model`（模型级路由/模型组改造基线）、`personal`（基于 `deploy-model` 的开发线：模型组路由全套 + 计费/Ollama/订阅/OAuth/开放注册移除）。它们相对 `upstream/main` 存在**独有魔改功能与文档**。开始作业前，**必须先读取**以下魔改文档并遵循其约定：
 
 | 文档 | 内容 | 何时必须读 |
 |------|------|------------|
-| `docs/local-github-workflow.md` | 分支工作流：同步上游、冲突处理原则、**tag 触发构建规范**（`deploy-image` 滚动 tag / `deploy-image-<short_sha>` 留档）、部署流程 | 每次作业开始、涉及 git 操作/构建发布时 |
-| `docs/request-debug-customization-manifest.md` | deploy 分支**定制功能清单**：全部魔改功能、引入提交、上游冲突风险文件、功能详情与文件清单 | 每次作业开始；新增魔改功能时必须在此登记；需要核对既有魔改时 |
+| `docs/local-github-workflow.md` | 分支工作流：分支拓扑、同步上游、冲突处理原则、**tag 触发构建规范**（`deploy-image` 滚动 tag / `deploy-image-<short_sha>` 留档，仅适用 `deploy` 分支）、部署流程 | 每次作业开始、涉及 git 操作/构建发布时 |
+| `docs/request-debug-customization-manifest.md` | **定制功能清单**：deploy 线全部魔改功能 + 「personal 分支半重构登记」小节（模型组路由、计费/Ollama/订阅/OAuth/注册移除）、引入提交、上游冲突风险文件、功能详情与文件清单 | 每次作业开始；新增魔改功能时必须在此登记；需要核对既有魔改时 |
 | `docs/request-debug-logging-guide.md` | 请求调试日志部署指南（环境变量、日志清理、生产建议） | 作业涉及请求调试/日志相关功能时 |
 | `docs/superpowers/specs/2026-07-19-request-debug-logging-design.md` | 请求调试日志设计文档（架构、安全） | 作业涉及请求调试模块设计/改动时 |
 
-deploy 分支作业约定：
+deploy 线作业约定：
 
-- **核心设计目标**：deploy 分支面向将众多免费/公益站上游整合到 new-api 的场景，上游不稳定是可预见的常态。所有魔改功能的设计标准之一是：通过 new-api 的重试、渠道选择、限流、滑动窗口禁用等机制，消减上游不稳定性，为下游提供尽可能稳定的访问。
-- **改动最小化（合并上游的硬约束）**：新增魔改功能时，独立逻辑**优先用新增文件承载**（新 service/controller/middleware/组件/API 客户端），避免改动既有文件；必须改动既有文件时，限制为**最小必要 diff**——只做纯追加/局部插入，不修改、不删除、不重排已有代码，能不改就不改。改动文件越少、越偏向新增文件，后续合并 `upstream/main` 冲突越少、越轻松。任何改动方案先按此原则审查：先问「这个文件能不能不动」，再问「改动能不能再小」。**「扩展点织入」：魔改逻辑优先进入新增文件，既有文件只保留最小挂载点调用（详见 manifest「魔改开发约定」）；本分支与上游的同步采用 rebase 线性重放（见 docs/local-github-workflow.md）**。
-- 魔改功能**必须**登记进 `docs/request-debug-customization-manifest.md`（功能总览表 + 详情章节），并更新其头部 `对应分支` commit 标记与魔改提交序列；`docs/local-github-workflow.md`、`docs/request-debug-logging-guide.md` 头部 commit 标记同步刷新。
+- **核心设计目标**：deploy/deploy-model/personal 面向将众多免费/公益站上游整合到 new-api 的场景，上游不稳定是可预见的常态。所有魔改功能的设计标准之一是：通过 new-api 的重试、渠道选择、限流、滑动窗口禁用等机制，消减上游不稳定性，为下游提供尽可能稳定的访问（如渠道流速率降级、滑动窗口渠道自动禁用、同优先级重试）。
+- **改动最小化（合并上游的硬约束）**：新增魔改功能时，独立逻辑**优先用新增文件承载**（新 service/controller/middleware/组件/API 客户端），避免改动既有文件；必须改动既有文件时，限制为**最小必要 diff**——只做纯追加/局部插入，不修改、不删除、不重排已有代码，能不改就不改。改动文件越少、越偏向新增文件，后续合并 `upstream/main` 冲突越少、越轻松。任何改动方案先按此原则审查：先问「这个文件能不能不动」，再问「改动能不能再小」。**「扩展点织入」：魔改逻辑优先进入新增文件，既有文件只保留最小挂载点调用（详见 manifest「魔改开发约定」）；与本上游的同步采用 rebase 线性重放（见 docs/local-github-workflow.md）**。
+- 魔改功能**必须**登记进 `docs/request-debug-customization-manifest.md`（功能总览表 + 详情章节，deploy 线功能登记在 deploy 小节、personal 专属改动登记在「personal 分支半重构登记」小节），并更新其头部 `对应分支` commit 标记与魔改提交序列；`docs/local-github-workflow.md`、`docs/request-debug-logging-guide.md` 头部 commit 标记同步刷新。`personal` 分支的改动相对其基线 `deploy-model` 登记（`git log deploy-model..personal` 核对）。
 - 涉及 `controller/relay.go`、`relay/common/relay_info.go`、`web/src/features/usage-logs/components/dialogs/details-dialog.tsx` 等已知高风险冲突文件时，遵循 `docs/local-github-workflow.md` 的冲突处理原则（保留魔改 + 采纳上游语义）。
-- 构建/发布（强约束）：**仅当用户明确要求触发构建/发布时才执行** tag 推送流程。纯文档改动（`docs/`、`AGENTS.md`、manifest 登记、说明性提交）**禁止触发构建**——只提交推送 `deploy` 分支即可，不推送任何 `deploy*` tag。触发方式：按 `docs/local-github-workflow.md` 打 `deploy*` tag（滚动 `deploy-image` / 留档 `deploy-image-<short_sha>`）。无 GitHub token 时，用公开 API 定时轮询确认构建状态（方法见该文档「确认构建状态」）。
+- 构建/发布（强约束，**仅适用 `deploy` 分支**）：**仅当用户明确要求触发构建/发布时才执行** tag 推送流程。纯文档改动（`docs/`、`AGENTS.md`、manifest 登记、说明性提交）**禁止触发构建**——只提交推送对应分支即可，不推送任何 `deploy*` tag。触发方式：按 `docs/local-github-workflow.md` 打 `deploy*` tag（滚动 `deploy-image` / 留档 `deploy-image-<short_sha>`）。无 GitHub token 时，用公开 API 定时轮询确认构建状态（方法见该文档「确认构建状态」）。`personal`/`deploy-model`/`deploy-re` 不构建 GHCR 镜像，不打 tag。
 
 ## Overview
 
-This is an AI API gateway/proxy built with Go. It aggregates 40+ upstream AI providers (OpenAI, Claude, Gemini, Azure, AWS Bedrock, etc.) behind a unified API, with user management, billing, rate limiting, and an admin dashboard.
+This is an AI API gateway/proxy built with Go. It aggregates 40+ upstream AI providers (OpenAI, Claude, Gemini, Azure, AWS Bedrock, etc.) behind a unified API, with user management, rate limiting, and an admin dashboard. On this branch (`personal`), billing/top-up/subscription and OAuth/Passkey login have been removed; relay is free of charge (billing code paths are short-circuited, DB tables retained).
 
 ## Tech Stack
 
@@ -31,7 +31,7 @@ This is an AI API gateway/proxy built with Go. It aggregates 40+ upstream AI pro
 - **Frontend**: React 19, TypeScript, Rsbuild, Base UI, Tailwind CSS
 - **Databases**: SQLite, MySQL, PostgreSQL (all three must be supported)
 - **Cache**: Redis (go-redis) + in-memory cache
-- **Auth**: JWT, WebAuthn/Passkeys, OAuth (GitHub, Discord, OIDC, etc.)
+- **Auth**: JWT + password login + 2FA (OAuth/Passkey login removed on `personal`; model stubs retained)
 - **Frontend package manager**: Bun (preferred over npm/yarn/pnpm)
 
 ## Architecture
@@ -52,7 +52,6 @@ dto/           — Data transfer objects (request/response structs)
 constant/      — Constants (API types, channel types, context keys)
 types/         — Type definitions (relay formats, file sources, errors)
 i18n/          — Backend internationalization (go-i18n, en/zh)
-oauth/         — OAuth provider implementations
 pkg/           — Internal packages (cachex, ionet)
 web/           — Frontend (React 19, Rsbuild, Base UI, Tailwind)
   src/i18n/    — Frontend internationalization (i18next, en/zh/zh-TW/fr/ru/ja/vi)
