@@ -561,13 +561,13 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 > 对应分支：`personal`（基于基线 `7e6415e7`，原 deploy-model 分支已退役，2026-08-21 更新）
 > 本小节登记 `personal` 相对基线 `7e6415e7` 的半重构（`git log 7e6415e7..personal` 核对）。
-> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `c9148fb6`（修复成员优先级/权重继承失效）
+> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `c9148fb6`（修复成员优先级/权重继承失效）→ `6deec7b4`（上游请求改用成员真实上游模型）
 
 ## 模型组路由表（一等公民）
 
 ### 功能概述
 
-将「模型路由表」升级为一等公民的**模型组管理**：组名 = 路由模型名，成员 = 渠道上的真实上游模型，按成员优先级/权重路由。支持手动建组/调参/启用禁用、组级参数覆盖。渠道级 `model_mapping` 继续负责路由名→上游名翻译，relay 零改动。
+将「模型路由表」升级为一等公民的**模型组管理**：组名 = 路由模型名（下游展示名，可与上游模型无关），成员 = 渠道上的真实上游模型，按成员优先级/权重路由。支持手动建组/调参/启用禁用、组级参数覆盖。请求上游时自动把成员的真实上游模型织入该渠道的 `model_mapping`（显式配置的同名条目优先），relay 零改动。
 
 ### 文件清单
 
@@ -581,13 +581,14 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 - `web/src/features/model-groups/` - 前端页面（组列表 + 创建/启用禁用/删除）
 - `web/src/routes/_authenticated/model-groups/index.tsx` - 路由 `/model-groups`
 - `model/model_group_repair.go` - 一次性数据修复 `repairModelGroupItemInheritance`：成员 Priority/Weight 曾带 gorm `default:0`，GORM 对 nil 指针省列并回填 0，把「继承渠道值」（NULL）落库成显式 0 覆盖；修复去掉 tag 并把存量 0 值重置为 NULL（options 表 flag 保证只跑一次，修复后的显式 0 覆盖不受影响）
+- `model/model_group_upstream.go` - `ResolveModelGroupUpstreamModel`/`ApplyModelGroupMemberMapping`：路由名（组名）与上游模型解耦——手动组（如 ox）成员记录真实上游模型，选渠后把 `{组名: 上游模型}` 合并进该渠道 `model_mapping`，由既有 ModelMappedHelper 完成请求改写；显式渠道映射同名条目优先；内存缓存路径读 `modelGroupItemOverrides`（结构新增 model 字段），无缓存路径直接查表
 
 **改动（挂载点/最小插入）：**
 - `model/main.go` - AutoMigrate 注册 `&ModelGroup{}`/`&ModelGroupItem{}`；`migrateDB` 挂载 `repairModelGroupItemInheritance`
 - `model/ability.go` - `GetGroupEnabledModels`/`GetEnabledModels` 数据源改模型组（/v1/models）
-- `middleware/distributor.go` - 组级参数覆盖逐 key 覆盖渠道级
+- `model/channel_cache.go` - 路由索引数据源改模型组成员；`modelGroupItemOverrides`/`modelGroupParamOverride` 缓存（override 结构含成员上游模型）；`effectivePriority`/`effectiveWeight`
 - `controller/relay.go` - `processChannelError` 渠道级判定优先于模型级
-- `service/channel_model_disable.go` - `IsChannelLevelError` + `BannedUntil` 到期 + `ExtendChannelModelBan`
+- `middleware/distributor.go` - 组级参数覆盖逐 key 覆盖渠道级；`SetupContextForSelectedChannel` 织入成员上游模型映射
 - `model/channel_disabled_model.go` - `BannedUntil` 字段
 - `controller/channel-test.go` - 开头接入到期恢复
 - `web/src/hooks/use-sidebar-data.ts` - Admin 组「Model Groups」菜单项
