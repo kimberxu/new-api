@@ -555,7 +555,7 @@ export function ModelGroupsPage() {
                                       <Button
                                         variant='ghost'
                                         size='icon-sm'
-                                        disabled={!!item.source_group}
+                                        disabled={group.source === 'auto' || !!item.source_group}
                                         onClick={() =>
                                           setDeleteItemTarget({ group, item })
                                         }
@@ -570,22 +570,24 @@ export function ModelGroupsPage() {
                           </TableBody>
                         </Table>
                       )}
-                      <div className='mt-3'>
-                        <Button
-                          variant='outline'
-                          size='sm'
-                          onClick={() => {
-                            setAddMemberGroup(group)
-                            setAddChannelId('')
-                            setAddModel('')
-                            setAddRefMode('channel')
-                            setAddRefGroupId('')
-                          }}
-                        >
-                          <Plus className='mr-1 h-4 w-4' />
-                          {t('Add Member')}
-                        </Button>
-                      </div>
+                      {group.source !== 'auto' && (
+                        <div className='mt-3'>
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            onClick={() => {
+                              setAddMemberGroup(group)
+                              setAddChannelId('')
+                              setAddModel('')
+                              setAddRefMode('channel')
+                              setAddRefGroupId('')
+                            }}
+                          >
+                            <Plus className='mr-1 h-4 w-4' />
+                            {t('Add Member')}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
