@@ -39,8 +39,6 @@ const legacySettingsTabs: Record<string, string> = {
   dashboard: '/system-settings/content/dashboard',
   chats: '/system-settings/content/chat',
   drawing: '/system-settings/content/drawing',
-  payment: '/system-settings/billing/payment',
-  ratio: '/system-settings/billing/model-pricing',
   ratelimit: '/system-settings/security/rate-limit',
   models: '/system-settings/models/global',
   'model-deployment': '/system-settings/models/model-deployment',
