@@ -5143,6 +5143,10 @@
     "Remove Group Reference": "Supprimer la référence de groupe",
     "Remove reference": "Supprimer la référence",
     "Remove reference to {{ref}} from {{group}}? Its members will no longer be included.": "Supprimer la référence à {{ref}} de {{group}} ? Ses membres ne seront plus inclus.",
-    "Select a group to include all its members": "Sélectionner un groupe pour inclure tous ses membres"
+    "Select a group to include all its members": "Sélectionner un groupe pour inclure tous ses membres",
+    "Ascending": "Croissant",
+    "Descending": "Décroissant",
+    "Manual first": "Manuels en premier",
+    "Member count": "Nombre de membres"
   }
 }

@@ -20,9 +20,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Plus,
   RefreshCw,
   Save,
+  Search,
   Trash2,
   X,
 } from 'lucide-react'
@@ -102,6 +104,9 @@ export function ModelGroupsPage() {
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [edits, setEdits] = useState<Record<number, MemberEditState>>({})
   const [rebuilding, setRebuilding] = useState(false)
+  const [keyword, setKeyword] = useState('')
+  const [sortBy, setSortBy] = useState<'default' | 'name' | 'count'>('default')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const { data, isLoading } = useQuery({
     queryKey: ['model-groups'],
@@ -299,7 +304,31 @@ export function ModelGroupsPage() {
     })
   }
 
-  const groups = useMemo(() => data?.items ?? [], [data])
+  const allGroups = useMemo(() => data?.items ?? [], [data])
+
+  const visibleGroups = useMemo(() => {
+    const kw = keyword.trim().toLowerCase()
+    const filtered = kw
+      ? allGroups.filter(
+          (g) =>
+            g.name.toLowerCase().includes(kw) ||
+            (g.members ?? []).some((m) => m.model.toLowerCase().includes(kw))
+        )
+      : allGroups
+
+    const dir = sortDir === 'desc' ? -1 : 1
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'name') {
+        return a.name.localeCompare(b.name) * dir
+      }
+      if (sortBy === 'count') {
+        return ((a.member_count ?? 0) - (b.member_count ?? 0)) * dir
+      }
+      // default: manual groups first, then auto groups, each by name
+      const diff = (a.source === 'auto' ? 1 : 0) - (b.source === 'auto' ? 1 : 0)
+      return diff !== 0 ? diff : a.name.localeCompare(b.name) * dir
+    })
+  }, [allGroups, keyword, sortBy, sortDir])
 
   const getEdit = (item: ModelGroupItem): MemberEditState => {
     const existing = edits[item.id]
@@ -336,13 +365,71 @@ export function ModelGroupsPage() {
           <div className='text-muted-foreground p-8 text-center'>
             {t('Loading')}...
           </div>
-        ) : groups.length === 0 ? (
+        ) : allGroups.length === 0 ? (
           <div className='text-muted-foreground p-8 text-center'>
             {t('No Model Groups')}
           </div>
         ) : (
           <div className='space-y-4'>
-            {groups.map((group) => {
+            {/* Toolbar: keyword filter + sorting */}
+            <div className='flex flex-wrap items-center gap-2'>
+              <div className='relative min-w-0 flex-1 basis-48'>
+                <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2' />
+                <Input
+                  className='pl-8'
+                  placeholder={t('Search groups...')}
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                />
+              </div>
+              <Select
+                value={sortBy}
+                onValueChange={(v) =>
+                  setSortBy(v as 'default' | 'name' | 'count')
+                }
+              >
+                <SelectTrigger className='w-auto'>
+                  <SelectValue placeholder={t('Sort')}>
+                    {sortBy === 'default'
+                      ? t('Manual first')
+                      : sortBy === 'name'
+                        ? t('Name')
+                        : t('Member count')}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='default'>
+                    {t('Manual first')}
+                  </SelectItem>
+                  <SelectItem value='name'>{t('Name')}</SelectItem>
+                  <SelectItem value='count'>
+                    {t('Member count')}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant='outline'
+                size='icon-sm'
+                disabled={sortBy === 'default'}
+                onClick={() =>
+                  setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+                }
+                title={sortDir === 'asc' ? t('Ascending') : t('Descending')}
+              >
+                {sortDir === 'asc' ? (
+                  <ChevronUp className='h-4 w-4' />
+                ) : (
+                  <ChevronDown className='h-4 w-4' />
+                )}
+              </Button>
+            </div>
+
+            {visibleGroups.length === 0 ? (
+              <div className='text-muted-foreground p-8 text-center'>
+                {t('No matching results')}
+              </div>
+            ) : (
+              visibleGroups.map((group) => {
               const isExpanded = expanded.has(group.id)
               const members = group.members ?? []
               return (
@@ -592,7 +679,8 @@ export function ModelGroupsPage() {
                   )}
                 </div>
               )
-            })}
+            })
+            )}
           </div>
         )}
       </SectionPageLayout.Content>

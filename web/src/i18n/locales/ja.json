@@ -5143,6 +5143,10 @@
     "Remove Group Reference": "グループ参照を削除",
     "Remove reference": "参照を削除",
     "Remove reference to {{ref}} from {{group}}? Its members will no longer be included.": "{{group}} から {{ref}} への参照を削除しますか？そのメンバーは含まれなくなります。",
-    "Select a group to include all its members": "すべてのメンバーを含めるグループを選択"
+    "Select a group to include all its members": "すべてのメンバーを含めるグループを選択",
+    "Ascending": "昇順",
+    "Descending": "降順",
+    "Manual first": "手動グループを先頭",
+    "Member count": "メンバー数"
   }
 }
