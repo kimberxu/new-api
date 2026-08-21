@@ -1,6 +1,9 @@
 package model
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // SyncModelGroupForChannel aggregates a channel's models into model groups
 // (group name = routable model name). It is idempotent: existing members keep
@@ -64,4 +67,34 @@ func SyncAllModelGroups() error {
 		}
 	}
 	return nil
+}
+
+// DeleteEmptyAutoModelGroups removes auto-sourced groups whose member list
+// became empty (every channel dropped the model). References pointing at or
+// from them are cleaned up by DeleteModelGroup; manual groups are never
+// touched. Returns the removed group names.
+func DeleteEmptyAutoModelGroups() ([]string, error) {
+	groups, err := ListModelGroups(GroupSourceAuto)
+	if err != nil {
+		return nil, err
+	}
+	var rows []struct{ GroupId int }
+	if err := DB.Model(&ModelGroupItem{}).Select("DISTINCT group_id").Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	nonEmpty := make(map[int]bool, len(rows))
+	for _, r := range rows {
+		nonEmpty[r.GroupId] = true
+	}
+	var removed []string
+	for _, g := range groups {
+		if nonEmpty[g.Id] {
+			continue
+		}
+		if err := DeleteModelGroup(g.Id); err != nil {
+			return removed, fmt.Errorf("delete empty auto group %q: %w", g.Name, err)
+		}
+		removed = append(removed, g.Name)
+	}
+	return removed, nil
 }
