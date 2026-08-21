@@ -698,8 +698,7 @@ export function useChannelsColumns(
           const hasParamOverride = Boolean(channel.param_override?.trim())
           const otherSettings = parseChannelOtherSettings(channel.settings)
           const hasRateLimit =
-            otherSettings.rate_limit_enabled === true &&
-            (otherSettings.rate_limit_rpm ?? 0) > 0
+            otherSettings.rate_limit_enabled === true
           const demotedInfos = demoted.get(channel.id)
 
           return (
@@ -777,9 +776,11 @@ export function useChannelsColumns(
                           {hasRateLimit && (
                             <span>
                               {t('Rate limit configured')}
-                              {otherSettings.rate_limit_rpm
+                              {(otherSettings.rate_limit_rpm ?? 0) > 0
                                 ? ` · ${t('RPM')} ${otherSettings.rate_limit_rpm}`
-                                : ''}
+                                : ` · ${t('RPM')} (${t(
+                                    '0 uses the global default setting'
+                                  )})`}
                             </span>
                           )}
                         </TooltipContent>
