@@ -249,35 +249,50 @@ func GetDemotedPriority(channelId int, model string, originalPriority int64) (bo
 	key := memoryKey(channelId, model)
 	var demotedUntil int64
 
-	// 生成速率降级源
-	if setting.Enabled {
-		if common.RedisEnabled && common.RDB != nil {
-			if v, err := common.RDB.Get(context.Background(), slowStreamRedisDemotedKey(channelId, model)).Int64(); err == nil && v > demotedUntil {
-				demotedUntil = v
-			}
-		} else if value, ok := slowStreamMap.Load(key); ok {
-			state := value.(*demotionState)
-			state.mu.Lock()
-			if state.demotedUntil > demotedUntil {
-				demotedUntil = state.demotedUntil
-			}
-			state.mu.Unlock()
+	// Redis 模式：两源降级标记合并为一次 MGET，避免每渠道多次往返。
+	if common.RedisEnabled && common.RDB != nil {
+		var keys []string
+		if setting.Enabled {
+			keys = append(keys, slowStreamRedisDemotedKey(channelId, model))
 		}
-	}
-
-	// 首字延迟降级源
-	if setting.TtftEnabled {
-		if common.RedisEnabled && common.RDB != nil {
-			if v, err := common.RDB.Get(context.Background(), slowStreamRedisTtftDemotedKey(channelId, model)).Int64(); err == nil && v > demotedUntil {
-				demotedUntil = v
+		if setting.TtftEnabled {
+			keys = append(keys, slowStreamRedisTtftDemotedKey(channelId, model))
+		}
+		if len(keys) > 0 {
+			vals, err := common.RDB.MGet(context.Background(), keys...).Result()
+			if err == nil {
+				for _, v := range vals {
+					s, ok := v.(string)
+					if !ok {
+						continue
+					}
+					if n, err := strconv.ParseInt(s, 10, 64); err == nil && n > demotedUntil {
+						demotedUntil = n
+					}
+				}
 			}
-		} else if value, ok := slowStreamTtftMap.Load(key); ok {
-			state := value.(*demotionState)
-			state.mu.Lock()
-			if state.demotedUntil > demotedUntil {
-				demotedUntil = state.demotedUntil
+		}
+	} else {
+		// 内存模式：分别读两源的降级标记
+		if setting.Enabled {
+			if value, ok := slowStreamMap.Load(key); ok {
+				state := value.(*demotionState)
+				state.mu.Lock()
+				if state.demotedUntil > demotedUntil {
+					demotedUntil = state.demotedUntil
+				}
+				state.mu.Unlock()
 			}
-			state.mu.Unlock()
+		}
+		if setting.TtftEnabled {
+			if value, ok := slowStreamTtftMap.Load(key); ok {
+				state := value.(*demotionState)
+				state.mu.Lock()
+				if state.demotedUntil > demotedUntil {
+					demotedUntil = state.demotedUntil
+				}
+				state.mu.Unlock()
+			}
 		}
 	}
 
@@ -331,44 +346,79 @@ func CleanupExpiredDemotions() {
 	cleanupMap(slowStreamTtftMap)
 }
 
+// 降级来源常量：生成速率（tps）与首字延迟（ttft）。
+const (
+	DemotionSourceTps  = "tps"
+	DemotionSourceTtft = "ttft"
+)
+
 // DemotionInfo 单个 (channelId, model) 的降级状态，供渠道列表展示。
+// 两源同时生效时合并为一条记录，Sources 同时包含两个来源。
 type DemotionInfo struct {
-	Model            string `json:"model"`
-	RemainingSeconds int64  `json:"remaining_seconds"`
+	Model            string   `json:"model"`
+	RemainingSeconds int64    `json:"remaining_seconds"`
+	Sources          []string `json:"sources"`
 }
 
-type demotionCollector func(channelId int, model string, demotedUntil int64)
+type demotionCollector func(channelId int, model string, demotedUntil int64, source string)
 
 // ListDemoted 返回当前所有降级中的渠道（channelId -> 降级模型列表）。
 // 内存模式遍历两个 sync.Map；Redis 模式 SCAN 两个降级标记 key 前缀。
+// 同一 (channelId, model) 的两源降级合并为一条，RemainingSeconds 取较大值。
 func ListDemoted() map[int][]DemotionInfo {
 	setting := operation_setting.GetChannelSlowStreamSetting()
 	if !setting.Enabled && !setting.TtftEnabled {
 		return nil
 	}
 	now := time.Now().Unix()
-	result := make(map[int][]DemotionInfo)
-	add := func(channelId int, model string, demotedUntil int64) {
+	merged := make(map[int][]*DemotionInfo)
+	add := func(channelId int, model string, demotedUntil int64, source string) {
 		if demotedUntil <= now {
 			return
 		}
-		info := DemotionInfo{Model: model, RemainingSeconds: demotedUntil - now}
-		if existing, ok := result[channelId]; ok {
-			result[channelId] = append(existing, info)
-		} else {
-			result[channelId] = []DemotionInfo{info}
+		for _, info := range merged[channelId] {
+			if info.Model != model {
+				continue
+			}
+			if r := demotedUntil - now; r > info.RemainingSeconds {
+				info.RemainingSeconds = r
+			}
+			known := false
+			for _, s := range info.Sources {
+				if s == source {
+					known = true
+					break
+				}
+			}
+			if !known {
+				info.Sources = append(info.Sources, source)
+			}
+			return
 		}
+		merged[channelId] = append(merged[channelId], &DemotionInfo{
+			Model:            model,
+			RemainingSeconds: demotedUntil - now,
+			Sources:          []string{source},
+		})
 	}
 	if common.RedisEnabled && common.RDB != nil {
 		collectRedisDemoted(now, add)
-		return result
+	} else {
+		collectMemoryDemoted(&slowStreamMap, now, add, DemotionSourceTps)
+		collectMemoryDemoted(&slowStreamTtftMap, now, add, DemotionSourceTtft)
 	}
-	collectMemoryDemoted(&slowStreamMap, now, add)
-	collectMemoryDemoted(&slowStreamTtftMap, now, add)
+	result := make(map[int][]DemotionInfo, len(merged))
+	for channelId, infos := range merged {
+		list := make([]DemotionInfo, len(infos))
+		for i, info := range infos {
+			list[i] = *info
+		}
+		result[channelId] = list
+	}
 	return result
 }
 
-func collectMemoryDemoted(m *sync.Map, now int64, add demotionCollector) {
+func collectMemoryDemoted(m *sync.Map, now int64, add demotionCollector, source string) {
 	m.Range(func(key, value any) bool {
 		keyStr, ok := key.(string)
 		if !ok {
@@ -386,20 +436,23 @@ func collectMemoryDemoted(m *sync.Map, now int64, add demotionCollector) {
 		state.mu.Lock()
 		until := state.demotedUntil
 		state.mu.Unlock()
-		add(channelId, keyStr[sep+1:], until)
+		add(channelId, keyStr[sep+1:], until, source)
 		return true
 	})
 }
 
 func collectRedisDemoted(now int64, add demotionCollector) {
 	ctx := context.Background()
-	for _, prefix := range []string{
-		slowStreamRedisNamespace + ":demoted:*",
-		slowStreamRedisNamespace + ":ttftDemoted:*",
+	for _, p := range []struct {
+		prefix string
+		source string
+	}{
+		{slowStreamRedisNamespace + ":demoted:*", DemotionSourceTps},
+		{slowStreamRedisNamespace + ":ttftDemoted:*", DemotionSourceTtft},
 	} {
 		var cursor uint64
 		for {
-			keys, next, err := common.RDB.Scan(ctx, cursor, prefix, 100).Result()
+			keys, next, err := common.RDB.Scan(ctx, cursor, p.prefix, 100).Result()
 			if err != nil {
 				return
 			}
@@ -408,8 +461,8 @@ func collectRedisDemoted(now int64, add demotionCollector) {
 				if err != nil || until <= now {
 					continue
 				}
-				rest := strings.TrimPrefix(k, slowStreamRedisNamespace+":demoted:")
-				rest = strings.TrimPrefix(rest, slowStreamRedisNamespace+":ttftDemoted:")
+				rest := strings.TrimPrefix(k, slowStreamRedisNamespace+":")
+				rest = strings.TrimPrefix(strings.TrimPrefix(rest, "demoted:"), "ttftDemoted:")
 				sep := strings.Index(rest, ":")
 				if sep <= 0 {
 					continue
@@ -418,7 +471,7 @@ func collectRedisDemoted(now int64, add demotionCollector) {
 				if err != nil {
 					continue
 				}
-				add(channelId, rest[sep+1:], until)
+				add(channelId, rest[sep+1:], until, p.source)
 			}
 			cursor = next
 			if cursor == 0 {
