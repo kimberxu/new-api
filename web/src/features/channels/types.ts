@@ -190,6 +190,18 @@ export interface DemotedChannelInfo {
   sources?: string[]
 }
 
+export interface ChannelDisabledModelInfo {
+  id: number
+  channel_id: number
+  model: string
+  /** "auto" | "manual" */
+  source: string
+  reason: string
+  /** Unix seconds; 0 = permanent (manual bans). */
+  banned_until: number
+  created_at: number
+}
+
 export interface ChannelTestResponse {
   success: boolean
   message?: string

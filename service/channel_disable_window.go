@@ -76,16 +76,10 @@ func channelDisableWindowRedisTake(channelID int, statusCode int, tier string, t
 	return count >= int64(threshold)
 }
 
-// CheckAndRecordDisable records one channel error and returns true if the
-// sliding window threshold has been reached (i.e. the channel should be
-// disabled). tier selects which window parameters apply:
-//
-//   - isConfiguredError=true  → strict window (ConfiguredDisable*)
-//   - isConfiguredError=false → lenient window (UnconfiguredDisable*)
-//
-// The error identity key is channelID:statusCode:tier, so different status
-// codes and different tiers are counted independently.
-func CheckAndRecordDisable(channelID int, statusCode int, isConfiguredError bool) bool {
+// 返回值第二个元素为触发详情（如 "3 failures in 180s window (threshold 3)"），
+// 未触发时为空串；供禁用原因文案携带窗口数据，避免只报笼统的
+// "repeated failures within window"。
+func CheckAndRecordDisable(channelID int, statusCode int, isConfiguredError bool) (bool, string) {
 	var threshold int
 	var windowSec int64
 	var tier string
@@ -102,11 +96,18 @@ func CheckAndRecordDisable(channelID int, statusCode int, isConfiguredError bool
 
 	if threshold <= 0 {
 		// Threshold of 0 means "never disable" — safety guard.
-		return false
+		return false, ""
+	}
+
+	detail := func() string {
+		return fmt.Sprintf("%d failures in %ds window (threshold %d)", threshold, windowSec, threshold)
 	}
 
 	if common.RedisEnabled && common.RDB != nil {
-		return channelDisableWindowRedisTake(channelID, statusCode, tier, threshold, windowSec)
+		if channelDisableWindowRedisTake(channelID, statusCode, tier, threshold, windowSec) {
+			return true, detail()
+		}
+		return false, ""
 	}
 
 	// In-memory sliding window.
@@ -120,9 +121,13 @@ func CheckAndRecordDisable(channelID int, statusCode int, isConfiguredError bool
 	// create the queue and return true on the first call, so we handle it
 	// explicitly: the first error immediately triggers.
 	if threshold == 1 {
-		return true
+		return true, detail()
 	}
 
 	key := channelDisableWindowRedisKey(channelID, statusCode, tier)
-	return !getChannelDisableWindowMemoryLimiter().Request(key, threshold-1, windowSec)
+	triggered := !getChannelDisableWindowMemoryLimiter().Request(key, threshold-1, windowSec)
+	if triggered {
+		return true, detail()
+	}
+	return false, ""
 }

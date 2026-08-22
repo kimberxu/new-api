@@ -62,6 +62,12 @@ func resetChannelModelDisableWindowLimiter() {
 	_ = getChannelModelDisableWindowMemoryLimiter()
 }
 
+// recordDisableModel wraps CheckAndRecordDisableModel for boolean assertions.
+func recordDisableModel(channelID int, modelName string, statusCode int, isConfiguredError bool) bool {
+	triggered, _ := CheckAndRecordDisableModel(channelID, modelName, statusCode, isConfiguredError)
+	return triggered
+}
+
 func TestCheckAndRecordDisableModel_ConfiguredThreshold(t *testing.T) {
 	common.RedisEnabled = false
 	common.ConfiguredDisableThreshold = 2
@@ -69,8 +75,8 @@ func TestCheckAndRecordDisableModel_ConfiguredThreshold(t *testing.T) {
 	resetChannelModelDisableWindowLimiter()
 
 	// Default: configured threshold = 2.
-	assert.False(t, CheckAndRecordDisableModel(1, "gpt-4", 404, true), "first error should not trigger")
-	assert.True(t, CheckAndRecordDisableModel(1, "gpt-4", 404, true), "second error should trigger")
+	assert.False(t, recordDisableModel(1, "gpt-4", 404, true), "first error should not trigger")
+	assert.True(t, recordDisableModel(1, "gpt-4", 404, true), "second error should trigger")
 }
 
 func TestCheckAndRecordDisableModel_ModelsIndependent(t *testing.T) {
@@ -80,10 +86,10 @@ func TestCheckAndRecordDisableModel_ModelsIndependent(t *testing.T) {
 	resetChannelModelDisableWindowLimiter()
 
 	// gpt-4: 1 error; gpt-4o: fresh key.
-	assert.False(t, CheckAndRecordDisableModel(1, "gpt-4", 404, true))
-	assert.False(t, CheckAndRecordDisableModel(1, "gpt-4o", 404, true), "gpt-4o first error must not trigger (key includes model)")
+	assert.False(t, recordDisableModel(1, "gpt-4", 404, true))
+	assert.False(t, recordDisableModel(1, "gpt-4o", 404, true), "gpt-4o first error must not trigger (key includes model)")
 	// gpt-4: 2nd error triggers — proves the two models count independently.
-	assert.True(t, CheckAndRecordDisableModel(1, "gpt-4", 404, true))
+	assert.True(t, recordDisableModel(1, "gpt-4", 404, true))
 }
 
 func TestCheckAndRecordDisableModel_DifferentStatusCodesIndependent(t *testing.T) {
@@ -93,11 +99,11 @@ func TestCheckAndRecordDisableModel_DifferentStatusCodesIndependent(t *testing.T
 	resetChannelModelDisableWindowLimiter()
 
 	// Channel 1, gpt-4, status 404 — 1 configured error.
-	assert.False(t, CheckAndRecordDisableModel(1, "gpt-4", 404, true))
+	assert.False(t, recordDisableModel(1, "gpt-4", 404, true))
 	// Channel 1, gpt-4, status 400 — different key, fresh.
-	assert.False(t, CheckAndRecordDisableModel(1, "gpt-4", 400, true))
+	assert.False(t, recordDisableModel(1, "gpt-4", 400, true))
 	// Channel 1, gpt-4, status 404 — 2nd error triggers.
-	assert.True(t, CheckAndRecordDisableModel(1, "gpt-4", 404, true))
+	assert.True(t, recordDisableModel(1, "gpt-4", 404, true))
 }
 
 func TestCheckAndRecordDisableModel_DifferentChannelsIndependent(t *testing.T) {
@@ -107,11 +113,11 @@ func TestCheckAndRecordDisableModel_DifferentChannelsIndependent(t *testing.T) {
 	resetChannelModelDisableWindowLimiter()
 
 	// Channel 1, gpt-4 — 1 error.
-	assert.False(t, CheckAndRecordDisableModel(1, "gpt-4", 404, true))
+	assert.False(t, recordDisableModel(1, "gpt-4", 404, true))
 	// Channel 2 — fresh key.
-	assert.False(t, CheckAndRecordDisableModel(2, "gpt-4", 404, true))
+	assert.False(t, recordDisableModel(2, "gpt-4", 404, true))
 	// Channel 1 — 2nd error triggers.
-	assert.True(t, CheckAndRecordDisableModel(1, "gpt-4", 404, true))
+	assert.True(t, recordDisableModel(1, "gpt-4", 404, true))
 }
 
 func TestCheckAndRecordDisableModel_ThresholdOne(t *testing.T) {
@@ -120,7 +126,7 @@ func TestCheckAndRecordDisableModel_ThresholdOne(t *testing.T) {
 	common.ConfiguredDisableWindowSeconds = 600
 	resetChannelModelDisableWindowLimiter()
 
-	assert.True(t, CheckAndRecordDisableModel(1, "gpt-4", 404, true), "threshold=1 triggers immediately")
+	assert.True(t, recordDisableModel(1, "gpt-4", 404, true), "threshold=1 triggers immediately")
 }
 
 func TestCheckAndRecordDisableModel_ThresholdZero(t *testing.T) {
@@ -129,5 +135,5 @@ func TestCheckAndRecordDisableModel_ThresholdZero(t *testing.T) {
 	common.ConfiguredDisableWindowSeconds = 600
 	resetChannelModelDisableWindowLimiter()
 
-	assert.False(t, CheckAndRecordDisableModel(1, "gpt-4", 404, true), "threshold=0 never disables")
+	assert.False(t, recordDisableModel(1, "gpt-4", 404, true), "threshold=0 never disables")
 }

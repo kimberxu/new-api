@@ -467,9 +467,10 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 			if upstream := model.ResolveModelGroupUpstreamModel(relayInfo.OriginModelName, channelError.ChannelId); upstream != "" {
 				banModel = upstream
 			}
-			if service.CheckAndRecordDisableModel(channelError.ChannelId, banModel, err.StatusCode, true) {
+			if triggered, detail := service.CheckAndRecordDisableModel(channelError.ChannelId, banModel, err.StatusCode, true); triggered {
+				reason := fmt.Sprintf("model disabled: %s (%s)", err.ErrorWithStatusCode(), detail)
 				gopool.Go(func() {
-					_ = service.DisableChannelModel(channelError.ChannelId, banModel, err.ErrorWithStatusCode())
+					_ = service.DisableChannelModel(channelError.ChannelId, banModel, reason)
 				})
 			}
 		} else {
