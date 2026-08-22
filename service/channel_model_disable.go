@@ -163,15 +163,16 @@ func channelModelDisableWindowRedisTake(channelID int, modelName string, statusC
 	return count >= int64(threshold)
 }
 
-// CheckAndRecordDisableModel records one model-level error and returns true if
+// CheckAndRecordDisableModel records one model-level error and reports whether
 // the sliding-window threshold has been reached (i.e. the model on this
 // channel should be disabled). The identity key is
 // channelID:modelName:statusCode:tier, so different models, status codes and
 // tiers are counted independently.
 //
 // Model-level errors are always counted on the strict (configured) tier, since
-// they are explicit errors.
-func CheckAndRecordDisableModel(channelID int, modelName string, statusCode int, isConfiguredError bool) bool {
+// they are explicit errors. The second return value carries the trigger detail
+// (e.g. "3 failures in 60s window (threshold 3)"), empty when not triggered.
+func CheckAndRecordDisableModel(channelID int, modelName string, statusCode int, isConfiguredError bool) (bool, string) {
 	var threshold int
 	var windowSec int64
 	var tier string
@@ -188,20 +189,31 @@ func CheckAndRecordDisableModel(channelID int, modelName string, statusCode int,
 
 	if threshold <= 0 {
 		// Threshold of 0 means "never disable" — safety guard.
-		return false
+		return false, ""
+	}
+
+	detail := func() string {
+		return fmt.Sprintf("%d failures in %ds window (threshold %d)", threshold, windowSec, threshold)
 	}
 
 	if common.RedisEnabled && common.RDB != nil {
-		return channelModelDisableWindowRedisTake(channelID, modelName, statusCode, tier, threshold, windowSec)
+		if channelModelDisableWindowRedisTake(channelID, modelName, statusCode, tier, threshold, windowSec) {
+			return true, detail()
+		}
+		return false, ""
 	}
 
 	// In-memory sliding window: allow threshold-1 within the window and
 	// trigger on the threshold-th error. threshold=1 triggers immediately.
 	if threshold == 1 {
-		return true
+		return true, detail()
 	}
 	key := channelModelDisableWindowRedisKey(channelID, modelName, statusCode, tier)
-	return !getChannelModelDisableWindowMemoryLimiter().Request(key, threshold-1, windowSec)
+	triggered := !getChannelModelDisableWindowMemoryLimiter().Request(key, threshold-1, windowSec)
+	if triggered {
+		return true, detail()
+	}
+	return false, ""
 }
 
 // [personal] modelBanAutoDuration is how long an auto model-level ban lasts

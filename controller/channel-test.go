@@ -976,9 +976,10 @@ func testChannelForHealthCheck(ctx context.Context, channel *model.Channel, test
 	newAPIError := result.newAPIError
 	if newAPIError != nil {
 		if result.modelName != "" && service.IsModelLevelError(newAPIError) {
-			if service.CheckAndRecordDisableModel(channel.Id, result.modelName, newAPIError.StatusCode, true) {
+			if triggered, detail := service.CheckAndRecordDisableModel(channel.Id, result.modelName, newAPIError.StatusCode, true); triggered {
 				summary.Disabled++
-				_ = service.DisableChannelModel(channel.Id, result.modelName, newAPIError.ErrorWithStatusCode())
+				_ = service.DisableChannelModel(channel.Id, result.modelName,
+					fmt.Sprintf("model disabled: %s (%s)", newAPIError.ErrorWithStatusCode(), detail))
 			}
 		} else {
 			shouldBanChannel = service.ShouldDisableChannelWithDecision(channel.Id, result.newAPIError).ShouldDisable

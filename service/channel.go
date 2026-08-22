@@ -82,8 +82,8 @@ func ShouldDisableChannelWithDecision(channelID int, err *types.NewAPIError) Dis
 	}
 
 	if isConfigured {
-		if CheckAndRecordDisable(channelID, err.StatusCode, true) {
-			return DisableDecision{ShouldDisable: true, Reason: reason}
+		if triggered, detail := CheckAndRecordDisable(channelID, err.StatusCode, true); triggered {
+			return DisableDecision{ShouldDisable: true, Reason: fmt.Sprintf("%s; %s", reason, detail)}
 		}
 		return DisableDecision{}
 	}
@@ -92,10 +92,10 @@ func ShouldDisableChannelWithDecision(channelID int, err *types.NewAPIError) Dis
 	if err.StatusCode < 100 || err.StatusCode > 599 {
 		return DisableDecision{}
 	}
-	if CheckAndRecordDisable(channelID, err.StatusCode, false) {
+	if triggered, detail := CheckAndRecordDisable(channelID, err.StatusCode, false); triggered {
 		return DisableDecision{
 			ShouldDisable: true,
-			Reason:        fmt.Sprintf("status_code=%d repeated failures within window", err.StatusCode),
+			Reason:        fmt.Sprintf("channel disabled: status_code=%d (%s)", err.StatusCode, detail),
 		}
 	}
 	return DisableDecision{}
