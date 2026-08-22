@@ -1,8 +1,8 @@
 # 定制功能清单（deploy / personal 分支）
 
-> 对应分支：`personal` 基线 `7e6415e7`（2026-08-22 刷新至 `2ada174c`；deploy 线功能部分，可用 `git diff upstream/main...7e6415e7` 核对。注意：`deploy` 分支自分叉点 `ab4d296e`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
+> 对应分支：`personal` 基线 `7e6415e7`（2026-08-22 刷新至 `34904e15`；deploy 线功能部分，可用 `git diff upstream/main...7e6415e7` 核对。注意：`deploy` 分支自分叉点 `ab4d296e`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
 > 以下功能均为魔改线相对 `upstream/main` 的定制；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `7e6415e7` 的改动。
-> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ `62830da3`（流式结束原因分类与中断流语义）→ `3a1279f1`（实时连接追踪）→ `8119f0ac`（manifest 登记实时连接追踪）→ `e024c98c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `977d2d5a`（实时连接表格优化）→ `15e56fb6`（尾部随机请求 ID + 下游/上游双模型列）→ `fe1cc018`（三文档头部标记刷新至 629d15cf）→ `5704e700`（滑动窗口渠道自动禁用）→ `4f52c010`（partial_failure length 收尾 + 异常流记错误日志）→ `d03a4c73`（实时连接侧边栏入口迁至 general 组）→ `e4da650b`（日志 t/s 计算排除 TTFT）→ `021771ae`（渠道流速率降级） → `4dc6823b`（慢流式降级配置 UI + 排除渠道 + 默认开启） → `214f874f`（首字延迟 TTFT 降级源） → `54d85b26`（TTFT 采样 min_input_tokens 门槛） → `385a17b2`（降级改固定数量窗口 ring buffer） → `35b1dc11`（渠道列表降级/限流图标）→ `822c1f85`（渠道测试请求随机化问句池与 max_tokens）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `8726fe30`（cherry-pick deploy 渠道密钥查看放开安全验证）
+> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ `62830da3`（流式结束原因分类与中断流语义）→ `3a1279f1`（实时连接追踪）→ `8119f0ac`（manifest 登记实时连接追踪）→ `e024c98c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `977d2d5a`（实时连接表格优化）→ `15e56fb6`（尾部随机请求 ID + 下游/上游双模型列）→ `fe1cc018`（三文档头部标记刷新至 629d15cf）→ `5704e700`（滑动窗口渠道自动禁用）→ `4f52c010`（partial_failure length 收尾 + 异常流记错误日志）→ `d03a4c73`（实时连接侧边栏入口迁至 general 组）→ `e4da650b`（日志 t/s 计算排除 TTFT）→ `021771ae`（渠道流速率降级） → `4dc6823b`（慢流式降级配置 UI + 排除渠道 + 默认开启） → `214f874f`（首字延迟 TTFT 降级源） → `54d85b26`（TTFT 采样 min_input_tokens 门槛） → `385a17b2`（降级改固定数量窗口 ring buffer） → `35b1dc11`（渠道列表降级/限流图标）→ `822c1f85`（渠道测试请求随机化问句池与 max_tokens）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `8726fe30`（cherry-pick deploy 渠道密钥查看放开安全验证）→ `34904e15`（慢流降级接入模型组 DB 回退 + 两源 MGET 合并查询 + 降级徽章来源）
 
 ## 魔改开发约定（合并上游友好）
 
@@ -34,7 +34,7 @@
 | token 大数 K/M/B 分级显示 | `ea91ebf1`、`4ce5615c` | 低（`web/src/lib/currency.ts`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
 | 滑动窗口渠道自动禁用 | `5704e700` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） | `独立文件`（service/channel_disable_window.go）+ `挂载点`（channel.go/relay.go/channel-test.go） | 否 |
 | 日志 t/s 计算排除 TTFT | `e4da650b` | 低（`web/src/features/usage-logs/`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
-| 渠道流速率降级（含首字延迟 TTFT 降级） | `021771ae`、`4dc6823b` | 中（`model/channel_cache.go`、`service/quota.go`、`service/text_quota.go`、`web/src/features/system-settings/models/routing-reliability-section.tsx`） | `独立文件`（pkg/channel_slowstream/）+ `挂载点`（channel_cache.go/服务计费） | 否 |
+| 渠道流速率降级（含首字延迟 TTFT 降级） | `021771ae`、`4dc6823b`、`34904e15` | 中（`model/channel_cache.go`、`model/model_group_select.go`、`service/quota.go`、`service/text_quota.go`、`web/src/features/system-settings/models/routing-reliability-section.tsx`） | `独立文件`（pkg/channel_slowstream/）+ `挂载点`（channel_cache.go/model_group_select.go/服务计费） | 否 |
 | 模型级路由表前台化与模型级禁用（含 auto-ban 细化） | `702be7eb` | 中（`controller/relay.go`、`model/channel_cache.go`、`model/ability.go`、`controller/channel-test.go`） | `独立文件`（model/channel_disabled_model.go、service/channel_model_disable.go、controller/channel_ability.go、web/src/features/channel-abilities/）+ `挂载点`（channel_cache.go、ability.go、relay.go、channel-test.go、channel.go、main.go、channel-router.go） | 否 |
 | 渠道密钥查看放开安全验证 | `8726fe30`（cherry-pick 自 deploy `570561d1`） | 低（`router/channel-router.go`） | `内联`（纯删一行中间件，无可迁移逻辑） | 否 |
 
@@ -448,6 +448,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 **2026-08-18 增强（固定数量窗口 / ring buffer）**：判定从「时间窗口内连续慢」改为「最近 `sample_size` 次采样中慢事件达 `threshold` 次即触发」。快慢结果都入队，快结果只挤掉最旧样本、不洗白历史慢记录（容错更高，针对持续慢的渠道）；长请求不再受影响——3-5 分钟甚至更长的请求结束后才采样，但窗口按样本数量判定而非时间，不会因采样延迟导致窗口过期。`window_seconds`/`ttft_window_seconds` 废弃不再生效（保留字段兼容旧配置）。`threshold` 默认从 `1` 调至 `3`（1 次波动即降级容错太低）。
 
 **2026-08-18 增强（渠道页图标展示）**：渠道列表名称旁新增两个图标——降级中（`GET /api/channel/demoted` 轮询，显示降级模型与剩余恢复时长，5s 刷新）与渠道级速率限制已配置（`rate_limit_enabled` 且 rpm > 0）。图标仅展示，不影响渠道行为。
+**2026-08-22 增强（DB 回退路径接入 + 查询合并 + 徽章降级原因）**：模型组 DB 回退选择器 `GetRandomSatisfiedChannelFromGroups`（MemoryCache 关闭时生效）同样按 `(channelId, model)` 应用降级拍平，语义与内存路径一致（原先该路径完全无视降级——状态照显、路由不避让）；内存路径选择改为单次选择内每渠道只查询一次降级优先级、两段循环复用，Redis 模式两源降级标记合并为一次 `MGET`（原先最多 4N 次 GET/请求）；`GET /api/channel/demoted` 的 `DemotionInfo` 新增 `sources` 字段（`tps`=生成速率过慢、`ttft`=首字延迟过慢），同一渠道同一模型两源同时降级合并为一条记录、剩余时长取较大值，渠道列表降级徽章悬停显示各模型的降级原因与剩余恢复时长。
 
 ### 判定与降级语义
 
@@ -488,26 +489,28 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - Redis 模式：窗口 key `slowStream:{channelId}:{model}`（生成速率）与 `slowStream:ttftWindow:{channelId}:{model}`（首字延迟）复用 `LPUSH`（1=慢/0=快）+ `LTRIM`（保留 sample_size 条）+ `LRANGE` 统计慢次数 Lua；降级标记 key `slowStream:demoted:{channelId}:{model}` / `slowStream:ttftDemoted:{channelId}:{model}`（SET + EXPIRE，value = demotedUntil 时间戳）
 - 采样入口 `service.RecordFromRelayInfo` 挂在 `PostAudioConsumeQuota` / `PostTextConsumeQuota` 的 `gopool.Go` 中（纯追加一行，与 `RecordRelaySample` 并列）；同一适配器内先采样 TTFT（`frt`）再采样生成 TPS，两源独立调用
 - `GetDemotedPriority` 合并两源：任一降级标记未过期即降级，取 `min(originalPriority, demoted_priority)`
-- 渠道选择 `GetRandomSatisfiedChannel` 的 highestPriority 计算段与 targetChannels 收集段均将 `GetPriority()` 替换为降级感知版本（`GetDemotedPriority`），weight 与加权随机段不动；不修改缓存中的 `*Channel` 对象，降级为运行时计算
+- 渠道选择 `GetRandomSatisfiedChannel` 单次选择内每渠道预计算一次降级优先级（`demotedPriority` map），highestPriority 计算段与 targetChannels 收集段复用；weight 与加权随机段不动；不修改缓存中的 `*Channel` 对象，降级为运行时计算。`GetDemotedPriority` Redis 分支两源标记合并为一次 `MGET`；模型组 DB 回退选择器 `GetRandomSatisfiedChannelFromGroups` 同样按 `(channelId, model)` 应用降级拍平（effectivePriority → GetDemotedPriority → 取最高层）
 
 ### 文件清单
 
 - `pkg/channel_slowstream/tracker.go` - 双源滑动窗口（生成速率 + 首字延迟）+ 降级记录 + 查询 + 后台恢复（新文件，只依赖 `common` / `setting/operation_setting`，避免 `model → service` 与 `relay/common → operation_setting` 循环）
 - `service/channel_slow_stream_record.go` - `RecordFromRelayInfo` 采样适配（过滤 + TPS/TTFT 计算，新文件）
 - `setting/operation_setting/channel_slow_stream_setting.go` - 全局配置注册（新文件）
-- `model/channel_cache.go` - `GetRandomSatisfiedChannel` 两段降级覆盖（import `pkg/channel_slowstream`）
+- `model/channel_cache.go` - `GetRandomSatisfiedChannel` 单次选择预计算每渠道降级优先级并两段复用（import `pkg/channel_slowstream`）
+- `model/model_group_select.go` - `GetRandomSatisfiedChannelFromGroups` DB 回退选择器按 `(channelId, model)` 应用降级拍平（import `pkg/channel_slowstream`）
 - `service/quota.go` / `service/text_quota.go` - 采样点各追加一行 `RecordFromRelayInfo` 调用
 - `main.go` - `channelslowstream.Init()` 后台恢复 goroutine 入口
 - `controller/channel-demoted.go` - `GET /api/channel/demoted` 降级状态查询（新文件）
 - `router/channel-router.go` - 注册 /demoted 路由（ChannelRead 权限）
 - `web/src/features/channels/components/channels-provider.tsx` - 5s 轮询降级状态注入 context
-- `web/src/features/channels/components/channels-columns.tsx` - 名称列降级图标 + 速率限制图标（tooltip 显示模型/剩余时长/RPM）
+- `web/src/features/channels/components/channels-columns.tsx` - 名称列降级图标 + 速率限制图标（降级 tooltip 显示模型/降级原因/剩余时长，限流 tooltip 显示 RPM）
+- `web/src/features/channels/types.ts` - `DemotedChannelInfo` 新增 `sources` 字段（tps/ttft 降级来源，tooltip 展示用）
 - `web/src/features/channels/lib/channel-utils.ts` - `formatSeconds` 剩余时长格式化
 - `web/src/features/system-settings/models/routing-reliability-section.tsx` - Routing Reliability 下新增 Slow stream demotion 表单块（生成速率 8 项 + 首字延迟 4 项 + 排除渠道输入）
 - `web/src/features/system-settings/models/utils.ts` - 排除渠道显示/提交格式转换（`parseExcludeChannelIds` / `serializeExcludeChannelIds`）
 - `web/src/features/system-settings/models/index.tsx` / `section-registry.tsx` / `types.ts` - 默认值（默认开启、min_tps 8.0、threshold 3、sample_size 5、max_ttft_ms 5000、ttft_threshold 3）与字段透传
 - `web/src/i18n/locales/*.json` - 七语言文案
-- 测试：`pkg/channel_slowstream/tracker_test.go`（未启用/阈值触发/ring buffer 滑动窗口——快结果压出最旧样本不洗白/长间隔仍连续计数/续期/到期恢复/清理/快结果不取消降级/排除渠道不计数不降级/排除后历史降级即时失效/首字延迟阈值触发/两源独立计数互不干扰/首字延迟排除渠道/sample_size 小于 threshold 时 sanitize 兜底）、`model/channel_slow_stream_selection_test.go`（降级渠道跌出最高层 + 高层耗尽后级联）、`service/channel_slow_stream_record_test.go`（min_input_tokens 门槛生效）、`web/src/features/system-settings/models/__tests__/exclude-channel-ids.test.ts`（排除渠道格式转换）
+- 测试：`pkg/channel_slowstream/tracker_test.go`（未启用/阈值触发/ring buffer 滑动窗口——快结果压出最旧样本不洗白/长间隔仍连续计数/续期/到期恢复/清理/快结果不取消降级/排除渠道不计数不降级/排除后历史降级即时失效/首字延迟阈值触发/两源独立计数互不干扰/首字延迟排除渠道/sample_size 小于 threshold 时 sanitize 兜底/ListDemoted 两源合并为一条含 sources）、`model/channel_slow_stream_selection_test.go`（降级渠道跌出最高层 + 高层耗尽后级联 + MemoryCache 关闭时 DB 回退路径同样避让与饿死恢复）、`service/channel_slow_stream_record_test.go`（min_input_tokens 门槛生效）、`web/src/features/system-settings/models/__tests__/exclude-channel-ids.test.ts`（排除渠道格式转换）
 
 ---
 
