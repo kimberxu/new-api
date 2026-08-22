@@ -30,6 +30,10 @@ export interface ModelGroupItem {
   enabled: boolean
   channel_priority: number
   channel_weight: number
+  // live channel status: 1 enabled, 2 manually disabled, 3 auto disabled.
+  // Members on a non-enabled channel are excluded from routing even though
+  // item.enabled is true.
+  channel_status?: number
   // source_group is set when this member came from a referenced group
   // (empty = direct member of this group).
   source_group?: string
