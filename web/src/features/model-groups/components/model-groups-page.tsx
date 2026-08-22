@@ -58,7 +58,6 @@ import {
 } from '@/components/ui/table'
 import {
   formatSeconds,
-  getChannelTypeLabel,
   parseModelsList,
 } from '@/features/channels/lib'
 import { getChannels } from '@/features/channels/api'
@@ -650,9 +649,6 @@ export function ModelGroupsPage() {
                                   </TableCell>
                                   <TableCell className='font-medium'>
                                     #{item.channel_id} {item.channel_name}
-                                    <span className='text-muted-foreground ml-1 text-xs'>
-                                      {getChannelTypeLabel(item.channel_type)}
-                                    </span>
                                     {item.channel_status != null && item.channel_status !== 1 && (
                                       <StatusBadge
                                         variant={
