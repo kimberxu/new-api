@@ -21,6 +21,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import {
   AlertTriangle,
+  Ban,
   ChevronDown,
   ChevronRight,
   Gauge,
@@ -591,7 +592,7 @@ export function useChannelsColumns(
   } = {}
 ): ColumnDef<Channel>[] {
   const { t, i18n } = useTranslation()
-  const { sensitiveVisible, demoted } = useChannels()
+  const { sensitiveVisible, demoted, disabledModels } = useChannels()
   const enableSelection = options.enableSelection ?? true
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   // The column definitions only depend on the translation function, the active
@@ -776,6 +777,45 @@ export function useChannelsColumns(
                       </Tooltip>
                     </TooltipProvider>
                   )}
+                  {(() => {
+                    const disabledInfos = disabledModels.get(channel.id)
+                    if (!disabledInfos || disabledInfos.length === 0) return null
+                    const nowSec = Math.floor(Date.now() / 1000)
+                    return (
+                      <TooltipProvider delay={100}>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Ban className='text-destructive h-3.5 w-3.5 flex-shrink-0' />
+                            }
+                          />
+                          <TooltipContent side='top' className='max-w-xs'>
+                            <div className='flex flex-col gap-1'>
+                              <span className='font-medium'>
+                                {t('Model-level disabled')}
+                              </span>
+                              {disabledInfos.map((info) => (
+                                <span key={info.model} className='text-xs'>
+                                  {info.model} ·{' '}
+                                  {info.source === 'auto'
+                                    ? t('Auto')
+                                    : t('Manual')}
+                                  {info.reason ? ` · ${info.reason}` : ''}
+                                  {info.banned_until > nowSec
+                                    ? ` · ${t('recovers in')} ${formatSeconds(
+                                        info.banned_until - nowSec
+                                      )}`
+                                    : info.source === 'manual'
+                                      ? ` · ${t('Permanent')}`
+                                      : ''}
+                                </span>
+                              ))}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )
+                  })()}
                   {hasRateLimit && (
                     <TooltipProvider delay={100}>
                       <Tooltip>
@@ -1289,6 +1329,6 @@ export function useChannelsColumns(
         meta: { pinned: 'right' as const },
       },
     ],
-    [enableSelection, t, locale, sensitiveVisible, demoted]
+    [enableSelection, t, locale, sensitiveVisible, demoted, disabledModels]
   )
 }

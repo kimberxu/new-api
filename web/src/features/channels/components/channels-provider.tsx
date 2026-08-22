@@ -26,10 +26,10 @@ import React, {
   useMemo,
 } from 'react'
 
-import { getDemotedChannels } from '../api'
+import { getChannelDisabledModels, getDemotedChannels } from '../api'
 import { useChannelUpstreamUpdates } from '../hooks/use-channel-upstream-updates'
 import { channelsQueryKeys } from '../lib'
-import type { Channel, DemotedChannelInfo } from '../types'
+import type { Channel, ChannelDisabledModelInfo, DemotedChannelInfo } from '../types'
 
 // ============================================================================
 // Types
@@ -66,6 +66,7 @@ type ChannelsContextType = {
   setSensitiveVisible: (visible: boolean) => void
   upstream: UpstreamUpdateState
   demoted: Map<number, DemotedChannelInfo[]>
+  disabledModels: Map<number, ChannelDisabledModelInfo[]>
 }
 
 // ============================================================================
@@ -117,6 +118,24 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
     return map
   }, [demotedData])
 
+  // 模型级禁用记录（不影响渠道整体状态）。30s 轮询 + 失焦不可见时暂停。
+  const { data: disabledModelsData } = useQuery({
+    queryKey: [...channelsQueryKeys.all, 'disabled-models'],
+    queryFn: getChannelDisabledModels,
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
+  })
+  const disabledModels = useMemo(() => {
+    const map = new Map<number, ChannelDisabledModelInfo[]>()
+    const raw = disabledModelsData?.data
+    if (raw) {
+      for (const [channelId, infos] of Object.entries(raw)) {
+        map.set(Number(channelId), infos)
+      }
+    }
+    return map
+  }, [disabledModelsData])
+
   // useState setters are stable, so the context value only needs to change when
   // an actual state value changes. Memoizing avoids handing every consumer
   // (including all channel cards/cells) a brand-new object on each render.
@@ -137,6 +156,7 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
       sensitiveVisible,
       setSensitiveVisible,
       upstream,
+      disabledModels,
       demoted,
     }),
     [
@@ -148,6 +168,7 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
       batchMode,
       sensitiveVisible,
       upstream,
+      disabledModels,
       demoted,
     ]
   )

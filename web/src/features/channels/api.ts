@@ -25,6 +25,7 @@ import type {
   BatchSetTagParams,
   Channel,
   ChannelBalanceResponse,
+  ChannelDisabledModelInfo,
   ChannelOpsResponse,
   ChannelTestResponse,
   CopyChannelParams,
@@ -125,10 +126,17 @@ export async function getChannelOps(): Promise<ChannelOpsResponse> {
 }
 
 export async function getDemotedChannels(): Promise<{
-  success: boolean
   data: Record<number, DemotedChannelInfo[]>
 }> {
   const res = await api.get('/api/channel/demoted', channelActionConfig())
+  return res.data
+}
+
+export async function getChannelDisabledModels(): Promise<{
+  success: boolean
+  data: Record<number, ChannelDisabledModelInfo[]>
+}> {
+  const res = await api.get('/api/channel/disabled_models', channelActionConfig())
   return res.data
 }
 
