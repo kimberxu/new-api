@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 
 	"github.com/QuantumNous/new-api/common"
+	channelslowstream "github.com/QuantumNous/new-api/pkg/channel_slowstream"
 )
 
 // selectRow is one candidate member: a (channel, upstream model) pair from an
@@ -70,10 +71,19 @@ func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChan
 		return nil, nil
 	}
 
-	// Highest effective priority tier.
-	highest := rows[0].priority()
+	// Highest effective priority tier, with slow-stream demotion applied
+	// per (requested model, channel): mirrors the memory-cache path so
+	// demotion stays effective when MemoryCache is disabled.
+	effectivePriority := func(r selectRow) int64 {
+		p := r.priority()
+		if demoted, dp := channelslowstream.GetDemotedPriority(r.ChannelId, model, p); demoted {
+			return dp
+		}
+		return p
+	}
+	highest := effectivePriority(rows[0])
 	for _, r := range rows[1:] {
-		if p := r.priority(); p > highest {
+		if p := effectivePriority(r); p > highest {
 			highest = p
 		}
 	}
@@ -85,7 +95,7 @@ func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChan
 	var top []draw
 	sumWeight := 0
 	for _, r := range rows {
-		if r.priority() == highest {
+		if effectivePriority(r) == highest {
 			w := r.weight()
 			sumWeight += w
 			top = append(top, draw{r.ChannelId, w})

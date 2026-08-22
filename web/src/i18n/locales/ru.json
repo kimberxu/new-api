@@ -3966,6 +3966,8 @@
     "Skip to Main": "Перейти к основному содержимому",
     "Slow event sample size": "Размер выборки медленных событий",
     "Slow events to trigger demotion": "Число медленных событий для понижения",
+    "Slow first-token latency": "Большая задержка первого токена",
+    "Slow generation rate": "Низкая скорость генерации",
     "Slow stream demotion": "Понижение медленных потоков",
     "Slug": "Идентификатор",
     "Slug can only contain letters, numbers, hyphens, and underscores": "Slug может содержать только буквы, цифры, дефисы и подчёркивания",

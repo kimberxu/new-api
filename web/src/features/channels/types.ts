@@ -186,6 +186,8 @@ export interface ChannelOpsResponse {
 export interface DemotedChannelInfo {
   model: string
   remaining_seconds: number
+  /** Demotion sources: "tps" (slow generation rate), "ttft" (slow first-token latency). */
+  sources?: string[]
 }
 
 export interface ChannelTestResponse {

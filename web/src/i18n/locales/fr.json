@@ -3966,6 +3966,8 @@
     "Skip to Main": "Aller au contenu principal",
     "Slow event sample size": "Taille d'échantillon des événements lents",
     "Slow events to trigger demotion": "Événements lents déclenchant le déclassement",
+    "Slow first-token latency": "Latence du premier token élevée",
+    "Slow generation rate": "Vitesse de génération lente",
     "Slow stream demotion": "Déclassement des flux lents",
     "Slug": "Slug",
     "Slug can only contain letters, numbers, hyphens, and underscores": "Le slug ne peut contenir que des lettres, des chiffres, des tirets et des underscores",

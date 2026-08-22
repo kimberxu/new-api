@@ -3966,6 +3966,8 @@
     "Skip to Main": "メインコンテンツへスキップ",
     "Slow event sample size": "遅延イベントのサンプル数",
     "Slow events to trigger demotion": "降格をトリガーする遅延イベント数",
+    "Slow first-token latency": "初回トークンの遅延が大きい",
+    "Slow generation rate": "生成速度が遅い",
     "Slow stream demotion": "低速ストリーム降格",
     "Slug": "スラッグ",
     "Slug can only contain letters, numbers, hyphens, and underscores": "スラッグには英数字、ハイフン、アンダースコアのみ使用できます",

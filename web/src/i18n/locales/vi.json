@@ -3966,6 +3966,8 @@
     "Skip to Main": "Bỏ qua đến nội dung chính",
     "Slow event sample size": "Kích thước mẫu sự kiện chậm",
     "Slow events to trigger demotion": "Số sự kiện chậm để kích hoạt hạ cấp",
+    "Slow first-token latency": "Độ trễ token đầu tiên lớn",
+    "Slow generation rate": "Tốc độ tạo chậm",
     "Slow stream demotion": "Hạ cấp luồng chậm",
     "Slug": "Slug",
     "Slug can only contain letters, numbers, hyphens, and underscores": "Slug chỉ có thể chứa chữ cái, số, dấu gạch ngang và dấu gạch dưới",
