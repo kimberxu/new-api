@@ -653,6 +653,20 @@ export function ModelGroupsPage() {
                                     <span className='text-muted-foreground ml-1 text-xs'>
                                       {getChannelTypeLabel(item.channel_type)}
                                     </span>
+                                    {item.channel_status != null && item.channel_status !== 1 && (
+                                      <StatusBadge
+                                        variant={
+                                          item.channel_status === 3 ? 'warning' : 'danger'
+                                        }
+                                        size='sm'
+                                        showDot
+                                        className='ml-1 align-middle'
+                                      >
+                                        {item.channel_status === 3
+                                          ? t('Auto Disabled')
+                                          : t('Manually Disabled')}
+                                      </StatusBadge>
+                                    )}
                                   </TableCell>
                                   <TableCell>
                                     <Input
