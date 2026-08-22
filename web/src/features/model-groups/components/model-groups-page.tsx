@@ -649,7 +649,7 @@ export function ModelGroupsPage() {
                                     )}
                                   </TableCell>
                                   <TableCell className='font-medium'>
-                                    {item.channel_name || `#${item.channel_id}`}
+                                    #{item.channel_id} {item.channel_name}
                                     <span className='text-muted-foreground ml-1 text-xs'>
                                       {getChannelTypeLabel(item.channel_type)}
                                     </span>
