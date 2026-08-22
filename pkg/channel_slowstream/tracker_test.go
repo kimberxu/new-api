@@ -322,6 +322,29 @@ func TestListDemoted_MemoryMode(t *testing.T) {
 	require.Empty(t, demoted)
 }
 
+func TestListDemoted_MergesBothSourcesPerModel(t *testing.T) {
+	// 同一 (channelId, model) 两源同时降级必须合并为一条记录，
+	// Sources 同时含 tps 与 ttft（前端悬停展示降级原因依赖此字段）。
+	cfg := setupTest(t, true)
+	cfg.Threshold = 1
+	cfg.TtftThreshold = 1
+	assert.True(t, RecordSlowStream(7, "gpt-4o", 1.0))
+	assert.True(t, RecordSlowTtft(7, "gpt-4o", 9000))
+
+	demoted := ListDemoted()
+	require.Len(t, demoted[7], 1)
+	info := demoted[7][0]
+	assert.Equal(t, "gpt-4o", info.Model)
+	assert.ElementsMatch(t, []string{DemotionSourceTps, DemotionSourceTtft}, info.Sources)
+	assert.Greater(t, info.RemainingSeconds, int64(0))
+
+	// 单源降级只报该来源
+	assert.True(t, RecordSlowStream(8, "gpt-4o", 1.0))
+	demoted = ListDemoted()
+	require.Len(t, demoted[8], 1)
+	assert.Equal(t, []string{DemotionSourceTps}, demoted[8][0].Sources)
+}
+
 func TestListDemoted_AllDisabled_ReturnsEmpty(t *testing.T) {
 	setupTest(t, false)
 	assert.Nil(t, ListDemoted())

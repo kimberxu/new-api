@@ -65,3 +65,57 @@ func TestGetRandomSatisfiedChannelSlowStreamDemotion(t *testing.T) {
 	require.NotNil(t, ch)
 	assert.Equal(t, 401, ch.Id, "demoted channel must be selectable after higher tier exhausted")
 }
+
+func TestGetRandomSatisfiedChannelFromGroupsSlowStreamDemotion(t *testing.T) {
+	// MemoryCache 关闭时走模型组 DB 回退选择器，降级语义必须与内存路径一致。
+	originalMemoryCacheEnabled := common.MemoryCacheEnabled
+	common.MemoryCacheEnabled = false
+	t.Cleanup(func() { common.MemoryCacheEnabled = originalMemoryCacheEnabled })
+
+	cfg := config.GlobalConfig.Get("channel_slow_stream_setting").(*operation_setting.ChannelSlowStreamSetting)
+	origCfg := *cfg
+	*cfg = operation_setting.ChannelSlowStreamSetting{
+		Enabled:           true,
+		MinTps:            5.0,
+		WindowSeconds:     300,
+		Threshold:         3,
+		MinOutputTokens:   50,
+		DemoteDurationSec: 600,
+		DemotedPriority:   0,
+	}
+	t.Cleanup(func() { *cfg = origCfg })
+
+	insertChannelSelectionTestData(t, []struct {
+		id       int
+		priority int64
+		weight   uint
+	}{
+		{id: 411, priority: 5, weight: 1},
+		{id: 412, priority: 5, weight: 1},
+	})
+
+	// 未降级：两个渠道同层，均可能被选中
+	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, "", nil)
+	require.NoError(t, err)
+	require.NotNil(t, ch)
+	require.Contains(t, []int{411, 412}, ch.Id)
+
+	// 触发渠道 411 降级（连续 3 次慢速）
+	assert.False(t, channelslowstream.RecordSlowStream(411, "test-model", 1.0))
+	assert.False(t, channelslowstream.RecordSlowStream(411, "test-model", 1.0))
+	assert.True(t, channelslowstream.RecordSlowStream(411, "test-model", 1.0))
+
+	// 降级后：DB 回退路径同样必须避开 411
+	for range 10 {
+		ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, "", nil)
+		require.NoError(t, err)
+		require.NotNil(t, ch)
+		assert.Equal(t, 412, ch.Id, "demoted channel 411 must not be selected via DB fallback while 412 is available")
+	}
+
+	// 排除 412 后：411 成为唯一最高层，级联选中，不会永久饿死
+	ch, err = GetRandomSatisfiedChannel("default", "test-model", 0, "", []int{412})
+	require.NoError(t, err)
+	require.NotNil(t, ch)
+	assert.Equal(t, 411, ch.Id, "demoted channel must be selectable via DB fallback after higher tier exhausted")
+}

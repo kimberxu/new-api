@@ -251,16 +251,22 @@ return GetRandomSatisfiedChannelFromGroups(group, model, excludeChannels)
 	// Pick the highest priority among the remaining (non-excluded) channels.
 	// retry no longer indexes into a sorted priority list: the same tier keeps
 	// being re-rolled until its channels are exhausted via excludeChannels.
-	highestPriority := int64(0)
-	first := true
+	// [deploy 分支定制] 慢速渠道降级：每渠道只查询一次降级优先级，两段循环复用，
+	// 避免 Redis 模式下同一选择内的重复往返。
+	demotedPriority := make(map[int]int64, len(channels))
 	for _, channelId := range channels {
 		if _, ok := channelsIDM[channelId]; !ok {
 			return nil, fmt.Errorf("数据库一致性错误,渠道# %d 不存在,请联系管理员修复", channelId)
 		}
-		// [personal] member-level override wins, else channel priority
+		if demoted, p := channelslowstream.GetDemotedPriority(channelId, model, effectivePriority(channelId, model)); demoted {
+			demotedPriority[channelId] = p
+		}
+	}
+	highestPriority := int64(0)
+	first := true
+	for _, channelId := range channels {
 		priority := effectivePriority(channelId, model)
-		// [deploy 分支定制] 慢速渠道降级：priority 拍平
-		if demoted, p := channelslowstream.GetDemotedPriority(channelId, model, priority); demoted {
+		if p, ok := demotedPriority[channelId]; ok {
 			priority = p
 		}
 		if first || priority > highestPriority {
@@ -276,8 +282,8 @@ return GetRandomSatisfiedChannelFromGroups(group, model, excludeChannels)
 		if channel, ok := channelsIDM[channelId]; ok {
 			// [personal] member-level override wins, else channel priority
 			priority := effectivePriority(channelId, model)
-			// [deploy 分支定制] 慢速渠道降级：priority 拍平
-			if demoted, p := channelslowstream.GetDemotedPriority(channelId, model, priority); demoted {
+			// [deploy 分支定制] 慢速渠道降级：priority 拍平（复用预计算结果）
+			if p, ok := demotedPriority[channelId]; ok {
 				priority = p
 			}
 			if priority == highestPriority {

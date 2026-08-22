@@ -4085,6 +4085,8 @@
     "Skip SMTP TLS certificate verification": "Skip SMTP TLS certificate verification",
     "Skip to Main": "Skip to Main",
     "Slow events to trigger demotion": "Slow events to trigger demotion",
+    "Slow first-token latency": "Slow first-token latency",
+    "Slow generation rate": "Slow generation rate",
     "Slow stream demotion": "Slow stream demotion",
     "Slug": "Slug",
     "Slug can only contain letters, numbers, hyphens, and underscores": "Slug can only contain letters, numbers, hyphens, and underscores",

@@ -4085,6 +4085,8 @@
     "Skip SMTP TLS certificate verification": "跳過 SMTP TLS 證書驗證",
     "Skip to Main": "跳到主內容",
     "Slow events to trigger demotion": "觸發降級的慢速次數",
+    "Slow first-token latency": "首字延遲過慢",
+    "Slow generation rate": "生成速率過慢",
     "Slow stream demotion": "慢速串流降級",
     "Slug": "標識符",
     "Slug can only contain letters, numbers, hyphens, and underscores": "Slug 只能包含字母、數字、連字符和底線",

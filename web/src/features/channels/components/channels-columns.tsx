@@ -753,12 +753,24 @@ export function useChannelsColumns(
                             <span className='font-medium'>
                               {t('Temporarily demoted (slow latency)')}
                             </span>
-                            {demotedInfos.map((info) => (
-                              <span key={info.model} className='text-xs'>
-                                {info.model} · {t('recovers in')}{' '}
-                                {formatSeconds(info.remaining_seconds)}
-                              </span>
-                            ))}
+                            {demotedInfos.map((info) => {
+                              const reasons = (info.sources ?? [])
+                                .map((s) =>
+                                  s === 'tps'
+                                    ? t('Slow generation rate')
+                                    : t('Slow first-token latency')
+                                )
+                                .join(' + ')
+                              return (
+                                <span key={info.model} className='text-xs'>
+                                  {info.model}
+                                  {reasons ? ` · ${reasons}` : ''}
+                                  {' · '}
+                                  {t('recovers in')}{' '}
+                                  {formatSeconds(info.remaining_seconds)}
+                                </span>
+                              )
+                            })}
                           </div>
                         </TooltipContent>
                       </Tooltip>
