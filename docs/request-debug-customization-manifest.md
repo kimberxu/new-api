@@ -1,6 +1,6 @@
 # 定制功能清单（deploy / personal 分支）
 
-> 对应分支：`personal` 基线 `7e6415e7`（2026-08-22 刷新至 `d7b4576f`；deploy 线功能部分，可用 `git diff upstream/main...7e6415e7` 核对。注意：`deploy` 分支自分叉点 `ab4d296e`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
+> 对应分支：`personal` 基线 `7e6415e7`（2026-08-24 刷新至 `e2238bc0`；deploy 线功能部分，可用 `git diff upstream/main...7e6415e7` 核对。注意：`deploy` 分支自分叉点 `ab4d296e`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
 > 以下功能均为魔改线相对 `upstream/main` 的定制；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `7e6415e7` 的改动。
 > 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ `62830da3`（流式结束原因分类与中断流语义）→ `3a1279f1`（实时连接追踪）→ `8119f0ac`（manifest 登记实时连接追踪）→ `e024c98c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `977d2d5a`（实时连接表格优化）→ `15e56fb6`（尾部随机请求 ID + 下游/上游双模型列）→ `fe1cc018`（三文档头部标记刷新至 629d15cf）→ `5704e700`（滑动窗口渠道自动禁用）→ `4f52c010`（partial_failure length 收尾 + 异常流记错误日志）→ `d03a4c73`（实时连接侧边栏入口迁至 general 组）→ `e4da650b`（日志 t/s 计算排除 TTFT）→ `021771ae`（渠道流速率降级） → `4dc6823b`（慢流式降级配置 UI + 排除渠道 + 默认开启） → `214f874f`（首字延迟 TTFT 降级源） → `54d85b26`（TTFT 采样 min_input_tokens 门槛） → `385a17b2`（降级改固定数量窗口 ring buffer） → `35b1dc11`（渠道列表降级/限流图标）→ `822c1f85`（渠道测试请求随机化问句池与 max_tokens）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `8726fe30`（cherry-pick deploy 渠道密钥查看放开安全验证）→ `34904e15`（慢流降级接入模型组 DB 回退 + 两源 MGET 合并查询 + 降级徽章来源）→ `d7b4576f`（自动禁用原因细化 + 渠道/模型级禁用区分展示）
 
@@ -589,7 +589,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 > 对应分支：`personal`（基于基线 `7e6415e7`，原 deploy-model 分支已退役，2026-08-21 更新）
 > 本小节登记 `personal` 相对基线 `7e6415e7` 的半重构（`git log 7e6415e7..personal` 核对）。
-> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `c9148fb6`（修复成员优先级/权重继承失效）→ `6deec7b4`（上游请求改用成员真实上游模型）→ `6702a043`（移除系统设置 Billing 页残留）→ `e9456b25`（模型组引用成员开放编辑）→ `3711a3b6`（添加成员界面全量列表化 + 搜索）→ `2e2acbe5`（勾选多选批量添加）→ `aa882479`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `2ada174c`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）
+> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `c9148fb6`（修复成员优先级/权重继承失效）→ `6deec7b4`（上游请求改用成员真实上游模型）→ `6702a043`（移除系统设置 Billing 页残留）→ `e9456b25`（模型组引用成员开放编辑）→ `3711a3b6`（添加成员界面全量列表化 + 搜索）→ `2e2acbe5`（勾选多选批量添加）→ `aa882479`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `2ada174c`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `e2238bc0`（禁用徽章悬停显示级别/原因/时间）
 
 ## 模型组路由表（一等公民）
 
@@ -604,6 +604,8 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 **成员级封禁显示与模型级禁用键修正（2026-08-22）**：`processChannelError` 的模型级自动禁用此前以请求模型名（= 组名）作禁用键，而缓存排除、DB 排除与页面匹配均按 `channel_disabled_models.model` = 成员真实上游模型——手动组（组名≠成员模型，如 ox→real-model）的禁用记录永远无法命中，被封成员仍参与选路。现记录前经 `ResolveModelGroupUpstreamModel` 把禁用键解析为路由条目模型（auto 组同名成员解析为空、回落组名，行为不变）。`/model-groups` 页面首次消费后端既有 `GroupItemView.Disabled` 字段：组头显示「N banned」警告徽章；成员行模型列显示封禁徽章——auto 来源显示剩余时长（tooltip 为 reason，已过期显示「Banned」），manual 来源显示「Disabled」；成员表 Model/Channel 列互换（Model 在前）。i18n 新增 3 键七语言。
 
 **成员视图透出渠道实时状态 + 渠道禁用徽章（2026-08-22）**：渠道被手动/自动禁用后，模型组路由三条路径（内存缓存索引、DB 兜底选路、`/v1/models` 列表）均按 `channels.status = enabled` 实时过滤、行为本就正确；但 `/model-groups` 页面此前无法看出成员所在渠道已被禁用（`GroupMemberView` 不带渠道状态），成员仍显示为正常启用，管理员易误判其仍在参与路由。现 `GroupMemberView` 新增 `channel_status int` 字段（复用 `getGroupMemberViews` 既有的逐成员 `GetChannelById` 解析，零额外查询），前端在成员行渠道列追加徽章：手动禁用红色「Manually Disabled」、自动禁用黄色「Auto Disabled」（均复用既有七语言 key，未新增文案）。
+
+**禁用徽章悬停显示级别/原因/时间（2026-08-24）**：上一增强的徽章只有文字、无法区分「渠道级禁用」与「模型级禁用」，也看不到原因与时间。现两类徽章均改为 Tooltip 悬停详情：模型级（`disabled` 徽章）由原生 `title` 升级为 Tooltip，显示来源（Auto/Manual）、原因、禁用时间（`channel_disabled_models.created_at`，前端类型补齐该字段）与恢复倒计时/永久；渠道级（`channel_status` 2/3）徽章新增 Tooltip，显示原因与时间——后端 `GroupMemberView` 新增 `channel_status_reason string` / `channel_status_time int64` 字段，取自渠道 `other_info.status_reason/status_time`（复用既有逐成员 `GetChannelById` 解析，仅非启用状态解析，零额外查询）。i18n 新增 `Channel-level disabled` 键七语言。
 
 ### 文件清单
 
