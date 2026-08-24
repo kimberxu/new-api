@@ -473,11 +473,28 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 					_ = service.DisableChannelModel(channelError.ChannelId, banModel, reason)
 				})
 			}
-		} else {
+		} else if service.IsConfiguredDisableError(err) || types.IsSkipRetryError(err) {
+			// Admin-configured rules keep feeding the channel-level window;
+			// skip-retry errors are never counted at any level.
 			decision := service.ShouldDisableChannelWithDecision(channelError.ChannelId, err)
 			if decision.ShouldDisable && channelError.AutoBan {
 				gopool.Go(func() {
 					service.DisableChannel(channelError, decision.Reason)
+				})
+			}
+		} else if err.StatusCode >= 100 && err.StatusCode <= 599 {
+			// [personal] Unclassified errors fall back to MODEL-level on the
+			// lenient window: repeated generic failures (e.g. a bare upstream
+			// 404 from a wrong path) disable only the affected model instead
+			// of taking down the whole channel.
+			banModel := relayInfo.OriginModelName
+			if upstream := model.ResolveModelGroupUpstreamModel(relayInfo.OriginModelName, channelError.ChannelId); upstream != "" {
+				banModel = upstream
+			}
+			if triggered, detail := service.CheckAndRecordDisableModel(channelError.ChannelId, banModel, err.StatusCode, false); triggered {
+				reason := fmt.Sprintf("model disabled: %s (%s)", err.ErrorWithStatusCode(), detail)
+				gopool.Go(func() {
+					_ = service.DisableChannelModel(channelError.ChannelId, banModel, reason)
 				})
 			}
 		}

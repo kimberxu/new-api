@@ -49,6 +49,25 @@ type DisableDecision struct {
 	Reason        string // human-readable disable reason
 }
 
+// IsConfiguredDisableError reports whether the error matches an explicitly
+// configured channel-disable rule: a channel-error type, a status code inside
+// AutomaticDisableStatusCodeRanges, or an automatic-disable keyword.
+// processChannelError uses it to route unclassified fallback errors between
+// the channel-level and model-level windows.
+func IsConfiguredDisableError(err *types.NewAPIError) bool {
+	if err == nil {
+		return false
+	}
+	if types.IsChannelError(err) {
+		return true
+	}
+	if operation_setting.ShouldDisableByStatusCode(err.StatusCode) {
+		return true
+	}
+	matched, _ := AcSearch(strings.ToLower(err.Error()), operation_setting.AutomaticDisableKeywords, true)
+	return matched
+}
+
 // ShouldDisableChannelWithDecision evaluates whether a channel should be
 // disabled based on the error, applying sliding-window counting. The
 // channelID is used as the error identity key so that different channels are
@@ -60,7 +79,6 @@ func ShouldDisableChannelWithDecision(channelID int, err *types.NewAPIError) Dis
 	if err == nil {
 		return DisableDecision{}
 	}
-
 	isConfigured := false
 	reason := ""
 
@@ -69,16 +87,9 @@ func ShouldDisableChannelWithDecision(channelID int, err *types.NewAPIError) Dis
 		reason = err.ErrorWithStatusCode()
 	} else if types.IsSkipRetryError(err) {
 		return DisableDecision{}
-	} else if operation_setting.ShouldDisableByStatusCode(err.StatusCode) {
+	} else if IsConfiguredDisableError(err) {
 		isConfigured = true
 		reason = err.ErrorWithStatusCode()
-	} else {
-		lowerMessage := strings.ToLower(err.Error())
-		matched, _ := AcSearch(lowerMessage, operation_setting.AutomaticDisableKeywords, true)
-		if matched {
-			isConfigured = true
-			reason = err.ErrorWithStatusCode()
-		}
 	}
 
 	if isConfigured {
