@@ -33,6 +33,10 @@ type GroupMemberView struct {
 	// 2 manually disabled, 3 auto disabled) so the UI can flag members that
 	// are currently excluded from routing by their channel's state.
 	ChannelStatus int `json:"channel_status"`
+	// [personal] Channel-level disable details from the channel's other_info
+	// (status_reason/status_time), only set when the channel is disabled.
+	ChannelStatusReason string `json:"channel_status_reason,omitempty"`
+	ChannelStatusTime   int64  `json:"channel_status_time,omitempty"`
 	// [personal] Disabled carries the model-level disable record (auto/manual)
 	// for this (channel, model) pair, if any.
 	Disabled *model.ChannelDisabledModel `json:"disabled,omitempty"`
@@ -85,6 +89,15 @@ func getGroupMemberViews(groupId int, items []*model.ModelGroupItem) []GroupMemb
 			view.ChannelPrio = ch.GetPriority()
 			view.ChannelWt = ch.GetWeight()
 			view.ChannelStatus = ch.Status
+			if ch.Status != common.ChannelStatusEnabled {
+				info := ch.GetOtherInfo()
+				if v, ok := info["status_reason"].(string); ok {
+					view.ChannelStatusReason = v
+				}
+				if v, ok := info["status_time"].(float64); ok {
+					view.ChannelStatusTime = int64(v)
+				}
+			}
 		}
 		if byModel, ok := disabledByChannelModel[it.ChannelId]; ok {
 			view.Disabled = byModel[it.Model]
