@@ -172,3 +172,39 @@ func TestShouldDisableChannelWithDecision_NilError(t *testing.T) {
 	decision := ShouldDisableChannelWithDecision(10, nil)
 	require.False(t, decision.ShouldDisable)
 }
+
+func TestIsConfiguredDisableError(t *testing.T) {
+	resetDisableWindowConfig()
+
+	tests := []struct {
+		name string
+		err  *types.NewAPIError
+		want bool
+	}{
+		{
+			name: "status code in configured range",
+			err:  types.NewOpenAIError(fmt.Errorf("unauthorized"), types.ErrorCodeBadResponseStatusCode, 401),
+			want: true,
+		},
+		{
+			name: "keyword match",
+			err:  types.NewOpenAIError(fmt.Errorf("You exceeded your current quota"), types.ErrorCodeBadResponseStatusCode, 500),
+			want: true,
+		},
+		{
+			name: "plain unclassified status code",
+			err:  types.NewOpenAIError(fmt.Errorf("404 page not found"), types.ErrorCodeBadResponseStatusCode, 404),
+			want: false,
+		},
+		{
+			name: "nil error",
+			err:  nil,
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsConfiguredDisableError(tt.err))
+		})
+	}
+}
