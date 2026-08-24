@@ -50,6 +50,7 @@ import {
   addGroupItem,
   updateGroupItem,
   deleteGroupItem,
+  testGroupItem,
   addGroupReference,
   deleteGroupReference,
   rebuildModelGroups,
@@ -430,6 +431,11 @@ export function ModelGroupsPage() {
                   onToggleMember={(item, enabled) =>
                     itemToggleMutation.mutate({ itemId: item.id, enabled })
                   }
+                  onTestMember={async (item) => {
+                    const res = await testGroupItem(item.id)
+                    invalidate()
+                    return res
+                  }}
                 />
               ))
             )}
