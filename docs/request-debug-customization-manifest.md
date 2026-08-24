@@ -524,14 +524,15 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 - **渠道模型路由表前台化**：新增独立管理页面 `/channel-abilities`（侧边栏 Admin 组「渠道路由表」+ 渠道页「路由表」入口按钮），展示渠道×模型能力行（渠道名/类型、模型、分组、优先级、权重、状态徽章），支持渠道/模型/分组/状态筛选与分页；行内可禁用/启用单模型、「测试此模型」。
 - **禁用粒度细化为「渠道×模型」**：新增独立禁用表 `channel_disabled_models`（channel_id × model，source=manual|auto，reason），路由构建（内存缓存 `InitChannelCache` 与 DB 路径 `getChannelQuery` NOT EXISTS）排除被禁的 (channel, model) 对。独立表隔离于「channel.status ↔ ability.enabled」既有同步不变式——渠道重新启用不会抹掉模型级禁用。
-- **auto-ban 模型级判定**：`processChannelError` 对明确模型类错误（404 消息含 model，或 400/422 命中模型关键词）只禁该渠道该模型（source=auto），不再整个渠道禁；模型维度独立滑动窗口（复用 `ConfiguredDisable*` 阈值），key = `channelID:modelName:statusCode:tier`。
+- **auto-ban 模型级判定**：`processChannelError` 对明确模型类错误（404 消息含 model，或 400/422 命中模型关键词）只禁该渠道该模型（source=auto），不再整个渠道禁；模型维度独立滑动窗口，key = `channelID:modelName:statusCode:tier`——明确模型类错误按 configured 严格档计数，未分类兜底错误按 unconfigured 宽容档计数（2026-08-24 兜底模型级化）。
 - **2026-08-22 增强（原因前缀 + 渠道列表徽章）**：模型级禁用原因加 `model disabled:` 前缀并携带窗口详情（`N failures in Ws window (threshold T)`），存入 `channel_disabled_models.reason`；新增 `GET /api/channel/disabled_models`（ChannelRead）返回全部禁用记录；渠道列表名称旁新增 Ban 徽章（30s 轮询），悬停列出各模型的来源 auto/manual、原因、剩余封禁时长或永久——此前模型级禁用在渠道页完全不可见，与渠道级自动禁用无法区分。
 - **测试语义细化到模型级**：测试模型 A 通过只恢复 A（手动测试恢复任意来源，自动周期仅恢复 auto 来源）；渠道级禁用仍由任一模型测试通过整体恢复，语义不变。
+- **2026-08-24 兜底模型级化**：`processChannelError` 中渠道级/模型级判定均不命中的未分类错误，原兜底进渠道级宽容窗口（反复裸 404 会拖垮整个渠道），现改为兜底进**模型级宽容窗口**（`CheckAndRecordDisableModel(..., false)`，默认 5 分钟 3 次禁该模型，封禁键同样经 `ResolveModelGroupUpstreamModel` 解析）；管理员显式配置的规则（状态码范围 / 关键词 / channel-error）仍走渠道级严格窗口，skip-retry 错误任何层级都不计数。分类逻辑抽为 `service.IsConfiguredDisableError` 供决策函数与兜底分支共用。
 
 ### 风险与渠道处理
 
 - 渠道级恢复语义不变（`ShouldEnableChannel` + `EnableChannel` 不动）；自动测试保持每渠道单模型串行，不做全模型并发测试。
-- 模型级错误均按 configured 档计数（`isConfiguredError=true`），语义上模型类错误属于「明确错误」。
+- 明确模型类错误按 configured 档计数（`isConfiguredError=true`），语义上属于「明确错误」；未分类兜底错误按 unconfigured 宽容档计数（2026-08-24 兜底模型级化，`controller/relay.go`）。
 - 多 key 渠道：禁用记录按 channel_id 作用于整个渠道（所有 key），不做 key 粒度细分，与渠道级禁用粒度一致。
 - 渠道更新模型列表不清除禁用记录（记录独立存在）；模型不在渠道 models 中时 ability 行不存在、路由表页不展示孤儿记录，属预期行为。
 - 404 宽松判定（消息含 model 即模型级）若线上误判（上游整体 404 页面含 model 字样），可收紧为「含 model 且含 not found/not exist」，同步更新 `IsModelLevelError` 测试。
@@ -553,12 +554,14 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 - `controller/relay.go` - `processChannelError` 模型级分支（包进 else，task relay 传 nil 走渠道级）；模型级原因带 `model disabled:` 前缀与窗口详情
 - `controller/channel-test.go` - `testResult.modelName`（命名返回值 + defer 注入）、`performChannelTests` 失败/成功分支模型级禁用与恢复、`TestChannel` 手动测试成功恢复任意来源
 - `router/channel-router.go` - 注册 `/abilities`、`/abilities/disable`、`/abilities/enable`
+- `service/channel.go` - `IsConfiguredDisableError` 分类器（2026-08-24 兜底模型级化抽出），`ShouldDisableChannelWithDecision` 复用
 - `controller/channel-disabled-models.go` - `GET /api/channel/disabled_models` 模型级禁用记录查询（新文件）
 - `web/src/hooks/use-sidebar-data.ts` - Admin 组「渠道路由表」菜单项
 - `web/src/features/channels/index.tsx` - Actions 区「路由表」入口按钮
 - `web/src/i18n/locales/*.json` - 七语言文案（新增 8 键）
 
 **测试：**
+- `service/channel_disable_window_test.go` - 渠道维度滑动窗口（configured/unconfigured 阈值与各维独立）+ `ShouldDisableChannelWithDecision` 决策 + `TestIsConfiguredDisableError`（状态码范围/关键词命中、未分类不命中、nil；2026-08-24 兜底模型级化新增）
 - `service/channel_model_disable_test.go` - `IsModelLevelError` 表驱动（404 宽松档/400/422 关键词/非 404-400-422 不判/nil）+ 模型维度窗口（模型/状态码/渠道独立、threshold 0/1）
 - `model/channel_disabled_model_test.go` - DB 路径排除、缓存路径排除、Add 幂等、按 source 清除、渠道清理
 - `model/task_cas_test.go` - 测试 DB AutoMigrate 注册新表
@@ -589,7 +592,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 > 对应分支：`personal`（基于基线 `7e6415e7`，原 deploy-model 分支已退役，2026-08-24 更新）
 > 本小节登记 `personal` 相对基线 `7e6415e7` 的半重构（`git log 7e6415e7..personal` 核对）。
-> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `c9148fb6`（修复成员优先级/权重继承失效）→ `6deec7b4`（上游请求改用成员真实上游模型）→ `6702a043`（移除系统设置 Billing 页残留）→ `e9456b25`（模型组引用成员开放编辑）→ `3711a3b6`（添加成员界面全量列表化 + 搜索）→ `2e2acbe5`（勾选多选批量添加）→ `aa882479`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `2ada174c`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `e2238bc0`（禁用徽章悬停显示级别/原因/时间）→ `1a29c27f`（成员测试按钮 + 测试通过即解禁）
+> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `c9148fb6`（修复成员优先级/权重继承失效）→ `6deec7b4`（上游请求改用成员真实上游模型）→ `6702a043`（移除系统设置 Billing 页残留）→ `e9456b25`（模型组引用成员开放编辑）→ `3711a3b6`（添加成员界面全量列表化 + 搜索）→ `2e2acbe5`（勾选多选批量添加）→ `aa882479`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `2ada174c`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `e2238bc0`（禁用徽章悬停显示级别/原因/时间）→ `1a29c27f`（成员测试按钮 + 测试通过即解禁）→ `84a96423`（未分类错误兜底改走模型级宽容窗口）
 
 ## 模型组路由表（一等公民）
 
@@ -608,6 +611,8 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 **禁用徽章悬停显示级别/原因/时间（2026-08-24）**：上一增强的徽章只有文字、无法区分「渠道级禁用」与「模型级禁用」，也看不到原因与时间。现两类徽章均改为 Tooltip 悬停详情：模型级（`disabled` 徽章）由原生 `title` 升级为 Tooltip，显示来源（Auto/Manual）、原因、禁用时间（`channel_disabled_models.created_at`，前端类型补齐该字段）与恢复倒计时/永久；渠道级（`channel_status` 2/3）徽章新增 Tooltip，显示原因与时间——后端 `GroupMemberView` 新增 `channel_status_reason string` / `channel_status_time int64` 字段，取自渠道 `other_info.status_reason/status_time`（复用既有逐成员 `GetChannelById` 解析，仅非启用状态解析，零额外查询）。i18n 新增 `Channel-level disabled` 键七语言。
 
 **成员测试按钮 + 测试通过即解禁（2026-08-24）**：`/model-groups` 页面成员 Actions 列新增测试按钮（Zap 图标），对成员的 `(渠道, 真实上游模型)` 直接发起一次 `testChannel` 探测——新端点 `POST /api/model-groups/items/:itemId/test`（`controller/model_group_member_probe.go` 新文件承载，路由挂 `ChannelOperate` 权限对齐 `/api/channel/test`）。探测成功即清除该 `(channel, model)` 的**任意来源**模型级禁用记录（`service.EnableChannelModel(source="")`，与渠道手动测试语义一致：手动探测是权威判定）——补上被自动/手动禁用成员此前只能在渠道页间接解禁的缺口，页面内即可完成「测试 → 解禁」；失败时透出上游错误 toast、徽章保留。响应结构同 `TestChannel`（success/message/time/error_code），顺带更新渠道响应时间。前端 per-row pending 动画；被禁成员成功后 toast「Test passed, member re-enabled」，未禁成员显示「Test passed」。i18n 新增 `Test passed` / `Test passed, member re-enabled` 两键七语言，并顺带归位上次漏跑 sync 排序的 `Channel-level disabled` 键。
+
+**未分类错误兜底模型级化（2026-08-24，`84a96423`）**：`processChannelError` 中渠道级/模型级判定均不命中的未分类错误（如裸 404 page not found），原兜底进渠道级宽容窗口——上游路径配置错误的反复 404 会把整个渠道拖进渠道级禁用，误伤同渠道其他可用模型。现兜底改为**模型级宽容窗口**（`CheckAndRecordDisableModel(..., false)`，默认 5 分钟 3 次只禁该成员，封禁键同样经 `ResolveModelGroupUpstreamModel` 解析）；管理员显式配置的规则（状态码范围/关键词/channel-error，经新分类器 `service.IsConfiguredDisableError` 判定）仍走渠道级严格窗口，skip-retry 错误任何层级不计数。
 
 ### 文件清单
 
@@ -628,7 +633,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 - `model/main.go` - AutoMigrate 注册 `&ModelGroup{}`/`&ModelGroupItem{}`；`migrateDB` 挂载 `repairModelGroupItemInheritance`
 - `model/ability.go` - `GetGroupEnabledModels`/`GetEnabledModels` 数据源改模型组（/v1/models）
 - `model/channel_cache.go` - 路由索引数据源改模型组成员；`modelGroupItemOverrides`/`modelGroupParamOverride` 缓存（override 结构含成员上游模型）；`effectivePriority`/`effectiveWeight`
-- `controller/relay.go` - `processChannelError` 渠道级判定优先于模型级；模型级分支禁用键经 `ResolveModelGroupUpstreamModel` 解析为成员真实上游模型
+- `controller/relay.go` - `processChannelError` 渠道级判定优先于模型级；模型级分支禁用键经 `ResolveModelGroupUpstreamModel` 解析为成员真实上游模型；未分类错误兜底改走模型级宽容窗口（2026-08-24，`84a96423`）
 - `middleware/distributor.go` - 组级参数覆盖逐 key 覆盖渠道级；`SetupContextForSelectedChannel` 织入成员上游模型映射
 - `model/channel_disabled_model.go` - `BannedUntil` 字段
 - `controller/channel-test.go` - 开头接入到期恢复
