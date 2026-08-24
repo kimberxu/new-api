@@ -100,12 +100,6 @@ export function GroupCard(props: GroupCardProps) {
 
   const [edits, setEdits] = useState<Record<number, MemberEditState>>({})
 
-  let maxWeight = 0
-  for (const m of members) {
-    const w = m.weight ?? m.channel_weight
-    if (typeof w === 'number' && w > maxWeight) maxWeight = w
-  }
-
   const getEdit = (item: ModelGroupItem): MemberEditState => {
     const existing = edits[item.id]
     if (existing) return existing
@@ -271,7 +265,6 @@ export function GroupCard(props: GroupCardProps) {
                       (item.priority != null ? String(item.priority) : '') ||
                     edit.weightInput !==
                       (item.weight != null ? String(item.weight) : '')
-                  const effectiveWeight = item.weight ?? item.channel_weight
                   let disabledLabel: string | undefined
                   let disabledVariant: 'danger' | 'warning' = 'warning'
                   if (item.disabled) {
@@ -453,16 +446,6 @@ export function GroupCard(props: GroupCardProps) {
                             }))
                           }
                         />
-                        {effectiveWeight != null && maxWeight > 0 && (
-                          <div className='bg-muted mt-1 h-1 w-full overflow-hidden rounded-full'>
-                            <div
-                              className='bg-primary h-full rounded-full'
-                              style={{
-                                width: `${Math.min(100, (effectiveWeight / maxWeight) * 100)}%`,
-                              }}
-                            />
-                          </div>
-                        )}
                       </TableCell>
                       <TableCell>
                         <Switch
