@@ -93,7 +93,6 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 		if err != nil {
 			return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 		}
-		info.UpstreamRequestBodySize = storage.Size()
 		requestBody = common.NewReplayableBodyReader(storage)
 		relaycommon.CaptureUpstreamRequestDebugFromStorage(c, info)
 	} else {
