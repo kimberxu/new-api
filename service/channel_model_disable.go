@@ -169,9 +169,12 @@ func channelModelDisableWindowRedisTake(channelID int, modelName string, statusC
 // channelID:modelName:statusCode:tier, so different models, status codes and
 // tiers are counted independently.
 //
-// Model-level errors are always counted on the strict (configured) tier, since
-// they are explicit errors. The second return value carries the trigger detail
-// (e.g. "3 failures in 60s window (threshold 3)"), empty when not triggered.
+// Classified model-level errors (IsModelLevelError) count on the strict
+// (configured) tier since they are explicit errors; unclassified fallback
+// errors from processChannelError count on the lenient (unconfigured) tier
+// (isConfiguredError=false). The second return value carries the trigger
+// detail (e.g. "3 failures in 60s window (threshold 3)"), empty when not
+// triggered.
 func CheckAndRecordDisableModel(channelID int, modelName string, statusCode int, isConfiguredError bool) (bool, string) {
 	var threshold int
 	var windowSec int64
