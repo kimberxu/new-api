@@ -47,8 +47,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { formatSeconds } from '@/features/channels/lib'
+import { formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
+
 import type {
   ModelGroup,
   ModelGroupItem,
@@ -270,9 +278,7 @@ export function GroupCard(props: GroupCardProps) {
                     if (item.disabled.source === 'manual') {
                       disabledLabel = t('Disabled')
                       disabledVariant = 'danger'
-                    } else if (
-                      item.disabled.banned_until > Date.now() / 1000
-                    ) {
+                    } else if (item.disabled.banned_until > Date.now() / 1000) {
                       disabledLabel = t('Banned ({{time}})', {
                         time: formatSeconds(
                           item.disabled.banned_until - Date.now() / 1000
@@ -300,15 +306,60 @@ export function GroupCard(props: GroupCardProps) {
                           </StatusBadge>
                         )}
                         {item.disabled && (
-                          <StatusBadge
-                            variant={disabledVariant}
-                            size='sm'
-                            showDot
-                            className='ml-1 align-middle'
-                            title={item.disabled.reason || undefined}
-                          >
-                            {disabledLabel}
-                          </StatusBadge>
+                          <TooltipProvider delay={100}>
+                            <Tooltip>
+                              <TooltipTrigger render={<span />}>
+                                <StatusBadge
+                                  variant={disabledVariant}
+                                  size='sm'
+                                  showDot
+                                  className='ml-1 align-middle'
+                                >
+                                  {disabledLabel}
+                                </StatusBadge>
+                              </TooltipTrigger>
+                              <TooltipContent side='top' className='max-w-xs'>
+                                <div className='space-y-1 text-xs'>
+                                  <div className='font-medium'>
+                                    {t('Model-level disabled')}
+                                  </div>
+                                  <div>
+                                    {item.disabled.source === 'auto'
+                                      ? t('Auto')
+                                      : t('Manual')}
+                                  </div>
+                                  {item.disabled.reason && (
+                                    <div>
+                                      {t('Reason:')} {item.disabled.reason}
+                                    </div>
+                                  )}
+                                  {!!item.disabled.created_at && (
+                                    <div>
+                                      {t('Time:')}{' '}
+                                      {formatTimestampToDate(
+                                        item.disabled.created_at
+                                      )}
+                                    </div>
+                                  )}
+                                  {item.disabled.banned_until >
+                                    Date.now() / 1000 && (
+                                    <div>
+                                      {t('recovers in')}{' '}
+                                      {formatSeconds(
+                                        item.disabled.banned_until -
+                                          Date.now() / 1000
+                                      )}
+                                    </div>
+                                  )}
+                                  {item.disabled.banned_until <=
+                                    Date.now() / 1000 &&
+                                    item.disabled.source === 'manual' && (
+                                      <div>{t('Permanent')}</div>
+                                    )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                       </TableCell>
                       <TableCell>
@@ -318,20 +369,47 @@ export function GroupCard(props: GroupCardProps) {
                         </span>
                         {item.channel_status != null &&
                           item.channel_status !== 1 && (
-                            <StatusBadge
-                              variant={
-                                item.channel_status === 3
-                                  ? 'warning'
-                                  : 'danger'
-                              }
-                              size='sm'
-                              showDot
-                              className='ml-1 align-middle'
-                            >
-                              {item.channel_status === 3
-                                ? t('Auto Disabled')
-                                : t('Manually Disabled')}
-                            </StatusBadge>
+                            <TooltipProvider delay={100}>
+                              <Tooltip>
+                                <TooltipTrigger render={<span />}>
+                                  <StatusBadge
+                                    variant={
+                                      item.channel_status === 3
+                                        ? 'warning'
+                                        : 'danger'
+                                    }
+                                    size='sm'
+                                    showDot
+                                    className='ml-1 align-middle'
+                                  >
+                                    {item.channel_status === 3
+                                      ? t('Auto Disabled')
+                                      : t('Manually Disabled')}
+                                  </StatusBadge>
+                                </TooltipTrigger>
+                                <TooltipContent side='top' className='max-w-xs'>
+                                  <div className='space-y-1 text-xs'>
+                                    <div className='font-medium'>
+                                      {t('Channel-level disabled')}
+                                    </div>
+                                    {item.channel_status_reason && (
+                                      <div>
+                                        {t('Reason:')}{' '}
+                                        {item.channel_status_reason}
+                                      </div>
+                                    )}
+                                    {!!item.channel_status_time && (
+                                      <div>
+                                        {t('Time:')}{' '}
+                                        {formatTimestampToDate(
+                                          item.channel_status_time
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           )}
                       </TableCell>
                       <TableCell>

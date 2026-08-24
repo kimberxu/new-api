@@ -32,8 +32,11 @@ export interface ModelGroupItem {
   channel_weight: number
   // live channel status: 1 enabled, 2 manually disabled, 3 auto disabled.
   // Members on a non-enabled channel are excluded from routing even though
-  // item.enabled is true.
+  // item.enabled is true. The reason/time come from the channel's other_info
+  // and are only set when the channel is disabled.
   channel_status?: number
+  channel_status_reason?: string
+  channel_status_time?: number
   // source_group is set when this member came from a referenced group
   // (empty = direct member of this group).
   source_group?: string
@@ -41,6 +44,8 @@ export interface ModelGroupItem {
     source: string
     reason: string
     banned_until: number
+    // unix seconds when the model-level disable was recorded
+    created_at: number
   } | null
 }
 
@@ -69,8 +74,12 @@ export interface ListModelGroupsResponse {
   total: number
 }
 
-export async function listModelGroups(withItems = false): Promise<ListModelGroupsResponse> {
-  const res = await api.get('/api/model-groups/', { params: { with_items: withItems ? '1' : '0' } })
+export async function listModelGroups(
+  withItems = false
+): Promise<ListModelGroupsResponse> {
+  const res = await api.get('/api/model-groups/', {
+    params: { with_items: withItems ? '1' : '0' },
+  })
   return res.data?.data ?? { items: [], total: 0 }
 }
 
@@ -79,52 +88,112 @@ export async function getModelGroup(id: number): Promise<ModelGroup> {
   return res.data?.data
 }
 
-export async function createModelGroup(name: string): Promise<{ success: boolean; message?: string; data?: ModelGroup }> {
-  const res = await api.post('/api/model-groups/', { name }, { skipBusinessError: true, skipErrorHandler: true })
+export async function createModelGroup(
+  name: string
+): Promise<{ success: boolean; message?: string; data?: ModelGroup }> {
+  const res = await api.post(
+    '/api/model-groups/',
+    { name },
+    { skipBusinessError: true, skipErrorHandler: true }
+  )
   return res.data
 }
 
-export async function setModelGroupEnabled(id: number, enabled: boolean): Promise<{ success: boolean; message?: string }> {
+export async function setModelGroupEnabled(
+  id: number,
+  enabled: boolean
+): Promise<{ success: boolean; message?: string }> {
   const res = await api.patch(`/api/model-groups/${id}`, { enabled })
   return res.data
 }
 
-export async function deleteModelGroup(id: number): Promise<{ success: boolean; message?: string }> {
-  const res = await api.delete(`/api/model-groups/${id}`, { skipBusinessError: true, skipErrorHandler: true })
+export async function deleteModelGroup(
+  id: number
+): Promise<{ success: boolean; message?: string }> {
+  const res = await api.delete(`/api/model-groups/${id}`, {
+    skipBusinessError: true,
+    skipErrorHandler: true,
+  })
   return res.data
 }
 
-export async function addGroupItem(groupId: number, channelId: number, model: string, priority?: number | null, weight?: number | null): Promise<{ success: boolean; message?: string }> {
-  const res = await api.post(`/api/model-groups/${groupId}/items`, { channel_id: channelId, model, priority, weight }, { skipBusinessError: true, skipErrorHandler: true })
+export async function addGroupItem(
+  groupId: number,
+  channelId: number,
+  model: string,
+  priority?: number | null,
+  weight?: number | null
+): Promise<{ success: boolean; message?: string }> {
+  const res = await api.post(
+    `/api/model-groups/${groupId}/items`,
+    { channel_id: channelId, model, priority, weight },
+    { skipBusinessError: true, skipErrorHandler: true }
+  )
   return res.data
 }
 
-export async function updateGroupItem(itemId: number, data: { enabled?: boolean; priority?: number | null; weight?: number | null }): Promise<{ success: boolean; message?: string }> {
-  const res = await api.patch(`/api/model-groups/items/${itemId}`, data, { skipBusinessError: true, skipErrorHandler: true })
+export async function updateGroupItem(
+  itemId: number,
+  data: { enabled?: boolean; priority?: number | null; weight?: number | null }
+): Promise<{ success: boolean; message?: string }> {
+  const res = await api.patch(`/api/model-groups/items/${itemId}`, data, {
+    skipBusinessError: true,
+    skipErrorHandler: true,
+  })
   return res.data
 }
 
-export async function deleteGroupItem(itemId: number): Promise<{ success: boolean; message?: string }> {
-  const res = await api.delete(`/api/model-groups/items/${itemId}`, { skipBusinessError: true, skipErrorHandler: true })
+export async function deleteGroupItem(
+  itemId: number
+): Promise<{ success: boolean; message?: string }> {
+  const res = await api.delete(`/api/model-groups/items/${itemId}`, {
+    skipBusinessError: true,
+    skipErrorHandler: true,
+  })
   return res.data
 }
 
-export async function setModelGroupParamOverride(id: number, paramOverride: string): Promise<{ success: boolean; message?: string }> {
-  const res = await api.put(`/api/model-groups/${id}/param-override`, { param_override: paramOverride })
+export async function setModelGroupParamOverride(
+  id: number,
+  paramOverride: string
+): Promise<{ success: boolean; message?: string }> {
+  const res = await api.put(`/api/model-groups/${id}/param-override`, {
+    param_override: paramOverride,
+  })
   return res.data
 }
 
-export async function addGroupReference(groupId: number, refGroupId: number): Promise<{ success: boolean; message?: string }> {
-  const res = await api.post(`/api/model-groups/${groupId}/references`, { ref_group_id: refGroupId }, { skipBusinessError: true, skipErrorHandler: true })
+export async function addGroupReference(
+  groupId: number,
+  refGroupId: number
+): Promise<{ success: boolean; message?: string }> {
+  const res = await api.post(
+    `/api/model-groups/${groupId}/references`,
+    { ref_group_id: refGroupId },
+    { skipBusinessError: true, skipErrorHandler: true }
+  )
   return res.data
 }
 
-export async function deleteGroupReference(groupId: number, refGroupId: number): Promise<{ success: boolean; message?: string }> {
-  const res = await api.delete(`/api/model-groups/${groupId}/references/${refGroupId}`, { skipBusinessError: true, skipErrorHandler: true })
+export async function deleteGroupReference(
+  groupId: number,
+  refGroupId: number
+): Promise<{ success: boolean; message?: string }> {
+  const res = await api.delete(
+    `/api/model-groups/${groupId}/references/${refGroupId}`,
+    { skipBusinessError: true, skipErrorHandler: true }
+  )
   return res.data
 }
 
-export async function rebuildModelGroups(): Promise<{ success: boolean; message?: string }> {
-  const res = await api.post('/api/model-groups/rebuild', {}, { skipBusinessError: true, skipErrorHandler: true })
+export async function rebuildModelGroups(): Promise<{
+  success: boolean
+  message?: string
+}> {
+  const res = await api.post(
+    '/api/model-groups/rebuild',
+    {},
+    { skipBusinessError: true, skipErrorHandler: true }
+  )
   return res.data
 }
