@@ -1,6 +1,6 @@
 # 本地 GitHub Fork 工作流
 
-> 对应分支:`personal` 基线 `7e6415e7`(2026-08-24 刷新至 `1a29c27f`；`personal` 线同步流程见「同步上游」节)
+> 对应分支:`personal` 基线 `317e9ddd`(2026-08-24 刷新至 `8d34b68b`；`personal` 线同步流程见「同步上游」节)
 
 ## 标准触发短语
 
@@ -16,10 +16,10 @@
 |------|------|------|
 | `main` | 贴近上游 | 仅保留少量本地改动（如 GHCR workflow 文件），几乎与上游同步 |
 | `deploy` | 部署分支 | 承载全部魔改功能；GHCR 部署镜像由它构建 |
-| `personal` | 个人开发线 | 历史前段（至 `7e6415e7`，原 deploy-model 中间态分支，已退役并入）承载：deploy 同步战略改造、模型级路由表前台化、model group 管理接口；其后叠加：模型组路由全套 + 计费/Ollama/订阅/OAuth/开放注册移除。与 `deploy` 共同祖先为 `ab4d296e`（原 deploy-re，已退役）。不构建镜像、不打 tag |
+| `personal` | 个人开发线 | 历史前段（至 `317e9ddd`，原 deploy-model 中间态分支，已退役并入）承载：deploy 同步战略改造、模型级路由表前台化、model group 管理接口；其后叠加：模型组路由全套 + 计费/Ollama/订阅/OAuth/开放注册移除。与 `deploy` 共同祖先为 `2ffa3979`（原 deploy-re，已退役）。不构建镜像、不打 tag |
 | `local/<feature>` | 本地定制功能分支 | 开发完成后合并进目标魔改分支 |
 
-魔改功能清单见 `request-debug-customization-manifest.md`；魔改功能不在 `main` 上。`deploy` 与 `personal` 线已分叉，各自独立维护与同步上游；manifest 中 deploy 线功能登记以 personal 基线 `7e6415e7`（原 deploy-model，已退役）为基准，personal 改动单独登记在「personal 分支半重构登记」小节。
+魔改功能清单见 `request-debug-customization-manifest.md`；魔改功能不在 `main` 上。`deploy` 与 `personal` 线已分叉，各自独立维护与同步上游；manifest 中 deploy 线功能登记以 personal 基线 `317e9ddd`（原 deploy-model，已退役）为基准，personal 改动单独登记在「personal 分支半重构登记」小节。
 
 ## 同步上游
 
@@ -77,7 +77,10 @@ git push --force-with-lease origin deploy
 
 | 文件 | 魔改内容 | 上游易冲突点 | 解决决策记录 |
 |------|----------|--------------|--------------|
-| `controller/relay.go` | 渠道限流检查、同优先级重试 `ExcludeChannel`、全渠道限流 429 兜底、（新增）模型级禁用分支 | 重试/计费逻辑（如 `PrepareTieredBillingForSelectedGroup`） | `e0b9f243`：2026-08-01 同步 8 提交；重试/计费逻辑拼序采纳、限流检查保留；`702be7eb`：2026-08-19 同步 0 提交；`processChannelError` 既有禁用两行包进 else、前插模型级 if 分支（包 else 非纯追加，冲突时按「保留魔改 + 采纳上游语义」手动合并） |
+| `controller/relay.go` | 渠道限流检查、同优先级重试 `ExcludeChannel`、全渠道限流 429 兜底、（新增）模型级禁用分支 | 重试/计费逻辑（如 `PrepareTieredBillingForSelectedGroup`） | `e0b9f243`：2026-08-01 同步 8 提交；重试/计费逻辑拼序采纳、限流检查保留；`cd98b0f8`：2026-08-19 同步 0 提交；`processChannelError` 既有禁用两行包进 else、前插模型级 if 分支（包 else 非纯追加，冲突时按「保留魔改 + 采纳上游语义」手动合并） |
+| `controller/channel-test.go` | 模型级禁用/恢复分支、`ShouldDisableChannelWithDecision`、`processChannelError` 第 4 参 `nil` | 上游 `4add708e` 把单渠道测试重构成 `runChannelTestWorkers` worker 池，循环体整体搬家 | `235ae5a7`：2026-08-24 同步 6 提交；上游重构后的新调用点逐处补魔改行（判定换 `WithDecision`、模型级 if/else 包裹、enable 块后插模型级恢复块、`performChannelTests` 调用前插 `recoverExpiredModelBans` 且保留上游新增的 `concurrency` 参数） |
+| `web/src/features/system-settings/models/routing-reliability-section.tsx` | 滑动窗口禁用 4 字段、慢流/TTFT 降级配置（`channel_slow_stream_setting`） | 上游把 schema 重构为 `createRoutingReliabilitySchema(t)` 工厂 + i18n 化 | `235ae5a7`：2026-08-24 同步 6 提交；schema 一律取上游工厂版再插入魔改字段（含 superRefine 两条采样校验）；i18n locale 冲突用语义三方合并（保留上游新增键、应用魔改键变更） |
+| i18n locale（`web/src/i18n/locales/*.json`） | 魔改 UI 文案键 | 上游同区段增删键导致整块冲突 | `235ae5a7`：2026-08-24 同步 6 提交；按「ours 为底 + theirs 增改覆盖」语义合并，键序以 ours 为准 |
 | `relay/common/relay_info.go` | `RequestDebugSnapshot` 字段 | `RelayInfo` 结构体字段增减、注释更新 | （空，待首录） |
 | `web/src/features/usage-logs/components/dialogs/details-dialog.tsx` | 请求调试快照面板 | 日志详情功能（如 stream status） | （空，待首录） |
 

@@ -1,8 +1,8 @@
 # 定制功能清单（deploy / personal 分支）
 
-> 对应分支：`personal` 基线 `7e6415e7`（2026-08-24 刷新至 `e2238bc0`；deploy 线功能部分，可用 `git diff upstream/main...7e6415e7` 核对。注意：`deploy` 分支自分叉点 `ab4d296e`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
-> 以下功能均为魔改线相对 `upstream/main` 的定制；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `7e6415e7` 的改动。
-> 魔改提交：`bfa99ad6`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `26271295`（渠道限流 RPM）→ `e09babdf`（上下文感知限流 + float RPM）→ `102747fd`（RPM 输入 `step='any'`）→ `d0fdb047`（渠道测试请求文案定制）→ `9a20e660`（加权模型映射）→ `c6c4bcf8`（加权映射目标暴露修复）→ `83329f48`（暴露目标守卫排除 source key）→ `d8378ee7`（额度显示模式切换修复）→ `ea91ebf1`（token 大数 K/M/B 分级显示）→ `91b3f9d9`（manifest 登记 token 大数）→ `ee83308d`（三文档头部标记刷新）→ `ff2462de`（504/524 超时重试开关 + 超时自动禁用）→ `4ce5615c`（token 显示改进：删除 Token 后缀）→ `62830da3`（流式结束原因分类与中断流语义）→ `3a1279f1`（实时连接追踪）→ `8119f0ac`（manifest 登记实时连接追踪）→ `e024c98c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `977d2d5a`（实时连接表格优化）→ `15e56fb6`（尾部随机请求 ID + 下游/上游双模型列）→ `fe1cc018`（三文档头部标记刷新至 629d15cf）→ `5704e700`（滑动窗口渠道自动禁用）→ `4f52c010`（partial_failure length 收尾 + 异常流记错误日志）→ `d03a4c73`（实时连接侧边栏入口迁至 general 组）→ `e4da650b`（日志 t/s 计算排除 TTFT）→ `021771ae`（渠道流速率降级） → `4dc6823b`（慢流式降级配置 UI + 排除渠道 + 默认开启） → `214f874f`（首字延迟 TTFT 降级源） → `54d85b26`（TTFT 采样 min_input_tokens 门槛） → `385a17b2`（降级改固定数量窗口 ring buffer） → `35b1dc11`（渠道列表降级/限流图标）→ `822c1f85`（渠道测试请求随机化问句池与 max_tokens）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `8726fe30`（cherry-pick deploy 渠道密钥查看放开安全验证）→ `34904e15`（慢流降级接入模型组 DB 回退 + 两源 MGET 合并查询 + 降级徽章来源）→ `d7b4576f`（自动禁用原因细化 + 渠道/模型级禁用区分展示）
+> 对应分支：`personal` 基线 `317e9ddd`（2026-08-24 刷新至 `b1d030b6`；deploy 线功能部分，可用 `git diff upstream/main...317e9ddd` 核对。注意：`deploy` 分支自分叉点 `2ffa3979`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
+> 以下功能均为魔改线相对 `upstream/main` 的定制；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `317e9ddd` 的改动。
+> 魔改提交：`ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日志 t/s 计算排除 TTFT）→ `088876eb`（渠道流速率降级） → `7832b0e9`（慢流式降级配置 UI + 排除渠道 + 默认开启） → `b4a9805d`（首字延迟 TTFT 降级源） → `555a76a0`（TTFT 采样 min_input_tokens 门槛） → `c3c412f3`（降级改固定数量窗口 ring buffer） → `65588e93`（渠道列表降级/限流图标）→ `75ac9db4`（渠道测试请求随机化问句池与 max_tokens）→ `b7419616`（GHCR 构建支持分支前缀镜像 tag）→ `dbde0b31`（cherry-pick deploy 渠道密钥查看放开安全验证）→ `f9198749`（慢流降级接入模型组 DB 回退 + 两源 MGET 合并查询 + 降级徽章来源）→ `9edda449`（自动禁用原因细化 + 渠道/模型级禁用区分展示）
 
 ## 魔改开发约定（合并上游友好）
 
@@ -18,25 +18,25 @@
 
 | 功能 | 引入提交 | 上游冲突风险 | 扩展点形态 | 上游实现替代 |
 |------|----------|--------------|------------|--------------|
-| 请求调试日志 | `bfa99ad6` | 中（`controller/relay.go`、`relay/common/relay_info.go`） | `挂载点`+`独立文件`（核心在 relay/common/request_debug.go，relay.go 为挂载点） | 否 |
-| 日志自动清理 | `bfa99ad6` | 低 | `挂载点`+`独立文件`（service/system_task.go 任务注册挂载） | 否 |
-| 同优先级渠道重试 | `bfa99ad6` | 中（`controller/relay.go`） | `内联`（controller/relay.go 内）→ 待迁移 | 待观察（upstream `fix/tiered-retry-billing-followups` 主题相邻；上游合并后审查能否退役本地版） |
-| 504/524 超时重试开关与自动禁用 | `ff2462de` | 中（`controller/relay.go`、`setting/operation_setting/status_code_ranges.go`、系统设置前端） | `挂载点`（relay.go 接入点 + status_code_ranges.go 独立） | 否 |
-| 流式结束原因分类与中断流语义 | `62830da3` | 中（`relay/common/stream_status.go`、`relay/channel/openai/relay-openai.go`、`service/log_info_generate.go`） | `挂载点`（stream_status.go 新文件 + relay-openai.go 接入） | 否 |
-| 实时连接追踪 | `3a1279f1`、`977d2d5a`、`15e56fb6` | 中（`controller/relay.go`、`router/api-router.go`、`service/inflight_tracker.go`） | `独立文件`（service/inflight_tracker.go）+ `挂载点`（relay.go） | 否 |
-| GHCR 部署镜像构建 | `bfa99ad6` | 低 | `挂载点`+`独立文件`（workflow 文件独立） | 否 |
-| GHCR 分支前缀镜像 tag | `22c4cc90` | 低（`.github/workflows/deploy-image-ghcr.yml`） | `内联`（workflow 步骤原地改造） | 否 |
-| GHCR 镜像自动清理 | `ae34ad6a` | 低（`.github/workflows/deploy-image-ghcr.yml`） | `挂载点`+`独立文件`（workflow 步骤独立） | 否 |
-| 渠道请求频率限制（RPM） | `26271295`、`e09babdf`、`102747fd` | 中（`controller/relay.go`） | `内联` → 待迁移 | 否 |
-| 渠道测试请求文案定制 | `d0fdb047` | 低（`controller/channel-test.go`） | `内联`（channel-test.go）→ 待迁移 | 否 |
-| 加权模型映射（1 对多） | `9a20e660`、`c6c4bcf8`、`83329f48` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） | `内联`（relay/helper/model_mapped.go）→ 待迁移 | 否 |
-| 额度显示模式切换修复 | `d8378ee7` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
-| token 大数 K/M/B 分级显示 | `ea91ebf1`、`4ce5615c` | 低（`web/src/lib/currency.ts`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
-| 滑动窗口渠道自动禁用 | `5704e700`、`d7b4576f` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） | `独立文件`（service/channel_disable_window.go）+ `挂载点`（channel.go/relay.go/channel-test.go） | 否 |
-| 日志 t/s 计算排除 TTFT | `e4da650b` | 低（`web/src/features/usage-logs/`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
-| 渠道流速率降级（含首字延迟 TTFT 降级） | `021771ae`、`4dc6823b`、`34904e15` | 中（`model/channel_cache.go`、`model/model_group_select.go`、`service/quota.go`、`service/text_quota.go`、`web/src/features/system-settings/models/routing-reliability-section.tsx`） | `独立文件`（pkg/channel_slowstream/）+ `挂载点`（channel_cache.go/model_group_select.go/服务计费） | 否 |
-| 模型级路由表前台化与模型级禁用（含 auto-ban 细化） | `702be7eb`、`d7b4576f` | 中（`controller/relay.go`、`model/channel_cache.go`、`model/ability.go`、`controller/channel-test.go`） | `独立文件`（model/channel_disabled_model.go、service/channel_model_disable.go、controller/channel_ability.go、web/src/features/channel-abilities/）+ `挂载点`（channel_cache.go、ability.go、relay.go、channel-test.go、channel.go、main.go、channel-router.go） | 否 |
-| 渠道密钥查看放开安全验证 | `8726fe30`（cherry-pick 自 deploy `570561d1`） | 低（`router/channel-router.go`） | `内联`（纯删一行中间件，无可迁移逻辑） | 否 |
+| 请求调试日志 | `ee6da30d` | 中（`controller/relay.go`、`relay/common/relay_info.go`） | `挂载点`+`独立文件`（核心在 relay/common/request_debug.go，relay.go 为挂载点） | 否 |
+| 日志自动清理 | `ee6da30d` | 低 | `挂载点`+`独立文件`（service/system_task.go 任务注册挂载） | 否 |
+| 同优先级渠道重试 | `ee6da30d` | 中（`controller/relay.go`） | `内联`（controller/relay.go 内）→ 待迁移 | 待观察（upstream `fix/tiered-retry-billing-followups` 主题相邻；上游合并后审查能否退役本地版） |
+| 504/524 超时重试开关与自动禁用 | `bf00be83` | 中（`controller/relay.go`、`setting/operation_setting/status_code_ranges.go`、系统设置前端） | `挂载点`（relay.go 接入点 + status_code_ranges.go 独立） | 否 |
+| 流式结束原因分类与中断流语义 | `e033cc91` | 中（`relay/common/stream_status.go`、`relay/channel/openai/relay-openai.go`、`service/log_info_generate.go`） | `挂载点`（stream_status.go 新文件 + relay-openai.go 接入） | 否 |
+| 实时连接追踪 | `6ff43dbc`、`3958b068`、`e8078e55` | 中（`controller/relay.go`、`router/api-router.go`、`service/inflight_tracker.go`） | `独立文件`（service/inflight_tracker.go）+ `挂载点`（relay.go） | 否 |
+| GHCR 部署镜像构建 | `ee6da30d` | 低 | `挂载点`+`独立文件`（workflow 文件独立） | 否 |
+| GHCR 分支前缀镜像 tag | `b7419616` | 低（`.github/workflows/deploy-image-ghcr.yml`） | `内联`（workflow 步骤原地改造） | 否 |
+| GHCR 镜像自动清理 | `3db875f5` | 低（`.github/workflows/deploy-image-ghcr.yml`） | `挂载点`+`独立文件`（workflow 步骤独立） | 否 |
+| 渠道请求频率限制（RPM） | `a5a2304f`、`6a12bc8d`、`48f9c2e2` | 中（`controller/relay.go`） | `内联` → 待迁移 | 否 |
+| 渠道测试请求文案定制 | `fab8e37f` | 低（`controller/channel-test.go`） | `内联`（channel-test.go）→ 待迁移 | 否 |
+| 加权模型映射（1 对多） | `d840c4fb`、`3ecd81c9`、`d23122a5` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） | `内联`（relay/helper/model_mapped.go）→ 待迁移 | 否 |
+| 额度显示模式切换修复 | `484d024c` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
+| token 大数 K/M/B 分级显示 | `99cc5e56`、`cda0a61f` | 低（`web/src/lib/currency.ts`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
+| 滑动窗口渠道自动禁用 | `c0272220`、`9edda449` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） | `独立文件`（service/channel_disable_window.go）+ `挂载点`（channel.go/relay.go/channel-test.go） | 否 |
+| 日志 t/s 计算排除 TTFT | `33f8aa0f` | 低（`web/src/features/usage-logs/`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
+| 渠道流速率降级（含首字延迟 TTFT 降级） | `088876eb`、`7832b0e9`、`f9198749` | 中（`model/channel_cache.go`、`model/model_group_select.go`、`service/quota.go`、`service/text_quota.go`、`web/src/features/system-settings/models/routing-reliability-section.tsx`） | `独立文件`（pkg/channel_slowstream/）+ `挂载点`（channel_cache.go/model_group_select.go/服务计费） | 否 |
+| 模型级路由表前台化与模型级禁用（含 auto-ban 细化） | `cd98b0f8`、`9edda449` | 中（`controller/relay.go`、`model/channel_cache.go`、`model/ability.go`、`controller/channel-test.go`） | `独立文件`（model/channel_disabled_model.go、service/channel_model_disable.go、controller/channel_ability.go、web/src/features/channel-abilities/）+ `挂载点`（channel_cache.go、ability.go、relay.go、channel-test.go、channel.go、main.go、channel-router.go） | 否 |
+| 渠道密钥查看放开安全验证 | `dbde0b31`（cherry-pick 自 deploy `570561d1`） | 低（`router/channel-router.go`） | `内联`（纯删一行中间件，无可迁移逻辑） | 否 |
 
 > **标注口径**：「扩展点形态」按各功能详情章节文件清单判定（`独立文件`=新文件承载全部逻辑；`挂载点`=既有文件仅插入少量挂载调用；`内联`=逻辑直接改在既有文件中，为负债项，后续同步冲突时优先迁移）；「上游实现替代」以实施时 `remotes/upstream/*` 可见主题为准，发现新对应分支即改标 `待观察` 并注明分支名。
 
@@ -158,7 +158,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 - 每次 buildx 构建会在 GHCR 产生 **3 个 digest version**：1 个带 tag 的主 index digest（`deploy` + `deploy-<short_sha>`）+ 2 个无 tag 的平台辅助 digest（amd64 平台 manifest + attestation manifest）。
 - 清理只对**带 `deploy*` tag** 的 version 计数保留（最新 KEEP=3 个）；无 tag 的辅助 digest 不是可回滚版本，不占名额、**一律跳过不删**（见下方事故记录）。
-- 历史教训（2026-08-14）：早期版本按 `created_at` 全局排序取前 3，导致无 tag 辅助 digest 挤占保留名额、误删真实留档（如 `deploy-d57f803`）。`ae34ad6a` 起改为"带 tag 版本独立编号"。
+- 历史教训（2026-08-14）：早期版本按 `created_at` 全局排序取前 3，导致无 tag 辅助 digest 挤占保留名额、误删真实留档（如 `deploy-d57f803`）。`3db875f5` 起改为"带 tag 版本独立编号"。
 - **事故记录（2026-08-15）：删除无 tag 辅助 digest 导致 index 悬空。** 原实现"无 tag 辅助 digest 一律删除"，但这两个 digest 正是被带 tag index 引用的子 manifest（amd64 平台 manifest、attestation manifest）。删除后 index 引用悬空：curl 请求 index 返回 200（index 仍在），docker pull 解析 index 后请求子 manifest 得 404 → `manifest unknown`。症状：最新一次构建的版本可拉（辅助 digest 因 GHCR 列表最终一致性延迟逃过当次清理），**所有更早版本全部不可拉**，与镜像格式、docker 版本、网络均无关。修复：无 tag 版本一律跳过，只清理带 tag 版本；被清理 index 的孤儿辅助 manifest 仅数 KB，可忽略。
 - 不使用 `gh api --paginate` + `--jq` 组合（gh CLI 逐页应用 jq 的已知问题，cli/cli#10459），先拉取完整 JSON 再本地 jq 决策。
 - 清理决策写入 step summary 便于核对；删除失败仅警告不阻断构建。
@@ -215,7 +215,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - 单渠道超限：跳过该渠道并排除出重试候选，继续尝试同优先级其他渠道
 - 全渠道均被限流：HTTP 429 + `Retry-After: 60`，错误码 `channel:rate_limited`，客户端可据此退避
 - 回退行为：Redis 不可用时自动切到内存模式；Redis 或内存均出错时放行
-- 演进：`26271295` 引入基础 RPM；`e09babdf` 改为上下文感知（仅对当前请求生效）+ RPM 支持小数；`102747fd` 前端 RPM 输入框加 `step='any'`；2026-08-17 前端 UI 迁移：限流配置从「API 访问设置」移入「高级设置」→「Routing & Overrides」子节（新增 nav 跳转项、已配置状态高亮与自动展开）
+- 演进：`a5a2304f` 引入基础 RPM；`6a12bc8d` 改为上下文感知（仅对当前请求生效）+ RPM 支持小数；`48f9c2e2` 前端 RPM 输入框加 `step='any'`；2026-08-17 前端 UI 迁移：限流配置从「API 访问设置」移入「高级设置」→「Routing & Overrides」子节（新增 nav 跳转项、已配置状态高亮与自动展开）
 
 ### 文件清单
 
@@ -287,7 +287,7 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 ### 前端
 
 - 渠道编辑页 model mapping 编辑器的视觉模式将加权条目渲染为只读摘要（`加权映射 model×weight, ...`），编辑需切换到 JSON 模式
-- 「将重定向的上游模型从 Models 移除」守卫（`channel-mutate-drawer.tsx`）会展开加权数组，识别全部 target；`83329f48` 起同时排除「既是 source key 又是 target」的模型——source key 是路由入口，从 Models 移除会使渠道不可达
+- 「将重定向的上游模型从 Models 移除」守卫（`channel-mutate-drawer.tsx`）会展开加权数组，识别全部 target；`d23122a5` 起同时排除「既是 source key 又是 target」的模型——source key 是路由入口，从 Models 移除会使渠道不可达
 - 保存时（`channel-form.ts` 的 `normalizeModelMapping`）自动为缺失 `weight` 的条目补全为 `1`
 
 ### 文件清单
@@ -590,9 +590,9 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 # personal 分支半重构登记（模型组路由 + 计费/Ollama/订阅/OAuth/注册移除）
 
-> 对应分支：`personal`（基于基线 `7e6415e7`，原 deploy-model 分支已退役，2026-08-24 更新）
-> 本小节登记 `personal` 相对基线 `7e6415e7` 的半重构（`git log 7e6415e7..personal` 核对）。
-> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `c9148fb6`（修复成员优先级/权重继承失效）→ `6deec7b4`（上游请求改用成员真实上游模型）→ `6702a043`（移除系统设置 Billing 页残留）→ `e9456b25`（模型组引用成员开放编辑）→ `3711a3b6`（添加成员界面全量列表化 + 搜索）→ `2e2acbe5`（勾选多选批量添加）→ `aa882479`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `2ada174c`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `e2238bc0`（禁用徽章悬停显示级别/原因/时间）→ `1a29c27f`（成员测试按钮 + 测试通过即解禁）→ `84a96423`（未分类错误兜底改走模型级宽容窗口）
+> 对应分支：`personal`（基于基线 `317e9ddd`，原 deploy-model 分支已退役，2026-08-24 更新）
+> 本小节登记 `personal` 相对基线 `317e9ddd` 的半重构（`git log 317e9ddd..personal` 核对）。
+> 魔改提交序列：`cfddd71b`（模型组接管路由）→ `b6925d13`（错误分级与模型级到期恢复）→ `d0f1ea52`（计费功能级移除）→ `a7e70937`（前端计费 UI 删除）→ `1ee3129d`（i18n 孤儿 key 清理）→ `6745718c`（移除 Ollama 渠道）→ `1219dfc6`（订阅后端残留清理）→ `d2c72bfe`（移除 OAuth/Passkey 登录）→ `b962fc25`（移除开放注册与 OAuth/Passkey 前端残余）→ `c99427f3`（新建模型组前端 feature）→ `c58905d9`（模型组列表工具栏）→ `5b797304`（模型组列表关键词筛选 + 排序工具栏）→ `b7419616`（GHCR 构建支持分支前缀镜像 tag）→ `9f70c191`（修复成员优先级/权重继承失效）→ `30fb8c53`（上游请求改用成员真实上游模型）→ `076db805`（移除系统设置 Billing 页残留）→ `a2473546`（模型组引用成员开放编辑）→ `66a000ae`（添加成员界面全量列表化 + 搜索）→ `8727d3ce`（勾选多选批量添加）→ `fe9cc024`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `ea91c322`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `b1d030b6`（禁用徽章悬停显示级别/原因/时间）→ `8d34b68b`（成员测试按钮 + 测试通过即解禁）→ `711a845c`（未分类错误兜底改走模型级宽容窗口）
 
 ## 模型组路由表（一等公民）
 
@@ -612,7 +612,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 **成员测试按钮 + 测试通过即解禁（2026-08-24）**：`/model-groups` 页面成员 Actions 列新增测试按钮（Zap 图标），对成员的 `(渠道, 真实上游模型)` 直接发起一次 `testChannel` 探测——新端点 `POST /api/model-groups/items/:itemId/test`（`controller/model_group_member_probe.go` 新文件承载，路由挂 `ChannelOperate` 权限对齐 `/api/channel/test`）。探测成功即清除该 `(channel, model)` 的**任意来源**模型级禁用记录（`service.EnableChannelModel(source="")`，与渠道手动测试语义一致：手动探测是权威判定）——补上被自动/手动禁用成员此前只能在渠道页间接解禁的缺口，页面内即可完成「测试 → 解禁」；失败时透出上游错误 toast、徽章保留。响应结构同 `TestChannel`（success/message/time/error_code），顺带更新渠道响应时间。前端 per-row pending 动画；被禁成员成功后 toast「Test passed, member re-enabled」，未禁成员显示「Test passed」。i18n 新增 `Test passed` / `Test passed, member re-enabled` 两键七语言，并顺带归位上次漏跑 sync 排序的 `Channel-level disabled` 键。
 
-**未分类错误兜底模型级化（2026-08-24，`84a96423`）**：`processChannelError` 中渠道级/模型级判定均不命中的未分类错误（如裸 404 page not found），原兜底进渠道级宽容窗口——上游路径配置错误的反复 404 会把整个渠道拖进渠道级禁用，误伤同渠道其他可用模型。现兜底改为**模型级宽容窗口**（`CheckAndRecordDisableModel(..., false)`，默认 5 分钟 3 次只禁该成员，封禁键同样经 `ResolveModelGroupUpstreamModel` 解析）；管理员显式配置的规则（状态码范围/关键词/channel-error，经新分类器 `service.IsConfiguredDisableError` 判定）仍走渠道级严格窗口，skip-retry 错误任何层级不计数。
+**未分类错误兜底模型级化（2026-08-24，`711a845c`）**：`processChannelError` 中渠道级/模型级判定均不命中的未分类错误（如裸 404 page not found），原兜底进渠道级宽容窗口——上游路径配置错误的反复 404 会把整个渠道拖进渠道级禁用，误伤同渠道其他可用模型。现兜底改为**模型级宽容窗口**（`CheckAndRecordDisableModel(..., false)`，默认 5 分钟 3 次只禁该成员，封禁键同样经 `ResolveModelGroupUpstreamModel` 解析）；管理员显式配置的规则（状态码范围/关键词/channel-error，经新分类器 `service.IsConfiguredDisableError` 判定）仍走渠道级严格窗口，skip-retry 错误任何层级不计数。
 
 ### 文件清单
 
@@ -633,7 +633,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 - `model/main.go` - AutoMigrate 注册 `&ModelGroup{}`/`&ModelGroupItem{}`；`migrateDB` 挂载 `repairModelGroupItemInheritance`
 - `model/ability.go` - `GetGroupEnabledModels`/`GetEnabledModels` 数据源改模型组（/v1/models）
 - `model/channel_cache.go` - 路由索引数据源改模型组成员；`modelGroupItemOverrides`/`modelGroupParamOverride` 缓存（override 结构含成员上游模型）；`effectivePriority`/`effectiveWeight`
-- `controller/relay.go` - `processChannelError` 渠道级判定优先于模型级；模型级分支禁用键经 `ResolveModelGroupUpstreamModel` 解析为成员真实上游模型；未分类错误兜底改走模型级宽容窗口（2026-08-24，`84a96423`）
+- `controller/relay.go` - `processChannelError` 渠道级判定优先于模型级；模型级分支禁用键经 `ResolveModelGroupUpstreamModel` 解析为成员真实上游模型；未分类错误兜底改走模型级宽容窗口（2026-08-24，`711a845c`）
 - `middleware/distributor.go` - 组级参数覆盖逐 key 覆盖渠道级；`SetupContextForSelectedChannel` 织入成员上游模型映射
 - `model/channel_disabled_model.go` - `BannedUntil` 字段
 - `controller/channel-test.go` - 开头接入到期恢复
@@ -647,7 +647,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 - **自动组成员增删权限收归系统**：`controller/model_group.go` `AddGroupItem`/`DeleteGroupItem` 对 `source=auto` 组返回错误（成员只由渠道初始化/重建路由增删），自动组仅允许手动改优先级/权重/启停；前端隐藏自动组「Add Member」按钮并禁用成员删除按钮
 - `router/model-group-router.go` - 注册 `POST /api/model-groups/rebuild`（权限 ChannelWrite）
 - `web/src/features/model-groups/lib/api.ts` - `rebuildModelGroups()` 函数
-- `web/src/features/model-groups/components/model-groups-page.tsx` - 页面顶部添加「Rebuild Model Routing」按钮（带旋转 loading 动画）；按钮/toast 四个文案 key 已补齐七语言 locale（83846d54）
+- `web/src/features/model-groups/components/model-groups-page.tsx` - 页面顶部添加「Rebuild Model Routing」按钮（带旋转 loading 动画）；按钮/toast 四个文案 key 已补齐七语言 locale（eed9994c）
 - `web/src/features/model-groups/components/model-groups-page.tsx` - 新增列表工具栏：关键词筛选（匹配组名或成员模型名）+ 排序（默认「手动组在前」，可选「名称」「成员数量」，支持升降序切换）
 
 ## 计费功能级移除
@@ -687,7 +687,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 ## 移除系统设置 Billing 页残留
 
-`1dde0498` 删除计费 UI 时保留了系统设置「Billing & Payment」页（仅剩 Quota Settings + Check-in Rewards 两个 section）。本提交将其彻底移除：
+`a7e70937` 删除计费 UI 时保留了系统设置「Billing & Payment」页（仅剩 Quota Settings + Check-in Rewards 两个 section）。本提交将其彻底移除：
 
 - 删 `web/src/features/system-settings/billing/`（index + section-registry）、`/system-settings/billing/*` 路由、侧边栏「Billing & Payment」导航组、`BillingSettings` 类型与孤儿组件 `quota-settings-section.tsx` / `checkin-settings-section.tsx`（签到奖励管理入口随计费一并移除；后端 checkin 模块未动）
 - 死链修复：`legacy-route` 的 payment/ratio tab 回退到 `/system-settings`；渠道测试对话框与 playground 的 model_price_error「Go to Settings」按钮（指向已删除的 model-pricing 设置页）移除，错误文案保留（后端价格校验仍在）
