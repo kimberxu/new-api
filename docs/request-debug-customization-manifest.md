@@ -587,9 +587,9 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 # personal 分支半重构登记（模型组路由 + 计费/Ollama/订阅/OAuth/注册移除）
 
-> 对应分支：`personal`（基于基线 `7e6415e7`，原 deploy-model 分支已退役，2026-08-21 更新）
+> 对应分支：`personal`（基于基线 `7e6415e7`，原 deploy-model 分支已退役，2026-08-24 更新）
 > 本小节登记 `personal` 相对基线 `7e6415e7` 的半重构（`git log 7e6415e7..personal` 核对）。
-> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `c9148fb6`（修复成员优先级/权重继承失效）→ `6deec7b4`（上游请求改用成员真实上游模型）→ `6702a043`（移除系统设置 Billing 页残留）→ `e9456b25`（模型组引用成员开放编辑）→ `3711a3b6`（添加成员界面全量列表化 + 搜索）→ `2e2acbe5`（勾选多选批量添加）→ `aa882479`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `2ada174c`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `e2238bc0`（禁用徽章悬停显示级别/原因/时间）
+> 魔改提交序列：`f0e22981`（模型组接管路由）→ `61ebb170`（错误分级与模型级到期恢复）→ `39855760`（计费功能级移除）→ `1dde0498`（前端计费 UI 删除）→ `98586abe`（i18n 孤儿 key 清理）→ `8aeaac07`（移除 Ollama 渠道）→ `46fbe6e6`（订阅后端残留清理）→ `a7c3bb6d`（移除 OAuth/Passkey 登录）→ `9018f826`（移除开放注册与 OAuth/Passkey 前端残余）→ `6919aeda`（新建模型组前端 feature）→ `7e5bddbe`（模型组列表工具栏）→ `eccb3c5e`（模型组列表关键词筛选 + 排序工具栏）→ `22c4cc90`（GHCR 构建支持分支前缀镜像 tag）→ `c9148fb6`（修复成员优先级/权重继承失效）→ `6deec7b4`（上游请求改用成员真实上游模型）→ `6702a043`（移除系统设置 Billing 页残留）→ `e9456b25`（模型组引用成员开放编辑）→ `3711a3b6`（添加成员界面全量列表化 + 搜索）→ `2e2acbe5`（勾选多选批量添加）→ `aa882479`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `2ada174c`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `e2238bc0`（禁用徽章悬停显示级别/原因/时间）→ `1a29c27f`（成员测试按钮 + 测试通过即解禁）
 
 ## 模型组路由表（一等公民）
 
@@ -607,6 +607,8 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 **禁用徽章悬停显示级别/原因/时间（2026-08-24）**：上一增强的徽章只有文字、无法区分「渠道级禁用」与「模型级禁用」，也看不到原因与时间。现两类徽章均改为 Tooltip 悬停详情：模型级（`disabled` 徽章）由原生 `title` 升级为 Tooltip，显示来源（Auto/Manual）、原因、禁用时间（`channel_disabled_models.created_at`，前端类型补齐该字段）与恢复倒计时/永久；渠道级（`channel_status` 2/3）徽章新增 Tooltip，显示原因与时间——后端 `GroupMemberView` 新增 `channel_status_reason string` / `channel_status_time int64` 字段，取自渠道 `other_info.status_reason/status_time`（复用既有逐成员 `GetChannelById` 解析，仅非启用状态解析，零额外查询）。i18n 新增 `Channel-level disabled` 键七语言。
 
+**成员测试按钮 + 测试通过即解禁（2026-08-24）**：`/model-groups` 页面成员 Actions 列新增测试按钮（Zap 图标），对成员的 `(渠道, 真实上游模型)` 直接发起一次 `testChannel` 探测——新端点 `POST /api/model-groups/items/:itemId/test`（`controller/model_group_member_probe.go` 新文件承载，路由挂 `ChannelOperate` 权限对齐 `/api/channel/test`）。探测成功即清除该 `(channel, model)` 的**任意来源**模型级禁用记录（`service.EnableChannelModel(source="")`，与渠道手动测试语义一致：手动探测是权威判定）——补上被自动/手动禁用成员此前只能在渠道页间接解禁的缺口，页面内即可完成「测试 → 解禁」；失败时透出上游错误 toast、徽章保留。响应结构同 `TestChannel`（success/message/time/error_code），顺带更新渠道响应时间。前端 per-row pending 动画；被禁成员成功后 toast「Test passed, member re-enabled」，未禁成员显示「Test passed」。i18n 新增 `Test passed` / `Test passed, member re-enabled` 两键七语言，并顺带归位上次漏跑 sync 排序的 `Channel-level disabled` 键。
+
 ### 文件清单
 
 **新增：**
@@ -620,6 +622,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 - `web/src/routes/_authenticated/model-groups/index.tsx` - 路由 `/model-groups`
 - `model/model_group_repair.go` - 一次性数据修复 `repairModelGroupItemInheritance`：成员 Priority/Weight 曾带 gorm `default:0`，GORM 对 nil 指针省列并回填 0，把「继承渠道值」（NULL）落库成显式 0 覆盖；修复去掉 tag 并把存量 0 值重置为 NULL（options 表 flag 保证只跑一次，修复后的显式 0 覆盖不受影响）
 - `model/model_group_upstream.go` - `ResolveModelGroupUpstreamModel`/`ApplyModelGroupMemberMapping`：路由名（组名）与上游模型解耦——手动组（如 ox）成员记录真实上游模型，选渠后把 `{组名: 上游模型}` 合并进该渠道 `model_mapping`，由既有 ModelMappedHelper 完成请求改写；显式渠道映射同名条目优先；内存缓存路径读 `modelGroupItemOverrides`（结构新增 model 字段），无缓存路径直接查表
+- `controller/model_group_member_probe.go` - `TestModelGroupItem` handler（成员测试端点，探测成功清任意来源模型级禁用）；配套 `model.GetModelGroupItem`（纯追加于 model_group.go）
 
 **改动（挂载点/最小插入）：**
 - `model/main.go` - AutoMigrate 注册 `&ModelGroup{}`/`&ModelGroupItem{}`；`migrateDB` 挂载 `repairModelGroupItemInheritance`
