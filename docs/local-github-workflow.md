@@ -80,7 +80,7 @@ git push --force-with-lease origin deploy
 | `controller/relay.go` | 渠道限流检查、同优先级重试 `ExcludeChannel`、全渠道限流 429 兜底、（新增）模型级禁用分支 | 重试/计费逻辑（如 `PrepareTieredBillingForSelectedGroup`） | `e0b9f243`：2026-08-01 同步 8 提交；重试/计费逻辑拼序采纳、限流检查保留；`cd98b0f8`：2026-08-19 同步 0 提交；`processChannelError` 既有禁用两行包进 else、前插模型级 if 分支（包 else 非纯追加，冲突时按「保留魔改 + 采纳上游语义」手动合并） |
 | `controller/channel-test.go` | 模型级禁用/恢复分支、`ShouldDisableChannelWithDecision`、`processChannelError` 第 4 参 `nil` | 上游 `4add708e` 把单渠道测试重构成 `runChannelTestWorkers` worker 池，循环体整体搬家 | `235ae5a7`：2026-08-24 同步 6 提交；上游重构后的新调用点逐处补魔改行（判定换 `WithDecision`、模型级 if/else 包裹、enable 块后插模型级恢复块、`performChannelTests` 调用前插 `recoverExpiredModelBans` 且保留上游新增的 `concurrency` 参数） |
 | `web/src/features/system-settings/models/routing-reliability-section.tsx` | 滑动窗口禁用 4 字段、慢流/TTFT 降级配置（`channel_slow_stream_setting`） | 上游把 schema 重构为 `createRoutingReliabilitySchema(t)` 工厂 + i18n 化 | `235ae5a7`：2026-08-24 同步 6 提交；schema 一律取上游工厂版再插入魔改字段（含 superRefine 两条采样校验）；i18n locale 冲突用语义三方合并（保留上游新增键、应用魔改键变更） |
-| i18n locale（`web/src/i18n/locales/*.json`） | 魔改 UI 文案键 | 上游同区段增删键导致整块冲突 | `235ae5a7`：2026-08-24 同步 6 提交；按「ours 为底 + theirs 增改覆盖」语义合并，键序以 ours 为准 |
+| i18n locale（`web/src/i18n/locales/*.json`） | 魔改 UI 文案键 | 上游同区段增删键导致整块冲突 | `235ae5a7`：2026-08-24 同步 6 提交；用 `scripts/i18n_3way_merge.py` 语义合并（ours 为底 + theirs 增改覆盖），键序以 ours 为准，事后 `bun run i18n:sync` 归位 |
 | `relay/common/relay_info.go` | `RequestDebugSnapshot` 字段 | `RelayInfo` 结构体字段增减、注释更新 | （空，待首录） |
 | `web/src/features/usage-logs/components/dialogs/details-dialog.tsx` | 请求调试快照面板 | 日志详情功能（如 stream status） | （空，待首录） |
 
@@ -90,15 +90,28 @@ git push --force-with-lease origin deploy
 
 历史参考：2026-08-01 同步 8 个上游提交时，前两个文件各产生一处冲突，处理方式记录在合并提交 `e0b9f243`。
 
+#### 同步后终态核对（防静默错合并，先于构建执行）
+
+三方合并可能「无冲突但错」：重放提交的 hunk 被静默丢弃、或残留已被后续魔改重构淘汰的代码（2026-08-24 同步时 `ea4f0210` 即发生过，靠 build 才暴露）。因此 rebase 完成后、跑构建前，必须对**本次解过冲突的每个文件**做终态核对：
+
+```bash
+git diff origin/<branch> -- <冲突文件>
+# 差异必须能逐行解释为「上游窗口内的改动」；解释不了的差异逐行查明
+```
+
+原理：解过冲突的文件若合并正确，其内容 = 旧线终态 + 上游本次改动，diff 中不应出现其它内容。整文件级 `git checkout --ours/--theirs` 前也必须先用 `git diff <commit>^ <commit> -- <file>` 核实另一侧对该文件的真实改动范围，禁止盲用。
+
 #### 合并后验证
 
 ```bash
 /usr/local/go/bin/go build ./...                                 # 根模块（需 Go >= 1.25）
 cd relaykit && GOWORK=off /usr/local/go/bin/go build ./...       # relaykit 独立模块（须独立可构建）
 cd web && bun run build                                          # 前端
+systemd-run --user --scope -p MemoryMax=1G -- /usr/local/go/bin/go test ./controller/... ./service/... ./relay/... ./common/... ./pkg/billingexpr/...
+cd web && systemd-run --user --scope -p MemoryMax=1G -- bun run test
 ```
 
-> 注意：本机 `/usr/bin/go` 是 1.19，无法解析 go.mod 的 `go 1.25.1` 指令。使用 `/usr/local/go/bin/go`（1.26），或先 `hash -r` 清除 shell 命令缓存。
+> 构建只证明可编译；计费/禁用/结算路径的合并正确性由测试兜底（AGENTS.md 计费不变量有回归要求）。已知预存在失败用例需先在旧线终态复跑确认非本次回归（`git worktree add /tmp/old origin/<旧tip>` 后同命令复跑），并在同步报告中注明。
 
 ## 部署
 
