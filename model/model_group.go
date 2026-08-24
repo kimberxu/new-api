@@ -123,6 +123,15 @@ func GetModelGroupByItemId(itemId int) (*ModelGroup, error) {
 	return GetModelGroupById(item.GroupId)
 }
 
+// GetModelGroupItem resolves one member row by id.
+func GetModelGroupItem(itemId int) (*ModelGroupItem, error) {
+	var item ModelGroupItem
+	if err := DB.First(&item, itemId).Error; err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
 // ListModelGroups returns all groups (optionally only one source).
 func ListModelGroups(source string) ([]*ModelGroup, error) {
 	var groups []*ModelGroup

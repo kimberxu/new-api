@@ -25,9 +25,11 @@ import {
   SlidersHorizontal,
   Trash2,
   X,
+  Zap,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
@@ -68,7 +70,7 @@ export interface MemberEditState {
   weightInput: string
 }
 
-export interface UpdateMemberResult {
+export interface MemberActionResult {
   success: boolean
   message?: string
 }
@@ -88,8 +90,9 @@ interface GroupCardProps {
     item: ModelGroupItem,
     priority: number | null,
     weight: number | null
-  ) => Promise<UpdateMemberResult>
+  ) => Promise<MemberActionResult>
   onToggleMember: (item: ModelGroupItem, enabled: boolean) => void
+  onTestMember: (item: ModelGroupItem) => Promise<MemberActionResult>
 }
 
 export function GroupCard(props: GroupCardProps) {
@@ -99,6 +102,7 @@ export function GroupCard(props: GroupCardProps) {
   const bannedCount = members.filter((m) => m.disabled).length
 
   const [edits, setEdits] = useState<Record<number, MemberEditState>>({})
+  const [testingId, setTestingId] = useState<number | null>(null)
 
   const getEdit = (item: ModelGroupItem): MemberEditState => {
     const existing = edits[item.id]
@@ -132,6 +136,26 @@ export function GroupCard(props: GroupCardProps) {
       }
     } catch {
       /* 页面 mutation onError 已 toast */
+    }
+  }
+
+  const testMember = async (item: ModelGroupItem) => {
+    setTestingId(item.id)
+    try {
+      const res = await props.onTestMember(item)
+      if (res.success) {
+        if (item.disabled) {
+          toast.success(t('Test passed, member re-enabled'))
+        } else {
+          toast.success(t('Test passed'))
+        }
+      } else {
+        toast.error(res.message || t('Test failed'))
+      }
+    } catch {
+      /* 网络层错误已由全局拦截器 toast */
+    } finally {
+      setTestingId(null)
     }
   }
 
@@ -457,6 +481,20 @@ export function GroupCard(props: GroupCardProps) {
                       </TableCell>
                       <TableCell>
                         <div className='flex items-center gap-1'>
+                          <Button
+                            variant='ghost'
+                            size='icon-sm'
+                            disabled={testingId !== null || props.updatingMember}
+                            onClick={() => testMember(item)}
+                            title={t('Test')}
+                          >
+                            <Zap
+                              className={cn(
+                                'h-4 w-4',
+                                testingId === item.id && 'animate-pulse'
+                              )}
+                            />
+                          </Button>
                           <Button
                             variant='ghost'
                             size='icon-sm'

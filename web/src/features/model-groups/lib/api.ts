@@ -197,3 +197,14 @@ export async function rebuildModelGroups(): Promise<{
   )
   return res.data
 }
+
+export async function testGroupItem(
+  itemId: number
+): Promise<{ success: boolean; message?: string }> {
+  const res = await api.post(
+    `/api/model-groups/items/${itemId}/test`,
+    {},
+    { skipBusinessError: true, skipErrorHandler: true }
+  )
+  return res.data
+}
