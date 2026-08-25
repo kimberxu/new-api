@@ -25,6 +25,14 @@ deploy 线作业约定：
 
 This is an AI API gateway/proxy built with Go. It aggregates 40+ upstream AI providers (OpenAI, Claude, Gemini, Azure, AWS Bedrock, etc.) behind a unified API, with user management, rate limiting, and an admin dashboard. On this branch (`personal`), billing/top-up/subscription and OAuth/Passkey login have been removed; relay is free of charge (billing code paths are short-circuited, DB tables retained).
 
+## 测试数据库（Supabase PostgreSQL，优先）
+
+- 本项目在本机做集成/运行测试时，**默认优先用 PostgreSQL（Supabase 免费档）而非 SQLite**，以贴近生产语义（三库兼容约束见下文 Rules）。仅当网络不可达或纯单元测试时才回退 SQLite。
+- 真实 DSN 存放在仓库根目录 `.env`（已被 `.gitignore` 忽略），启动方式：`set -a; source .env; set +a; go run .`。**严禁把真实 DSN 写入任何被跟踪的文件**；`.env.example` 只放占位示例。
+- 该 Supabase 项目同时承载 GitHub Actions 保活表 `baohuo`：本项目 AutoMigrate 只建自己的表，二者互不影响；保活查询顺带防止免费档 7 天不活跃暂停。
+- 直连域名 `db.<ref>.supabase.co:5432` 仅解析 IPv6，本机有 IPv6 可直连；无 IPv6 环境（部分 CI/公司网）改用 Session Pooler：`postgresql://postgres.<ref>:<密码>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require`。不要用 6543 端口（transaction 模式池化，prepared statement 会报错）。
+- 安全注意：Supabase 默认把 `public` schema 暴露在自动生成的 Data API（`/rest/v1/<table>`）上，且 GORM 建的表没有 RLS，anon key 可直接读写 `users`、`tokens` 等表。跑实例前先到 Dashboard → Settings → API 把 Exposed schemas 里的 `public` 移除（或禁用 Data API）。
+
 ## Tech Stack
 
 - **Backend**: Go 1.22+, Gin web framework, GORM v2 ORM
