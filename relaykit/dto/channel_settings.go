@@ -85,6 +85,8 @@ type ChannelOtherSettings struct {
 	UpstreamModelUpdateLastDetectedModels []string              `json:"upstream_model_update_last_detected_models,omitempty"` // 上次检测到的可加入模型
 	UpstreamModelUpdateLastRemovedModels  []string              `json:"upstream_model_update_last_removed_models,omitempty"`  // 上次检测到的可删除模型
 	UpstreamModelUpdateIgnoredModels      []string              `json:"upstream_model_update_ignored_models,omitempty"`       // 手动忽略的模型
+	UpstreamModelUpdateAutoDeleteEnabled  bool                  `json:"upstream_model_update_auto_delete_enabled,omitempty"` // 检出的上游已消失模型是否自动删除（空列表时不删）
+	UpstreamModelUpdateIncludeFilter      []string              `json:"upstream_model_update_include_filter,omitempty"`       // 仅纳入命中的模型（精确名 + regex: 前缀）
 	AdvancedCustom                        *AdvancedCustomConfig `json:"advanced_custom,omitempty"`
 	// ToolLossPolicy is a channel-level opt-in for request-phase conversion
 	// rejection. Empty follows the default allow policy. Accepted values:

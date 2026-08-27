@@ -308,6 +308,8 @@ const SENSITIVE_FORM_FIELDS = [
   'upstream_model_update_check_enabled',
   'upstream_model_update_auto_sync_enabled',
   'upstream_model_update_ignored_models',
+  'upstream_model_update_auto_delete_enabled',
+  'upstream_model_update_include_filter',
 ] satisfies (keyof ChannelFormValues)[]
 
 function readAdvancedSettingsPreference(): boolean {
@@ -356,7 +358,9 @@ function hasAdvancedSettingsValues(values: ChannelFormValues): boolean {
     values.rate_limit_enabled === true ||
     values.upstream_model_update_check_enabled ||
     values.upstream_model_update_auto_sync_enabled ||
-    values.upstream_model_update_ignored_models?.trim()
+    values.upstream_model_update_ignored_models?.trim() ||
+    values.upstream_model_update_auto_delete_enabled ||
+    values.upstream_model_update_include_filter?.trim()
   )
 }
 
@@ -782,6 +786,12 @@ export function ChannelMutateDrawer({
   const currentUpstreamModelUpdateIgnoredModels = form.watch(
     'upstream_model_update_ignored_models'
   )
+  const currentUpstreamModelUpdateAutoDeleteEnabled = form.watch(
+    'upstream_model_update_auto_delete_enabled'
+  )
+  const currentUpstreamModelUpdateIncludeFilter = form.watch(
+    'upstream_model_update_include_filter'
+  )
   const shouldPreviewUnsavedModels =
     !isEditing ||
     (currentType === CHANNEL_TYPE_ADVANCED_CUSTOM && canEditSensitive)
@@ -1070,7 +1080,9 @@ export function ChannelMutateDrawer({
   const upstreamModelDetectionConfigured = Boolean(
     upstreamModelUpdateCheckEnabled ||
     currentUpstreamModelUpdateAutoSyncEnabled ||
-    currentUpstreamModelUpdateIgnoredModels?.trim()
+    currentUpstreamModelUpdateIgnoredModels?.trim() ||
+    currentUpstreamModelUpdateAutoDeleteEnabled ||
+    currentUpstreamModelUpdateIncludeFilter?.trim()
   )
   const rateLimitConfigured = rateLimitEnabled === true
   const advancedConfigured = Boolean(
@@ -4889,6 +4901,33 @@ export function ChannelMutateDrawer({
                                     </FormItem>
                                   )}
                                 />
+                                <FormField
+                                  control={form.control}
+                                  name='upstream_model_update_auto_delete_enabled'
+                                  render={({ field }) => (
+                                    <FormItem className='flex items-center justify-between px-4 py-3'>
+                                      <div className='space-y-0.5'>
+                                        <FormLabel>
+                                          {t('Auto Delete Upstream Models')}
+                                        </FormLabel>
+                                        <FormDescription>
+                                          {t(
+                                            'Automatically remove models missing from upstream when detected'
+                                          )}
+                                        </FormDescription>
+                                      </div>
+                                      <FormControl>
+                                        <Switch
+                                          checked={field.value}
+                                          disabled={
+                                            !upstreamModelUpdateCheckEnabled
+                                          }
+                                          onCheckedChange={field.onChange}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
                               </div>
                               <FormField
                                 control={form.control}
@@ -4915,14 +4954,39 @@ export function ChannelMutateDrawer({
                                   </FormItem>
                                 )}
                               />
+                              <FormField
+                                control={form.control}
+                                name='upstream_model_update_include_filter'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t('Only process matching upstream models')}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t(
+                                          'e.g., gpt-4o,regex:^claude-.*$'
+                                        )}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t(
+                                        'Comma-separated exact model names. Prefix with regex: to only process matching models. Empty = process all.'
+                                      )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
                               <div className='text-muted-foreground space-y-2 border-t pt-3 text-xs'>
                                 <div>
                                   <span className='text-foreground font-medium'>
                                     {t('Last check time')}:
                                   </span>{' '}
-                                  {formatUnixTime(
-                                    upstreamUpdateMeta.lastCheckTime
-                                  )}
+                                {formatUnixTime(
+                                  upstreamUpdateMeta.lastCheckTime
+                                )}
                                 </div>
                                 <div>
                                   <span className='text-foreground font-medium'>

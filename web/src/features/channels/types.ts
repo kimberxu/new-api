@@ -106,13 +106,14 @@ export interface ChannelOtherSettings {
   upstream_model_update_check_enabled?: boolean
   upstream_model_update_auto_sync_enabled?: boolean
   upstream_model_update_ignored_models?: string[]
+  upstream_model_update_auto_delete_enabled?: boolean
+  upstream_model_update_include_filter?: string[]
   upstream_model_update_last_check_time?: number
   upstream_model_update_last_detected_models?: string[]
   rate_limit_enabled?: boolean
   rate_limit_rpm?: number
   advanced_custom?: AdvancedCustomConfig
 }
-
 export interface AdvancedCustomConfig {
   advanced_routes?: AdvancedCustomRoute[]
 }
