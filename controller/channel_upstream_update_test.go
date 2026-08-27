@@ -345,7 +345,7 @@ func TestFailedAdvancedCustomDetectionDoesNotStageFullRemoval(t *testing.T) {
 	channel.SetOtherSettings(settings)
 	require.NoError(t, db.Create(channel).Error)
 
-	modelsChanged, autoAdded, err := checkAndPersistChannelUpstreamModelUpdates(channel, &settings, true, true)
+	modelsChanged, autoAdded, _, err := checkAndPersistChannelUpstreamModelUpdates(channel, &settings, true, true)
 	require.ErrorContains(t, err, "no valid model IDs")
 	require.False(t, modelsChanged)
 	require.Zero(t, autoAdded)
@@ -511,6 +511,7 @@ func TestCollectPendingUpstreamModelChangesFromModels_WithModelMapping(t *testin
 		[]string{"alias-model", "gpt-4o", "stale-model"},
 		[]string{"gpt-4o", "gpt-4.1", "mapped-target"},
 		[]string{"gpt-4.1"},
+		nil,
 		map[string][]string{
 			"alias-model": {"mapped-target"},
 		},
@@ -525,6 +526,7 @@ func TestCollectPendingUpstreamModelChangesFromModels_WithIgnoredRegexPatterns(t
 		[]string{"gpt-4o"},
 		[]string{"gpt-4o", "claude-3-5-sonnet", "sora-video", "gpt-4.1"},
 		[]string{"regex:^sora-.*$", "gpt-4.1"},
+		nil,
 		nil,
 	)
 
@@ -603,4 +605,90 @@ func TestDetectAllChannelUpstreamModelUpdatesRejectsExistingActiveTask(t *testin
 	require.Equal(t, http.StatusConflict, recorder.Code)
 	require.Contains(t, recorder.Body.String(), existing.TaskID)
 	require.Contains(t, recorder.Body.String(), "已有模型更新任务正在运行或等待中")
+}
+func TestCheckAndPersistAutoDeleteRemovesStaleModels(t *testing.T) {
+	db := setupModelListControllerTestDB(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"id":"gpt-4o"},{"id":"gpt-4.1"}]}`))
+	}))
+	defer server.Close()
+
+	channel := &model.Channel{
+		Type:    constant.ChannelTypeNewAPI,
+		Key:     "new-api-key",
+		BaseURL: &server.URL,
+		Name:    "auto-delete channel",
+		Models:  "gpt-4o,stale-model",
+	}
+	settings := channel.GetOtherSettings()
+	settings.UpstreamModelUpdateCheckEnabled = true
+	settings.UpstreamModelUpdateAutoDeleteEnabled = true
+	channel.SetOtherSettings(settings)
+	require.NoError(t, db.Create(channel).Error)
+
+	modelsChanged, autoAdded, autoRemoved, err := checkAndPersistChannelUpstreamModelUpdates(channel, &settings, true, true)
+	require.NoError(t, err)
+	require.True(t, modelsChanged)
+	require.Zero(t, autoAdded)
+	require.Equal(t, []string{"stale-model"}, autoRemoved)
+	// 自动删除后 remove staging 清空，add staging 保留待审。
+	require.Empty(t, settings.UpstreamModelUpdateLastRemovedModels)
+	require.Equal(t, []string{"gpt-4.1"}, settings.UpstreamModelUpdateLastDetectedModels)
+
+	reloaded, err := model.GetChannelById(channel.Id, true)
+	require.NoError(t, err)
+	reloadedSettings := reloaded.GetOtherSettings()
+	require.Equal(t, "gpt-4o", reloaded.Models)
+	require.Empty(t, reloadedSettings.UpstreamModelUpdateLastRemovedModels)
+	require.Equal(t, []string{"gpt-4.1"}, reloadedSettings.UpstreamModelUpdateLastDetectedModels)
+}
+
+func TestCheckAndPersistAutoDeleteSkipsEmptyUpstreamList(t *testing.T) {
+	db := setupModelListControllerTestDB(t)
+	// 通用 OpenAI 契约渠道：上游返回空列表不报错（仅 AdvancedCustom 对空列表报错）。
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}))
+	defer server.Close()
+
+	channel := &model.Channel{
+		Type:    constant.ChannelTypeNewAPI,
+		Key:     "new-api-key",
+		BaseURL: &server.URL,
+		Name:    "empty upstream channel",
+		Models:  "gpt-4o,stale-model",
+	}
+	settings := channel.GetOtherSettings()
+	settings.UpstreamModelUpdateCheckEnabled = true
+	settings.UpstreamModelUpdateAutoDeleteEnabled = true
+	channel.SetOtherSettings(settings)
+	require.NoError(t, db.Create(channel).Error)
+
+	modelsChanged, autoAdded, autoRemoved, err := checkAndPersistChannelUpstreamModelUpdates(channel, &settings, true, true)
+	require.NoError(t, err)
+	require.False(t, modelsChanged)
+	require.Zero(t, autoAdded)
+	require.Empty(t, autoRemoved)
+	// 空上游列表视为「获取不到模型」：不自动删除，也不把误判的删除写入 staging。
+	require.Empty(t, settings.UpstreamModelUpdateLastRemovedModels)
+
+	reloaded, err := model.GetChannelById(channel.Id, true)
+	require.NoError(t, err)
+	require.Equal(t, "gpt-4o,stale-model", reloaded.Models)
+	require.Empty(t, reloaded.GetOtherSettings().UpstreamModelUpdateLastRemovedModels)
+}
+
+func TestCollectPendingUpstreamModelChangesFromModels_WithIncludeFilter(t *testing.T) {
+	pendingAddModels, pendingRemoveModels := collectPendingUpstreamModelChangesFromModels(
+		[]string{"gpt-4o", "claude-3-5-sonnet", "stale-model"},
+		[]string{"gpt-4o", "claude-4-sonnet", "sora-video", "gpt-4.1"},
+		nil,
+		[]string{"gpt-4o", "regex:^claude-.*$"},
+		nil,
+	)
+
+	// 只取命中筛选的模型：claude-3-5-sonnet 已过时将被移除，claude-4-sonnet 可加入，
+	// 未命中的 sora-video / gpt-4.1 / stale-model 完全不参与。
+	require.Equal(t, []string{"claude-4-sonnet"}, pendingAddModels)
+	require.Equal(t, []string{"claude-3-5-sonnet"}, pendingRemoveModels)
 }
