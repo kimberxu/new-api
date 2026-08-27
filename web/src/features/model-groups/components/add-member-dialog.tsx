@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
-import { Search, X } from 'lucide-react'
+import { Check, Search, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -103,6 +103,14 @@ export function AddMemberDialog(props: AddMemberDialogProps) {
       `${o.model} ${o.channelLabel}`.toLowerCase().includes(kw)
     )
   }, [memberOptions, memberSearch])
+
+  const existingMemberKeys = useMemo(() => {
+    const set = new Set<string>()
+    for (const m of props.group.members ?? []) {
+      set.add(`${m.channel_id}|${m.model}`)
+    }
+    return set
+  }, [props.group.members])
 
   const toggleMemberOption = (value: string, checked: boolean) => {
     setAddSelected((prev) => {
@@ -252,31 +260,45 @@ export function AddMemberDialog(props: AddMemberDialogProps) {
                   {t('No matching channel model.')}
                 </div>
               ) : (
-                visibleMemberOptions.map((option) => (
+                visibleMemberOptions.map((option) => {
+                  const isExisting = existingMemberKeys.has(option.value)
+                  return (
                   <div
                     key={option.value}
                     className='hover:bg-accent/60 flex items-center gap-2 rounded-md px-2 py-1.5'
                   >
                     <Checkbox
                       id={`member-option-${option.value}`}
-                      checked={addSelected.has(option.value)}
+                      checked={isExisting || addSelected.has(option.value)}
+                      disabled={isExisting}
                       onCheckedChange={(checked) =>
                         toggleMemberOption(option.value, !!checked)
                       }
                     />
                     <Label
                       htmlFor={`member-option-${option.value}`}
-                      className='min-w-0 flex-1 cursor-pointer font-normal'
+                      className={
+                        'min-w-0 flex-1 cursor-pointer font-normal' +
+                        (isExisting ? ' text-muted-foreground line-through' : '')
+                      }
                     >
                       <span className='block truncate font-mono text-xs font-medium'>
                         {option.model}
                       </span>
                     </Label>
-                    <span className='ml-auto shrink-0 pl-2 text-muted-foreground text-xs'>
-                      {option.channelLabel}
-                    </span>
+                    {isExisting ? (
+                      <span className='ml-auto flex shrink-0 items-center gap-1 pl-2 text-muted-foreground text-xs'>
+                        <Check className='h-3 w-3' />
+                        {option.channelLabel}
+                      </span>
+                    ) : (
+                      <span className='ml-auto shrink-0 pl-2 text-muted-foreground text-xs'>
+                        {option.channelLabel}
+                      </span>
+                    )}
                   </div>
-                ))
+                  )
+                })
               )}
             </div>
             <p className='text-muted-foreground text-xs'>
