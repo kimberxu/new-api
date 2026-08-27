@@ -2,7 +2,7 @@
 
 > 对应分支：`personal` 基线 `317e9ddd`（2026-08-24 刷新至 `b1d030b6`；deploy 线功能部分，可用 `git diff upstream/main...317e9ddd` 核对。注意：`deploy` 分支自分叉点 `2ffa3979`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
 > 以下功能均为魔改线相对 `upstream/main` 的定制；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `317e9ddd` 的改动。
-> 魔改提交：`ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日志 t/s 计算排除 TTFT）→ `088876eb`（渠道流速率降级） → `7832b0e9`（慢流式降级配置 UI + 排除渠道 + 默认开启） → `b4a9805d`（首字延迟 TTFT 降级源） → `555a76a0`（TTFT 采样 min_input_tokens 门槛） → `c3c412f3`（降级改固定数量窗口 ring buffer） → `65588e93`（渠道列表降级/限流图标）→ `75ac9db4`（渠道测试请求随机化问句池与 max_tokens）→ `b7419616`（GHCR 构建支持分支前缀镜像 tag）→ `dbde0b31`（cherry-pick deploy 渠道密钥查看放开安全验证）→ `f9198749`（慢流降级接入模型组 DB 回退 + 两源 MGET 合并查询 + 降级徽章来源）→ `9edda449`（自动禁用原因细化 + 渠道/模型级禁用区分展示）
+> 魔改提交：`f10d688f`（上游模型自动删除开关与筛选模型）→ `ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日…
 
 ## 魔改开发约定（合并上游友好）
 
@@ -29,8 +29,8 @@
 | GHCR 镜像自动清理 | `3db875f5` | 低（`.github/workflows/deploy-image-ghcr.yml`） | `挂载点`+`独立文件`（workflow 步骤独立） | 否 |
 | 渠道请求频率限制（RPM） | `a5a2304f`、`6a12bc8d`、`48f9c2e2` | 中（`controller/relay.go`） | `内联` → 待迁移 | 否 |
 | 渠道测试请求文案定制 | `fab8e37f` | 低（`controller/channel-test.go`） | `内联`（channel-test.go）→ 待迁移 | 否 |
-  | 加权模型映射（1 对多） | `d840c4fb`、`3ecd81c9`、`d23122a5` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） | `内联`（relay/helper/model_mapped.go）→ 待迁移 | 否 |
-  | 上游模型自动删除与筛选 | `待提交` | 中（`controller/channel_upstream_update.go`、`relaykit/dto/channel_settings.go`、前端渠道抽屉） | `内联`（channel_upstream_update.go 既有魔改文件内扩展）→ 待迁移 | 否
+| 加权模型映射（1 对多） | `d840c4fb`、`3ecd81c9`、`d23122a5` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） | `内联`（relay/helper/model_mapped.go）→ 待迁移 | 否 |
+| 上游模型自动删除与筛选 | `f10d688f` | 中（`controller/channel_upstream_update.go`、`relaykit/dto/channel_settings.go`、前端渠道抽屉） | `内联`（channel_upstream_update.go 既有魔改文件内扩展）→ 待迁移 | 否 |
 | 额度显示模式切换修复 | `484d024c` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
 | token 大数 K/M/B 分级显示 | `99cc5e56`、`cda0a61f` | 低（`web/src/lib/currency.ts`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
 | 滑动窗口渠道自动禁用 | `c0272220`、`9edda449` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） | `独立文件`（service/channel_disable_window.go）+ `挂载点`（channel.go/relay.go/channel-test.go） | 否 |
