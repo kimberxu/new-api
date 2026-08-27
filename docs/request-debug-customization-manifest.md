@@ -29,7 +29,8 @@
 | GHCR 镜像自动清理 | `3db875f5` | 低（`.github/workflows/deploy-image-ghcr.yml`） | `挂载点`+`独立文件`（workflow 步骤独立） | 否 |
 | 渠道请求频率限制（RPM） | `a5a2304f`、`6a12bc8d`、`48f9c2e2` | 中（`controller/relay.go`） | `内联` → 待迁移 | 否 |
 | 渠道测试请求文案定制 | `fab8e37f` | 低（`controller/channel-test.go`） | `内联`（channel-test.go）→ 待迁移 | 否 |
-| 加权模型映射（1 对多） | `d840c4fb`、`3ecd81c9`、`d23122a5` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） | `内联`（relay/helper/model_mapped.go）→ 待迁移 | 否 |
+  | 加权模型映射（1 对多） | `d840c4fb`、`3ecd81c9`、`d23122a5` | 中（`relay/helper/model_mapped.go`、`controller/channel_upstream_update.go`） | `内联`（relay/helper/model_mapped.go）→ 待迁移 | 否 |
+  | 上游模型自动删除与筛选 | `待提交` | 中（`controller/channel_upstream_update.go`、`relaykit/dto/channel_settings.go`、前端渠道抽屉） | `内联`（channel_upstream_update.go 既有魔改文件内扩展）→ 待迁移 | 否
 | 额度显示模式切换修复 | `484d024c` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
 | token 大数 K/M/B 分级显示 | `99cc5e56`、`cda0a61f` | 低（`web/src/lib/currency.ts`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
 | 滑动窗口渠道自动禁用 | `c0272220`、`9edda449` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） | `独立文件`（service/channel_disable_window.go）+ `挂载点`（channel.go/relay.go/channel-test.go） | 否 |
@@ -298,6 +299,30 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 - 前端：`model-mapping-editor.tsx`、`channel-form.ts`、`model-mapping-validation.ts`、`channel-mutate-drawer.tsx`
 - 测试：`relay/helper/model_mapped_test.go`、`controller/channel_upstream_update_test.go`
 - 前端测试：`web/src/features/channels/lib/__tests__/model-mapping-validation.test.ts`（`findExposedTargetModels` 排除 source key、加权数组展开、无效输入）
+---
+
+## 上游模型自动删除与筛选
+
+### 功能概述
+
+上游模型检测（渠道「检测上游模型设置」）在原有「自动同步新增（auto-sync）」基础上补充两个独立能力：
+
+- **自动删除（Auto Delete）**：开启 `upstream_model_update_auto_delete_enabled` 后，巡检检出「上游已不存在、本地仍在」的模型时，在定时任务（`allowAutoApply`）路径下直接将其从 `channel.Models` 移除并同步模型组；手动 detect 仅暂存待审。与 auto-sync 对称——自动新增只加不删，自动删除只删不加，两者可独立开关。
+- **筛选模型（Include Filter）**：`upstream_model_update_include_filter` 为逗号分隔列表（精确名或 `regex:` 前缀正则）。非空时变更计算只取命中的模型——未命中的上游模型不会被加入，未命中的本地模型也不会因上游缺失被删除（对本地模型天然提供保护）。
+
+### 行为与安全
+
+- 自动删除仅在 `allowAutoApply=true`（定时巡检）时生效；手动 `detect_all` / `detect` 仅暂存。
+- **空列表保护**：上游返回空模型列表视为「获取不到模型」（如上游 502 / 空响应）。此时既不执行自动删除，也不把误判的「全部本地模型可删除」写进 staging，避免一次空响应误删全部本地模型。
+- 删除判定仍排除 `model_mapping` 的 source（虚拟别名从不因上游缺失删除），并复用加权映射 target 收集逻辑避免误删。
+
+### 文件清单
+
+- `relaykit/dto/channel_settings.go` - `ChannelOtherSettings` 新增 `UpstreamModelUpdateAutoDeleteEnabled`、`UpstreamModelUpdateIncludeFilter`
+- `controller/channel_upstream_update.go` - `modelMatchesAnyFilter`（精确 + 正则命中）；`collectPendingUpstreamModelChangesFromModels` 增加 include 过滤；`collectPendingUpstreamModelChanges` 返回上游模型数；自动删除与空列表保护分支；任务汇总 `auto_removed_models`
+- `controller/channel_upstream_update_test.go` - 自动删除、空列表保护、include 筛选回归测试
+- 前端：`types.ts`、`lib/channel-form.ts`、`lib/channel-form-errors.ts`、`components/drawers/channel-mutate-drawer.tsx`
+- `web/src/i18n/locales/*.json` - 7 语言文案
 
 ---
 
