@@ -17,6 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   ChevronDown,
   Layers,
   Link2,
@@ -28,7 +31,8 @@ import {
   X,
   Zap,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -102,6 +106,17 @@ export function GroupCard(props: GroupCardProps) {
   const { group } = props
   const members = group.members ?? []
   const bannedCount = members.filter((m) => m.disabled).length
+  const [prioritySort, setPrioritySort] = useState<'asc' | 'desc' | null>(
+    null
+  )
+  const sortedMembers = useMemo(() => {
+    if (!prioritySort) return members
+    return [...members].sort((a, b) => {
+      const ea = a.priority ?? a.channel_priority ?? 0
+      const eb = b.priority ?? b.channel_priority ?? 0
+      return prioritySort === 'desc' ? eb - ea : ea - eb
+    })
+  }, [members, prioritySort])
 
   const [edits, setEdits] = useState<Record<number, MemberEditState>>({})
   const [testingId, setTestingId] = useState<number | null>(null)
@@ -287,8 +302,26 @@ export function GroupCard(props: GroupCardProps) {
                 <TableRow>
                   <TableHead>{t('Model')}</TableHead>
                   <TableHead>{t('Channel')}</TableHead>
-                  <TableHead className='w-32'>
-                    {t('Priority (empty = inherit)')}
+                  <TableHead className='w-36'>
+                    <button
+                      type='button'
+                      className='hover:text-foreground flex cursor-pointer items-center gap-1 font-medium'
+                      onClick={() =>
+                        setPrioritySort((cur) =>
+                          cur === null ? 'desc' : cur === 'desc' ? 'asc' : null
+                        )
+                      }
+                      title={t('Sort by priority')}
+                    >
+                      {t('Priority (empty = inherit)')}
+                      {prioritySort === 'desc' ? (
+                        <ArrowDown className='h-3.5 w-3.5' />
+                      ) : prioritySort === 'asc' ? (
+                        <ArrowUp className='h-3.5 w-3.5' />
+                      ) : (
+                        <ArrowUpDown className='text-muted-foreground h-3.5 w-3.5' />
+                      )}
+                    </button>
                   </TableHead>
                   <TableHead className='w-32'>
                     {t('Weight (empty = inherit)')}
@@ -298,7 +331,7 @@ export function GroupCard(props: GroupCardProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {members.map((item) => {
+                {sortedMembers.map((item) => {
                   const edit = getEdit(item)
                   const dirty =
                     edit.priorityInput !==
