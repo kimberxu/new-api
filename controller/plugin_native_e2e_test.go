@@ -184,7 +184,9 @@ func TestKlingNativeRouteSubmitPollSettleAndQuery(t *testing.T) {
 	outcome, taskErr := executeTaskSubmissionWith(submitContext, relayInfo, relay.RelayTaskSubmit)
 	require.Nil(t, taskErr)
 	require.NotNil(t, outcome)
-	require.Equal(t, []string{"reserve", "settle"}, billing.events)
+	// [personal] 结算短路（SettleBilling 恒 nil），Billing.Settle 不会被调用，
+	// 事件序列只有 reserve；配额断言 999_999 由 reserve 扣减产生，与短路结算一致。
+	require.Equal(t, []string{"reserve"}, billing.events)
 	require.False(t, submitContext.Writer.Written())
 
 	presentTaskSubmission(submitContext, outcome)

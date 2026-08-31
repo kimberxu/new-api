@@ -79,7 +79,7 @@ func TestRelayTaskSubmitMapsBeforeValidateWhenOriginSet(t *testing.T) {
 
 	_, taskErr := RelayTaskSubmit(c, info)
 	require.NotNil(t, taskErr)
-	assert.Equal(t, "model_price_error", taskErr.Code)
+	assert.Equal(t, "do_request_failed", taskErr.Code) // [personal] 未定价模型免费放行，请求真实发出后失败
 	assert.Equal(t, "alias-model", info.OriginModelName)
 	assert.Equal(t, "declared-model", info.UpstreamModelName)
 	assert.True(t, info.IsModelMapped)
@@ -92,7 +92,7 @@ func TestRelayTaskSubmitDeclaredNameWithoutMappingIsUnchanged(t *testing.T) {
 
 	_, taskErr := RelayTaskSubmit(c, info)
 	require.NotNil(t, taskErr)
-	assert.Equal(t, "model_price_error", taskErr.Code)
+	assert.Equal(t, "do_request_failed", taskErr.Code) // [personal] 未定价模型免费放行，请求真实发出后失败
 	assert.Equal(t, "declared-model", info.OriginModelName)
 	assert.Equal(t, "declared-model", info.UpstreamModelName)
 	assert.False(t, info.IsModelMapped)
@@ -105,7 +105,7 @@ func TestRelayTaskSubmitDoesNotApplyMappingTwice(t *testing.T) {
 
 	_, taskErr := RelayTaskSubmit(c, info)
 	require.NotNil(t, taskErr)
-	assert.Equal(t, "model_price_error", taskErr.Code)
+	assert.Equal(t, "do_request_failed", taskErr.Code) // [personal] 未定价模型免费放行，请求真实发出后失败
 	assert.Equal(t, "rewritten", info.UpstreamModelName, "late mapping would overwrite rewriteModel with the chain tail")
 	assert.Equal(t, "alias-model", info.OriginModelName)
 }
@@ -121,7 +121,7 @@ func TestRelayTaskSubmitEmptyOriginKeepsLateMapping(t *testing.T) {
 
 	_, taskErr := RelayTaskSubmit(c, info)
 	require.NotNil(t, taskErr)
-	assert.Equal(t, "model_price_error", taskErr.Code)
+	assert.Equal(t, "do_request_failed", taskErr.Code) // [personal] 未定价模型免费放行，请求真实发出后失败
 	assert.Equal(t, synthesized, info.OriginModelName)
 	assert.Equal(t, "legacy-tail", info.UpstreamModelName)
 	assert.True(t, info.IsModelMapped)
@@ -225,7 +225,7 @@ func TestRelayTaskSubmitAliasBillingIdentityAndExprFallback(t *testing.T) {
 				assert.NotEqual(t, "model_price_error", taskErr.Code)
 			} else {
 				assert.Nil(t, info.TieredBillingSnapshot)
-				assert.Equal(t, "model_price_error", taskErr.Code)
+				assert.Equal(t, "do_request_failed", taskErr.Code) // [personal] 非 tiered 免费放行，无 model_price_error 拦截
 			}
 		})
 	}

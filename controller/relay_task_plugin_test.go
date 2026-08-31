@@ -148,7 +148,11 @@ func TestExecuteTaskSubmissionRefundsWhenInsertFails(t *testing.T) {
 	assert.False(t, c.Writer.Written())
 }
 
-func TestExecuteTaskSubmissionSettlementFailureStaysDurableAndWritesNothing(t *testing.T) {
+// [personal] 计费功能级移除：SettleBilling 恒 nil，结算失败分支不可达。
+// 上游版本（settleErr 注入断言 task_billing_settlement_failed）在免费线上
+// 无对应行为；改写为验证 personal 语义——结算短路后任务照常 durable 落库、
+// 无 refund、事件序列无 settle（Billing.Settle 永不被调用）。
+func TestExecuteTaskSubmissionSettlesWithoutErrorAndPersists(t *testing.T) {
 	events := make([]string, 0, 3)
 	database := setupTaskSubmissionDatabase(t, true, &events)
 	billing := &taskSubmissionTestBilling{events: &events, settleErr: errors.New("settlement failed")}
@@ -162,10 +166,9 @@ func TestExecuteTaskSubmissionSettlementFailureStaysDurableAndWritesNothing(t *t
 		}, nil
 	})
 
-	assert.Nil(t, outcome)
-	require.NotNil(t, taskErr)
-	assert.Equal(t, "task_billing_settlement_failed", taskErr.Code)
-	assert.Equal(t, []string{"reserve", "insert", "settle"}, events)
+	require.NotNil(t, outcome)
+	require.Nil(t, taskErr)
+	assert.Equal(t, []string{"reserve", "insert"}, events) // [personal] settle 缺席：结算短路
 	assert.Zero(t, billing.refunds)
 	var count int64
 	require.NoError(t, database.Model(&model.Task{}).Where("task_id = ?", "task_public").Count(&count).Error)
@@ -339,12 +342,12 @@ func TestExecuteTaskSubmissionDisconnectAfterDurableInsertDoesNotRefund(t *testi
 			Platform:       constant.TaskPlatform("plugin"),
 		}, nil
 	})
-
 	require.Nil(t, taskErr)
+	assert.Equal(t, []string{"reserve", "insert"}, events) // [personal] 结算短路，Billing.Settle 永不被调用
 	require.NotNil(t, outcome)
 	assert.Equal(t, "task_public", outcome.Task.TaskID)
-	assert.Equal(t, []string{"reserve", "insert", "settle"}, events)
 	assert.Zero(t, billing.refunds)
+
 	var count int64
 	require.NoError(t, database.Model(&model.Task{}).Where("task_id = ?", "task_public").Count(&count).Error)
 	assert.Equal(t, int64(1), count)
