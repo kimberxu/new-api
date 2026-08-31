@@ -1,6 +1,6 @@
 # 定制功能清单（deploy / personal 分支）
 
-> 对应分支：`personal` 基线 `317e9ddd`（2026-08-29 刷新至 `949e1e69`；deploy 线功能部分，可用 `git diff upstream/main...317e9ddd` 核对。注意：`deploy` 分支自分叉点 `2ffa3979`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
+> 对应分支：`personal` 基线 `317e9ddd`（2026-08-31 刷新至 `55032e6b`；deploy 线功能部分，可用 `git diff upstream/main...317e9ddd` 核对。注意：`deploy` 分支自分叉点 `2ffa3979`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
 > 以下功能均为魔改线相对 `upstream/main` 的定制；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `317e9ddd` 的改动。
 > 魔改提交：`f10d688f`（上游模型自动删除开关与筛选模型）→ `ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日…
 
@@ -618,6 +618,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 > 对应分支：`personal`（基于基线 `317e9ddd`，原 deploy-model 分支已退役，2026-08-24 更新）
 > 本小节登记 `personal` 相对基线 `317e9ddd` 的半重构（`git log 317e9ddd..personal` 核对）。
 > 魔改提交序列：`cfddd71b`（模型组接管路由）→ `b6925d13`（错误分级与模型级到期恢复）→ `d0f1ea52`（计费功能级移除）→ `a7e70937`（前端计费 UI 删除）→ `1ee3129d`（i18n 孤儿 key 清理）→ `6745718c`（移除 Ollama 渠道）→ `1219dfc6`（订阅后端残留清理）→ `d2c72bfe`（移除 OAuth/Passkey 登录）→ `b962fc25`（移除开放注册与 OAuth/Passkey 前端残余）→ `c99427f3`（新建模型组前端 feature）→ `c58905d9`（模型组列表工具栏）→ `5b797304`（模型组列表关键词筛选 + 排序工具栏）→ `b7419616`（GHCR 构建支持分支前缀镜像 tag）→ `9f70c191`（修复成员优先级/权重继承失效）→ `30fb8c53`（上游请求改用成员真实上游模型）→ `076db805`（移除系统设置 Billing 页残留）→ `a2473546`（模型组引用成员开放编辑）→ `66a000ae`（添加成员界面全量列表化 + 搜索）→ `8727d3ce`（勾选多选批量添加）→ `fe9cc024`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `ea91c322`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `b1d030b6`（禁用徽章悬停显示级别/原因/时间）→ `8d34b68b`（成员测试按钮 + 测试通过即解禁）→ `711a845c`（未分类错误兜底改走模型级宽容窗口）
+→ `55032e6b`（模型组手动组组名开放编辑）
 
 ## 模型组路由表（一等公民）
 
@@ -638,6 +639,8 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 **成员测试按钮 + 测试通过即解禁（2026-08-24）**：`/model-groups` 页面成员 Actions 列新增测试按钮（Zap 图标），对成员的 `(渠道, 真实上游模型)` 直接发起一次 `testChannel` 探测——新端点 `POST /api/model-groups/items/:itemId/test`（`controller/model_group_member_probe.go` 新文件承载，路由挂 `ChannelOperate` 权限对齐 `/api/channel/test`）。探测成功即清除该 `(channel, model)` 的**任意来源**模型级禁用记录（`service.EnableChannelModel(source="")`，与渠道手动测试语义一致：手动探测是权威判定）——补上被自动/手动禁用成员此前只能在渠道页间接解禁的缺口，页面内即可完成「测试 → 解禁」；失败时透出上游错误 toast、徽章保留。响应结构同 `TestChannel`（success/message/time/error_code），顺带更新渠道响应时间。前端 per-row pending 动画；被禁成员成功后 toast「Test passed, member re-enabled」，未禁成员显示「Test passed」。i18n 新增 `Test passed` / `Test passed, member re-enabled` 两键七语言，并顺带归位上次漏跑 sync 排序的 `Channel-level disabled` 键。
 
 **未分类错误兜底模型级化（2026-08-24，`711a845c`）**：`processChannelError` 中渠道级/模型级判定均不命中的未分类错误（如裸 404 page not found），原兜底进渠道级宽容窗口——上游路径配置错误的反复 404 会把整个渠道拖进渠道级禁用，误伤同渠道其他可用模型。现兜底改为**模型级宽容窗口**（`CheckAndRecordDisableModel(..., false)`，默认 5 分钟 3 次只禁该成员，封禁键同样经 `ResolveModelGroupUpstreamModel` 解析）；管理员显式配置的规则（状态码范围/关键词/channel-error，经新分类器 `service.IsConfiguredDisableError` 判定）仍走渠道级严格窗口，skip-retry 错误任何层级不计数。
+
+**手动组组名开放编辑（2026-08-31，`55032e6b`）**：组名（= 路由模型名）此前创建后不可改，现开放手动组重命名：新端点 `PATCH /api/model-groups/:id/name`（`controller.UpdateModelGroup`），仅 `source=manual` 组可改名（auto 组系统管理、名称跟随渠道模型，拒绝）；校验与创建一致（非空、无空格/逗号/分号、组名唯一），改回自身同名放行，成功后 `InitChannelCache()` 重建路由索引。前端组头名称仅对手动组可点击（悬停下划线 + 铅笔图标 + tooltip），`stopPropagation` 防止触发折叠；弹出重命名对话框（预填当前名，复用创建对话框的说明文案与占位符），空值/未变化时禁用保存。i18n 新增 4 键七语言。回归测试 `controller/model_group_rename_test.go`：手动组改名成功（组成员保持）、auto 组拒绝、重名拒绝、非法名拒绝、同名放行。
 
 ### 文件清单
 
