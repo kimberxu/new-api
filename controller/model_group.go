@@ -224,6 +224,53 @@ func DeleteModelGroup(c *gin.Context) {
 	common.ApiSuccess(c, gin.H{"deleted": true})
 }
 
+// UpdateModelGroup renames a manual model group. The group name is the
+// routable model name; auto groups are system-managed (their name tracks the
+// channel model) and rejected. Validation mirrors CreateModelGroup.
+func UpdateModelGroup(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		common.ApiError(c, fmt.Errorf("invalid group id"))
+		return
+	}
+	g, err := model.GetModelGroupById(id)
+	if err != nil || g == nil {
+		common.ApiError(c, fmt.Errorf("model group #%d not found", id))
+		return
+	}
+	if g.Source == model.GroupSourceAuto {
+		common.ApiError(c, fmt.Errorf("auto groups are system-managed and cannot be renamed"))
+		return
+	}
+	var req CreateModelGroupRequest
+	if err := common.UnmarshalBodyReusable(c, &req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		common.ApiError(c, fmt.Errorf("group name is required"))
+		return
+	}
+	if strings.ContainsAny(name, ",; \t\n") {
+		common.ApiError(c, fmt.Errorf("group name must not contain spaces, commas or semicolons"))
+		return
+	}
+	if existing, err := model.GetModelGroupByName(name); err != nil {
+		common.ApiError(c, err)
+		return
+	} else if existing != nil && existing.Id != g.Id {
+		common.ApiError(c, fmt.Errorf("model group %q already exists", name))
+		return
+	}
+	if err := model.RenameModelGroup(g.Id, name); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	model.InitChannelCache()
+	common.ApiSuccess(c, gin.H{"renamed": true})
+}
+
 // SetModelGroupEnabled toggles a group-level switch for manual groups.
 func SetModelGroupEnabled(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))

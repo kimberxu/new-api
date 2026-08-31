@@ -99,6 +99,18 @@ export async function createModelGroup(
   return res.data
 }
 
+export async function renameModelGroup(
+  id: number,
+  name: string
+): Promise<{ success: boolean; message?: string }> {
+  const res = await api.patch(
+    `/api/model-groups/${id}/name`,
+    { name },
+    { skipBusinessError: true, skipErrorHandler: true }
+  )
+  return res.data
+}
+
 export async function setModelGroupEnabled(
   id: number,
   enabled: boolean
