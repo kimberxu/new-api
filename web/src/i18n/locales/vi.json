@@ -5141,6 +5141,10 @@
     "Ascending": "Tăng dần",
     "Descending": "Giảm dần",
     "Manual first": "Thủ công trước",
-    "Member count": "Số thành viên"
+    "Member count": "Số thành viên",
+    "Click to rename model group": "Nhấp để đổi tên nhóm mô hình",
+    "Failed to rename model group": "Không đổi được tên nhóm mô hình",
+    "Model group renamed": "Đã đổi tên nhóm mô hình",
+    "Rename Model Group": "Đổi tên nhóm mô hình"
   }
 }

@@ -5141,6 +5141,10 @@
     "Ascending": "升冪",
     "Descending": "降冪",
     "Manual first": "手動組在前",
-    "Member count": "成員數量"
+    "Member count": "成員數量",
+    "Click to rename model group": "點擊重新命名模型組",
+    "Failed to rename model group": "重新命名模型組失敗",
+    "Model group renamed": "模型組已重新命名",
+    "Rename Model Group": "重新命名模型組"
   }
 }

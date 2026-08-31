@@ -5141,6 +5141,10 @@
     "Ascending": "昇順",
     "Descending": "降順",
     "Manual first": "手動グループを先頭",
-    "Member count": "メンバー数"
+    "Member count": "メンバー数",
+    "Click to rename model group": "クリックでモデルグループ名を変更",
+    "Failed to rename model group": "モデルグループ名の変更に失敗しました",
+    "Model group renamed": "モデルグループ名を変更しました",
+    "Rename Model Group": "モデルグループ名を変更"
   }
 }

@@ -54,6 +54,7 @@ import {
   addGroupReference,
   deleteGroupReference,
   rebuildModelGroups,
+  renameModelGroup,
   type ModelGroup,
   type ModelGroupItem,
   type ModelGroupReference,
@@ -67,6 +68,8 @@ export function ModelGroupsPage() {
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
   const [newName, setNewName] = useState('')
+  const [renameTarget, setRenameTarget] = useState<ModelGroup | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<ModelGroup | null>(null)
   const [deleteItemTarget, setDeleteItemTarget] = useState<{
     group: ModelGroup
@@ -119,6 +122,21 @@ export function ModelGroupsPage() {
         invalidate()
       } else {
         toast.error(res.message || t('Failed to create model group'))
+      }
+    },
+  })
+
+  const renameMutation = useMutation({
+    mutationFn: ({ id, name }: { id: number; name: string }) =>
+      renameModelGroup(id, name),
+    onError: () => toast.error(t('Failed to rename model group')),
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success(t('Model group renamed'))
+        setRenameTarget(null)
+        invalidate()
+      } else {
+        toast.error(res.message || t('Failed to rename model group'))
       }
     },
   })
@@ -413,6 +431,10 @@ export function ModelGroupsPage() {
                     toggleMutation.mutate({ id, enabled })
                   }
                   onEditParams={setParamOverrideTarget}
+                  onRename={(g) => {
+                    setRenameValue(g.name)
+                    setRenameTarget(g)
+                  }}
                   onDelete={setDeleteTarget}
                   onAddMember={(g) => setAddMemberGroup(g)}
                   onDeleteReference={(g, ref) =>
@@ -465,6 +487,54 @@ export function ModelGroupsPage() {
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && newName.trim()) createMutation.mutate()
+          }}
+        />
+      </Dialog>
+
+      {/* Rename group dialog */}
+      <Dialog
+        open={!!renameTarget}
+        onOpenChange={(open) => {
+          if (!open) setRenameTarget(null)
+        }}
+        title={t('Rename Model Group')}
+        description={t('A model group name must match the routable model name.')}
+        footer={
+          <Button
+            disabled={
+              !renameValue.trim() ||
+              renameValue.trim() === renameTarget?.name ||
+              renameMutation.isPending
+            }
+            onClick={() => {
+              if (renameTarget) {
+                renameMutation.mutate({
+                  id: renameTarget.id,
+                  name: renameValue.trim(),
+                })
+              }
+            }}
+          >
+            {t('Save')}
+          </Button>
+        }
+      >
+        <Input
+          placeholder={t('Enter group name (model name)')}
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (
+              e.key === 'Enter' &&
+              renameValue.trim() &&
+              renameValue.trim() !== renameTarget?.name &&
+              renameTarget
+            ) {
+              renameMutation.mutate({
+                id: renameTarget.id,
+                name: renameValue.trim(),
+              })
+            }
           }}
         />
       </Dialog>
