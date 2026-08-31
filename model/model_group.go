@@ -162,6 +162,13 @@ func SetModelGroupEnabled(groupId int, enabled bool) error {
 	return DB.Model(&ModelGroup{}).Where("id = ?", groupId).Update("enabled", enabled).Error
 }
 
+// RenameModelGroup renames a group. The name is the routable model name, so
+// renaming changes the routing entry. Callers validate the target name
+// (non-empty, no spaces/commas/semicolons, unique) before calling.
+func RenameModelGroup(groupId int, name string) error {
+	return DB.Model(&ModelGroup{}).Where("id = ?", groupId).Update("name", name).Error
+}
+
 // DeleteModelGroup removes a group, its members, and its references
 // (both inbound and outbound) in one transaction.
 func DeleteModelGroup(groupId int) error {

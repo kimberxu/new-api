@@ -5141,6 +5141,10 @@
     "Ascending": "По возрастанию",
     "Descending": "По убыванию",
     "Manual first": "Сначала ручные",
-    "Member count": "Кол-во участников"
+    "Member count": "Кол-во участников",
+    "Click to rename model group": "Нажмите, чтобы переименовать группу моделей",
+    "Failed to rename model group": "Не удалось переименовать группу моделей",
+    "Model group renamed": "Группа моделей переименована",
+    "Rename Model Group": "Переименовать группу моделей"
   }
 }

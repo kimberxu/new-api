@@ -5141,6 +5141,10 @@
     "Ascending": "升序",
     "Descending": "降序",
     "Manual first": "手动组在前",
-    "Member count": "成员数量"
+    "Member count": "成员数量",
+    "Click to rename model group": "点击重命名模型组",
+    "Failed to rename model group": "重命名模型组失败",
+    "Model group renamed": "模型组已重命名",
+    "Rename Model Group": "重命名模型组"
   }
 }

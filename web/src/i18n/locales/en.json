@@ -5141,6 +5141,10 @@
     "Ascending": "Ascending",
     "Descending": "Descending",
     "Manual first": "Manual first",
-    "Member count": "Member count"
+    "Member count": "Member count",
+    "Click to rename model group": "Click to rename model group",
+    "Failed to rename model group": "Failed to rename model group",
+    "Model group renamed": "Model group renamed",
+    "Rename Model Group": "Rename Model Group"
   }
 }

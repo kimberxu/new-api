@@ -5141,6 +5141,10 @@
     "Ascending": "Croissant",
     "Descending": "Décroissant",
     "Manual first": "Manuels en premier",
-    "Member count": "Nombre de membres"
+    "Member count": "Nombre de membres",
+    "Click to rename model group": "Cliquer pour renommer le groupe de modèles",
+    "Failed to rename model group": "Échec du renommage du groupe de modèles",
+    "Model group renamed": "Groupe de modèles renommé",
+    "Rename Model Group": "Renommer le groupe de modèles"
   }
 }

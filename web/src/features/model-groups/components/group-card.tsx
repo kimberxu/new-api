@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Layers,
   Link2,
+  Pencil,
   Plus,
   Save,
   SlidersHorizontal,
@@ -82,6 +83,7 @@ interface GroupCardProps {
   onToggleExpanded: (id: number) => void
   onToggleEnabled: (id: number, enabled: boolean) => void
   onEditParams: (group: ModelGroup) => void
+  onRename: (group: ModelGroup) => void
   onDelete: (group: ModelGroup) => void
   onAddMember: (group: ModelGroup) => void
   onDeleteReference: (group: ModelGroup, ref: ModelGroupReference) => void
@@ -188,7 +190,21 @@ export function GroupCard(props: GroupCardProps) {
           >
             <Layers className='h-3.5 w-3.5' />
           </IconBadge>
-          <span className='truncate font-medium'>{group.name}</span>
+          {group.source === 'manual' ? (
+            <span
+              className='hover:text-foreground hover:underline cursor-pointer truncate font-medium underline-offset-4'
+              onClick={(e) => {
+                e.stopPropagation()
+                props.onRename(group)
+              }}
+              title={t('Click to rename model group')}
+            >
+              {group.name}
+              <Pencil className='text-muted-foreground ml-1 inline h-3 w-3' />
+            </span>
+          ) : (
+            <span className='truncate font-medium'>{group.name}</span>
+          )}
           <StatusBadge
             variant={group.source === 'auto' ? 'info' : 'success'}
             size='sm'
