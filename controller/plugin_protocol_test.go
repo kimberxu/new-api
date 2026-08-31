@@ -214,7 +214,7 @@ func TestServeTaskPluginProtocolDisconnectBeforeDurableBarrierPersistsAndSettles
 		require.FailNow(t, "detached submission did not finish")
 	}
 
-	assert.Equal(t, []string{"reserve", "insert", "settle"}, events)
+	assert.Equal(t, []string{"reserve", "insert"}, events) // [personal] 结算短路，Billing.Settle 永不被调用
 	assert.Zero(t, billing.refunds)
 	var persisted model.Task
 	require.NoError(t, database.Where("task_id = ?", "task_disconnect_persisted").First(&persisted).Error)

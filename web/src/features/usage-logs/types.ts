@@ -19,8 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 /**
  * Type definitions for usage logs
  */
-import type { RequestRuleTrace } from '@/features/pricing/lib/billing-expr'
-
 import type { UsageLog } from './data/schema'
 // ============================================================================
 // Log Category Types
@@ -142,15 +140,14 @@ export interface LogOtherData {
       original: number
       clamped: number
     }
-// Reject / intercept reason (admin only)
+    // Reject / intercept reason (admin only)
     reject_reason?: string
+    request_debug?: RequestDebugSnapshot
     task_plugin?: TaskPluginInfo
-  }
   root_info?: {
     task_plugin?: TaskPluginRuntimeInfo
     upstream_task_id?: string
     node_name?: string
-    request_debug?: RequestDebugSnapshot
   }
   // Language-independent operation descriptor (audit/login logs).
   // Frontend renders localized content from action + params via i18n templates.
@@ -241,6 +238,8 @@ export interface LogOtherData {
   violation_fee_code?: string
   violation_fee_marker?: string
   fee_quota?: number
+  // Reject / intercept reason (admin)
+  reject_reason?: string
   // Task-related fields (for refund logs, type=6)
   is_task?: boolean
   task_id?: string

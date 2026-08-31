@@ -708,6 +708,7 @@ func executeTaskSubmissionWith(
 ) (*taskSubmissionOutcome, *taskdto.TaskError) {
 	diagnostics := newTaskPluginSubmitDiagnostics(c)
 	diagnostics.start(relayInfo)
+	requestId := c.GetString(common.RequestIdKey)
 	var result *relay.TaskSubmitResult
 	var taskErr *taskdto.TaskError
 	durable := false
@@ -772,17 +773,16 @@ func executeTaskSubmissionWith(
 			stage = "read_body"
 			if common.IsRequestBodyTooLargeError(bodyErr) || errors.Is(bodyErr, common.ErrRequestBodyTooLarge) {
 				taskErr = service.TaskErrorWrapperLocal(bodyErr, "read_request_body_failed", http.StatusRequestEntityTooLarge)
-			} else {
-				taskErr = service.TaskErrorWrapperLocal(bodyErr, "read_request_body_failed", http.StatusBadRequest)
+
 			}
 			break
 		}
 		c.Request.Body = io.NopCloser(bodyStorage)
 
 		stage = "submit"
-		result, taskErr = relay.RelayTaskSubmit(c, relayInfo)
+
 		// After the handler runs, the upstream (model-mapped) name is resolved.
-		service.UpdateUpstreamModel(requestId, relayInfo.GetUpstreamModelName())
+		result, taskErr = submit(c, relayInfo)
 		if requestErr := c.Request.Context().Err(); requestErr != nil {
 			diagnostics.cancelled("after_submit", retryParam.GetRetry()+1)
 			taskErr = service.TaskErrorWrapperLocal(requestErr, "request_cancelled", http.StatusRequestTimeout)
