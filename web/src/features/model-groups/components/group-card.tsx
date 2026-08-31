@@ -60,6 +60,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+
 import { formatSeconds } from '@/features/channels/lib'
 import { formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -69,6 +70,7 @@ import type {
   ModelGroupItem,
   ModelGroupReference,
 } from '../lib/api'
+import { sortByPriority } from '../lib/priority-sort'
 
 export interface MemberEditState {
   priorityInput: string
@@ -111,11 +113,7 @@ export function GroupCard(props: GroupCardProps) {
   )
   const sortedMembers = useMemo(() => {
     if (!prioritySort) return members
-    return [...members].sort((a, b) => {
-      const ea = a.priority ?? a.channel_priority ?? 0
-      const eb = b.priority ?? b.channel_priority ?? 0
-      return prioritySort === 'desc' ? eb - ea : ea - eb
-    })
+    return sortByPriority(members, prioritySort)
   }, [members, prioritySort])
 
   const [edits, setEdits] = useState<Record<number, MemberEditState>>({})
