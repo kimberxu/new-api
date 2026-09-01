@@ -137,6 +137,29 @@ func normalizeClickHouseDSN(dsn string) string {
 	return parsed.String()
 }
 
+// normalizePostgresDSN 兜底给 PG DSN 附加对 simple-protocol 必需的运行时参数。
+// 参见 chooseDB PostgreSQL 分支注释:PreferSimpleProtocol 下 pgx 的
+// sanitizeForSimpleQuery(conn.go:1265) 强制要求:
+//   1. client_encoding=UTF8    — 否则带参数查询在编码非 UTF8 的库上启动即失败
+//   2. standard_conforming_strings=on  — 否则同上(拒绝转义注入)
+// 两者均仅在用户未显式携带时追加,尊重覆盖值。
+func normalizePostgresDSN(dsn string) string {
+	dsn = ensurePGRuntimeParam(dsn, "client_encoding", "UTF8")
+	dsn = ensurePGRuntimeParam(dsn, "standard_conforming_strings", "on")
+	return dsn
+}
+
+func ensurePGRuntimeParam(dsn, key, value string) string {
+	if strings.Contains(dsn, key+"=") {
+		return dsn
+	}
+	sep := "?"
+	if strings.Contains(dsn, "?") {
+		sep = "&"
+	}
+	return dsn + sep + key + "=" + value
+}
+
 func chooseDB(envName string, isLog bool) (*gorm.DB, common.DatabaseType, error) {
 	dsn := os.Getenv(envName)
 	if dsn != "" {
@@ -149,6 +172,13 @@ func chooseDB(envName string, isLog bool) (*gorm.DB, common.DatabaseType, error)
 			return db, common.DatabaseTypeClickHouse, err
 		}
 		if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+			// 兜底 client_encoding=UTF8 + standard_conforming_strings=on:
+			// PreferSimpleProtocol(见下)下 pgx 对带参数查询走
+			// sanitizeForSimpleQuery,强求两者,否则任何参数化 raw SQL
+			// (HasTable、migratePrefillGroupUniqueness 的 pg_constraint
+			// 查询等)在连接编码非 UTF8(历史 SQL_ASCII/LATIN1)的库启动即 FATAL。
+			// 已显式携带 client_encoding 时尊重用户值,不覆盖。
+			dsn = normalizePostgresDSN(dsn)
 			// Use PostgreSQL
 			common.SysLog("using PostgreSQL as database")
 			// 同时关闭 pgx 隐式与 GORM 显式预处理语句:命名 prepared statement 与
