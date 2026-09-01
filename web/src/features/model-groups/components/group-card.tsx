@@ -362,6 +362,10 @@ export function GroupCard(props: GroupCardProps) {
                           item.disabled.banned_until - Date.now() / 1000
                         ),
                       })
+                    } else if (item.disabled.banned_until === 0) {
+                      // Permanent auto ban: never expires, recovery probe
+                      // no longer re-tests it.
+                      disabledLabel = t('Banned permanently')
                     } else {
                       disabledLabel = t('Banned')
                     }
@@ -416,6 +420,14 @@ export function GroupCard(props: GroupCardProps) {
                                       {t('Reason:')} {item.disabled.reason}
                                     </div>
                                   )}
+                                  {item.disabled.last_error &&
+                                    item.disabled.last_error !==
+                                      item.disabled.reason && (
+                                      <div className='break-words'>
+                                        {t('Last probe error:')}{' '}
+                                        {item.disabled.last_error}
+                                      </div>
+                                    )}
                                   {!!item.disabled.created_at && (
                                     <div>
                                       {t('Time:')}{' '}
@@ -434,11 +446,9 @@ export function GroupCard(props: GroupCardProps) {
                                       )}
                                     </div>
                                   )}
-                                  {item.disabled.banned_until <=
-                                    Date.now() / 1000 &&
-                                    item.disabled.source === 'manual' && (
-                                      <div>{t('Permanent')}</div>
-                                    )}
+                                  {item.disabled.banned_until === 0 && (
+                                    <div>{t('Permanent')}</div>
+                                  )}
                                 </div>
                               </TooltipContent>
                             </Tooltip>

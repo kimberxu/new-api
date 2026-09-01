@@ -625,7 +625,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 > 对应分支：`personal`（基于基线 `317e9ddd`，2026-09-01 更新）
 > 本小节登记 `personal` 相对基线 `317e9ddd` 的半重构（`git log 317e9ddd..personal` 核对）。
-> 魔改提交序列：`cfddd71b`（模型组接管路由）→ `b6925d13`（错误分级与模型级到期恢复）→ `d0f1ea52`（计费功能级移除）→ `a7e70937`（前端计费 UI 删除）→ `1ee3129d`（i18n 孤儿 key 清理）→ `6745718c`（移除 Ollama 渠道）→ `1219dfc6`（订阅后端残留清理）→ `d2c72bfe`（移除 OAuth/Passkey 登录）→ `b962fc25`（移除开放注册与 OAuth/Passkey 前端残余）→ `c99427f3`（新建模型组前端 feature）→ `c58905d9`（模型组列表工具栏）→ `5b797304`（模型组列表关键词筛选 + 排序工具栏）→ `b7419616`（GHCR 构建支持分支前缀镜像 tag）→ `9f70c191`（修复成员优先级/权重继承失效）→ `30fb8c53`（上游请求改用成员真实上游模型）→ `076db805`（移除系统设置 Billing 页残留）→ `a2473546`（模型组引用成员开放编辑）→ `66a000ae`（添加成员界面全量列表化 + 搜索）→ `8727d3ce`（勾选多选批量添加）→ `fe9cc024`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `ea91c322`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `b1d030b6`（禁用徽章悬停显示级别/原因/时间）→ `8d34b68b`（成员测试按钮 + 测试通过即解禁）→ `711a845c`（未分类错误兜底改走模型级宽容窗口）→ `55032e6b`（模型组手动组组名开放编辑）→ `7dccc6db4`（同步上游 21 提交：冲突归位 + 免费计费测试语义适配）→ `0985c75a9`（折叠三角可展开 + 组内成员按优先级排序）→ `c555a188a`（排序逻辑提取 lib + 补单测）→ `badf2e5ee`（可配置上游默认 User-Agent）→ `acc91ab4f`（统一模型级封禁重写：渠道级自动禁用退役）→ `551330c09`（错误日志记录实际上游模型）
+> 魔改提交序列：`cfddd71b`（模型组接管路由）→ `b6925d13`（错误分级与模型级到期恢复）→ `d0f1ea52`（计费功能级移除）→ `a7e70937`（前端计费 UI 删除）→ `1ee3129d`（i18n 孤儿 key 清理）→ `6745718c`（移除 Ollama 渠道）→ `1219dfc6`（订阅后端残留清理）→ `d2c72bfe`（移除 OAuth/Passkey 登录）→ `b962fc25`（移除开放注册与 OAuth/Passkey 前端残余）→ `c99427f3`（新建模型组前端 feature）→ `c58905d9`（模型组列表工具栏）→ `5b797304`（模型组列表关键词筛选 + 排序工具栏）→ `b7419616`（GHCR 构建支持分支前缀镜像 tag）→ `9f70c191`（修复成员优先级/权重继承失效）→ `30fb8c53`（上游请求改用成员真实上游模型）→ `076db805`（移除系统设置 Billing 页残留）→ `a2473546`（模型组引用成员开放编辑）→ `66a000ae`（添加成员界面全量列表化 + 搜索）→ `8727d3ce`（勾选多选批量添加）→ `fe9cc024`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `ea91c322`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `b1d030b6`（禁用徽章悬停显示级别/原因/时间）→ `8d34b68b`（成员测试按钮 + 测试通过即解禁）→ `711a845c`（未分类错误兜底改走模型级宽容窗口）→ `55032e6b`（模型组手动组组名开放编辑）→ `7dccc6db4`（同步上游 21 提交：冲突归位 + 免费计费测试语义适配）→ `0985c75a9`（模型组折叠三角可展开 + 组内优先级排序）→ `c555a188a`（成员优先级排序逻辑提取与单测）→ `c84e1d82c`（模型组降级徽章）→ `badf2e5ee`（可配置上游默认 User-Agent）→ `acc91ab4f`（统一模型级封禁重写：渠道级自动禁用退役）→ `551330c09`（错误日志记录实际上游模型）→ `5e413558f`（成员封禁悬停显示上次探测错误 + 永久封禁标识）
 
 ## 可配置上游默认 User-Agent（隐藏 new-api 转发特征）
 
@@ -766,3 +766,33 @@ new-api 公共默认转发链路（`relay/channel/api_request.go` 的 `SetupApiR
 ### 验证
 - `go test ./controller/... ./service/... ./relay/...` 全绿
 - 端到端：手动组（组名≠成员模型）错误日志 other 含 `is_model_mapped: true, upstream_model_name: "deepseek-ai/deepseek-v4-flash-07"`；auto 组（组名==成员模型）不含；`model_name` 保持下游请求模型
+## 成员封禁悬停显示上次探测错误 + 永久封禁标识
+
+模型级禁用成员的 tooltip 悬停此前只显示初始禁用原因（`reason`）与封禁时长，但当恢复探活失败导致封禁时长升级（stage 递增）时，管理员无法看到「本次升级的具体上游错误」——只能看到原始禁用原因。同理，成员手动测试失败时，错误仅 toast 返回、不持久化。永久封禁（stage 7，`BannedUntil=0`）与普通自动禁用共用「已封禁」badge 文案，无视觉区分。
+
+本次增强：
+1. `ChannelDisabledModel` 新增 `last_error` 字段（`type:text`），在恢复探活失败延长封禁（`ExtendChannelModelBan`）与成员手动测试失败（`TestModelGroupItem`）时写入上游错误信息；初始禁用（`DisableChannelModel`）同步写入。tooltip 悬停新增「Last probe error: {error}」行，仅当 `last_error` 非空且不同于 `reason` 时显示。
+2. 永久封禁（`source=auto && banned_until=0`）badge 改为独立文案「Banned permanently」（七语言）；tooltip 同步显示「Permanent」。
+
+### 文件清单
+
+**改动（最小插入）：**
+- `model/channel_disabled_model.go` - `ChannelDisabledModel` 结构体新增 `LastError` 字段；`SetChannelDisabledModelBanStage` 签名增加 `lastError string` 参数（同时写入）；新增 `SetChannelDisabledModelError` 纯更新 last_error 辅助函数
+- `service/channel_model_disable.go` - `DisableChannelModel` 末尾参数增加 `lastError string`；`ExtendChannelModelBan` 末尾参数增加 `lastError string`，透传至 `SetChannelDisabledModelBanStage`
+- `controller/relay.go` - `processChannelError` 调用 `DisableChannelModel` 追加 `err.ErrorWithStatusCode()` 作为 lastError
+- `controller/channel-test.go` - 渠道测试禁用调用追加 `newAPIError.ErrorWithStatusCode()` 作为 lastError
+- `controller/model_ban_recovery.go` - `recoverExpiredModelBans` 探活失败延长调用追加 `result.localErr.Error()` 作为 lastError
+- `controller/model_group_member_probe.go` - `TestModelGroupItem` 失败分支新增：若对应禁用记录存在，调用 `SetChannelDisabledModelError` 持久化上游错误
+- `service/channel_model_disable_test.go` - 所有 `DisableChannelModel`/`ExtendChannelModelBan` 调用补齐 lastError 参数；新增 `record.LastError` 断言
+- `web/src/features/model-groups/lib/api.ts` - `ModelGroupItem.disabled` 类型新增 `last_error?: string`
+- `web/src/features/model-groups/components/group-card.tsx` - badge 分支新增 `banned_until===0` → `Banned permanently`；tooltip 新增 `last_error` 行（仅 `!== reason` 时显示）；Permanent 条件从仅 manual 改为 `banned_until===0`（覆盖 manual 与 auto 永久）
+- `web/src/i18n/locales/*.json` - 新增 `Banned permanently` / `Last probe error:` 键七语言
+
+### 验证
+- `go build ./...` + `cd relaykit && GOWORK=off go build ./...` 干净
+- `go test ./service/... -run "TestDisableChannelModel|TestExtendChannelModelBan"` 全绿
+- `bun run build` 前端构建通过
+- 3-DB AutoMigrate 验证（`last_error` 列 schema 变更）：
+  - SQLite ✓（内存库，service 单测覆盖 fresh + upgrade）
+  - PostgreSQL ✓（Supabase `db.djfnafgoszislyumucpi`：已有旧表无 `last_error` 列，AutoMigrate 后确认列存在、重启幂等无报错）
+  - MySQL ✗（本机无实例，无法验证）

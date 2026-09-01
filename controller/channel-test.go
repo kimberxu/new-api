@@ -975,7 +975,7 @@ func testChannelForHealthCheck(ctx context.Context, channel *model.Channel, test
 		// [personal] 统一模型级封禁：测试失败只禁该模型，不区分错误类型。
 		summary.Disabled++
 		_ = service.DisableChannelModel(channel.Id, result.modelName,
-			fmt.Sprintf("model disabled: %s", newAPIError.ErrorWithStatusCode()), newAPIError.StatusCode)
+			fmt.Sprintf("model disabled: %s", newAPIError.ErrorWithStatusCode()), newAPIError.StatusCode, newAPIError.ErrorWithStatusCode())
 	}
 
 	if newAPIError == nil {

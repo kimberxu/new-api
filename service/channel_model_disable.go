@@ -34,7 +34,7 @@ func initialBanStageForStatusCode(statusCode int) int {
 // rebuilds the channel cache so routing excludes the pair immediately. The
 // initial ban stage is determined by statusCode: 401 errors start at stage 5
 // (16h), all other errors at stage 0 (30min).
-func DisableChannelModel(channelID int, modelName string, reason string, statusCode int) error {
+func DisableChannelModel(channelID int, modelName string, reason string, statusCode int, lastError string) error {
 	common.SysLog(fmt.Sprintf("通道 #%d 模型 %s 请求失败，准备禁用该模型，原因：%s", channelID, modelName, common.LocalLogPreview(reason)))
 
 	now := time.Now()
@@ -44,7 +44,7 @@ func DisableChannelModel(channelID int, modelName string, reason string, statusC
 		common.SysLog(fmt.Sprintf("failed to add channel disabled model: channel_id=%d, model=%s, error=%v", channelID, modelName, err))
 		return err
 	}
-	if err := model.SetChannelDisabledModelBanStage(channelID, modelName, stage, bannedUntil); err != nil {
+	if err := model.SetChannelDisabledModelBanStage(channelID, modelName, stage, bannedUntil, lastError); err != nil {
 		common.SysLog(fmt.Sprintf("failed to set ban stage: channel_id=%d, model=%s, error=%v", channelID, modelName, err))
 		return err
 	}
@@ -73,8 +73,10 @@ func EnableChannelModel(channelID int, modelName string, source string) error {
 // ExtendChannelModelBan escalates the ban of an auto model-level disable
 // record (used when the recovery probe still fails). Stage advances one step
 // per call; stage 7 (newStage >= len(modelBanDurations)) means permanent
-// (BannedUntil=0), and the recovery probe will not re-test.
-func ExtendChannelModelBan(channelID int, modelName string) error {
+// (BannedUntil=0), and the recovery probe will not re-test. lastError is
+// the upstream error observed by the failing probe, persisted so the UI can
+// explain the extension.
+func ExtendChannelModelBan(channelID int, modelName string, lastError string) error {
 	record, err := model.GetChannelDisabledModel(channelID, modelName)
 	if err != nil || record == nil {
 		return nil // record gone (manual clear) — nothing to extend
@@ -85,7 +87,7 @@ func ExtendChannelModelBan(channelID int, modelName string) error {
 		bannedUntil = time.Now().Add(modelBanDurations[newStage]).Unix()
 	}
 	// newStage == len(modelBanDurations) (7) ⇒ bannedUntil stays 0 = permanent
-	if err := model.SetChannelDisabledModelBanStage(channelID, modelName, newStage, bannedUntil); err != nil {
+	if err := model.SetChannelDisabledModelBanStage(channelID, modelName, newStage, bannedUntil, lastError); err != nil {
 		common.SysLog(fmt.Sprintf("failed to extend channel disabled model ban: channel_id=%d, model=%s, error=%v", channelID, modelName, err))
 		return err
 	}
