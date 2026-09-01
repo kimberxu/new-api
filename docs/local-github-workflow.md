@@ -1,6 +1,6 @@
 # 本地 GitHub Fork 工作流
 
-> 对应分支:`personal` 基线 `317e9ddd`(2026-09-01 刷新至 `3621f98f9`;`personal` 线同步流程见「同步上游」节)
+> 对应分支:`personal` 基线 `317e9ddd`(2026-09-01 刷新至 `77efd0936`;`personal` 线同步流程见「同步上游」节)
 
 ## 标准触发短语
 
@@ -86,7 +86,7 @@ git push --force-with-lease origin deploy
 | i18n locale（`web/src/i18n/locales/*.json`） | 魔改 UI 文案键 | 上游同区段增删键导致整块冲突 | `235ae5a7`：2026-08-24 同步 6 提交；用 `scripts/i18n_3way_merge.py` 语义合并（ours 为底 + theirs 增改覆盖），键序以 ours 为准，事后 `bun run i18n:sync` 归位 |
 | `relay/common/relay_info.go` | `RequestDebugSnapshot` 字段 | `RelayInfo` 结构体字段增减、注释更新 | `7dccc6db4`：2026-08-31 同步 21 提交；上游字段增删自动合并，`RequestDebugSnapshot` 保留无冲突 |
 | `web/src/features/usage-logs/components/dialogs/details-dialog.tsx` | 请求调试快照面板 | 日志详情功能（如 stream status） | `7dccc6db4`：2026-08-31 同步 21 提交；上游新增 task_plugin 计费展示块（BillingBreakdown/DynamicPricingBreakdown/usage-facts），按计费移除语义整块弃用；魔改 request_debug 面板与上游 PluginAuthorLink 共存，import 拼接保留两侧 |
-| `model/main.go` | PostgreSQL 连接强制 `PreferSimpleProtocol: true`（兼容 PgBouncer/Neon/Supabase）+ `normalizePostgresDSN` 兜底 `client_encoding=UTF8` + `standard_conforming_strings=on` | 上游新增 `ensureUserQuotaColumns`、`migratePrefillGroupUniqueness`（参数化 raw SQL）与 `migrateDBFast` 删除 | `3621f98f9`：2026-09-01 fix；上游 `migratePrefillGroupUniqueness` 的 `db.Raw(...to_regclass(?) ...)` 参数化查询在 personal `PreferSimpleProtocol` + PG 连接编码非 UTF8 环境触发 pgx `sanitizeForSimpleQuery` 强制 `client_encoding=UTF8` 与 `standard_conforming_strings=on`（conn.go:1265-1269）→ 启动 FATAL；新增 `normalizePostgresDSN` 兜底给 DSN 追加两 runtime param，已显式携带时尊重用户值不覆盖 |
+| `model/main.go` | PostgreSQL 连接强制 `PreferSimpleProtocol: true`（兼容 PgBouncer/Neon/Supabase）+ `normalizePostgresDSN` 兜底 `client_encoding=UTF8` + `standard_conforming_strings=on` | 上游新增 `ensureUserQuotaColumns`、`migratePrefillGroupUniqueness`（参数化 raw SQL）与 `migrateDBFast` 删除 | `7667fe5b3`：2026-09-01 fix；上游 `migratePrefillGroupUniqueness` 的 `db.Raw(...to_regclass(?) ...)` 参数化查询在 personal `PreferSimpleProtocol` + PG 连接编码非 UTF8 环境触发 pgx `sanitizeForSimpleQuery` 强制 `client_encoding=UTF8` 与 `standard_conforming_strings=on`（conn.go:1265-1269）→ 启动 FATAL；新增 `normalizePostgresDSN` 兜底给 DSN 追加两 runtime param，已显式携带时尊重用户值不覆盖 |
 
 #### 冲突决策记录规则
 
