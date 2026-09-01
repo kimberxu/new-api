@@ -41,7 +41,7 @@ func TestGetRandomSatisfiedChannelSlowStreamDemotion(t *testing.T) {
 	InitChannelCache()
 
 	// 未降级：两个渠道同层，均可能被选中
-	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, "", nil)
+	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	require.Contains(t, []int{401, 402}, ch.Id)
@@ -53,14 +53,14 @@ func TestGetRandomSatisfiedChannelSlowStreamDemotion(t *testing.T) {
 
 	// 降级后：多次调用应始终返回 402（独占最高优先级层 5），401 跌到 0 层
 	for range 10 {
-		ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, "", nil)
+		ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, ch)
 		assert.Equal(t, 402, ch.Id, "demoted channel 401 must not be selected while 402 is available")
 	}
 
 	// 排除 402 后：401 成为唯一最高层（0 层），级联选中，不会永久饿死
-	ch, err = GetRandomSatisfiedChannel("default", "test-model", 0, "", []int{402})
+	ch, err = GetRandomSatisfiedChannel("default", "test-model", 0, nil, []int{402})
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	assert.Equal(t, 401, ch.Id, "demoted channel must be selectable after higher tier exhausted")
@@ -95,7 +95,7 @@ func TestGetRandomSatisfiedChannelFromGroupsSlowStreamDemotion(t *testing.T) {
 	})
 
 	// 未降级：两个渠道同层，均可能被选中
-	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, "", nil)
+	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	require.Contains(t, []int{411, 412}, ch.Id)
@@ -107,14 +107,14 @@ func TestGetRandomSatisfiedChannelFromGroupsSlowStreamDemotion(t *testing.T) {
 
 	// 降级后：DB 回退路径同样必须避开 411
 	for range 10 {
-		ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, "", nil)
+		ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, ch)
 		assert.Equal(t, 412, ch.Id, "demoted channel 411 must not be selected via DB fallback while 412 is available")
 	}
 
 	// 排除 412 后：411 成为唯一最高层，级联选中，不会永久饿死
-	ch, err = GetRandomSatisfiedChannel("default", "test-model", 0, "", []int{412})
+	ch, err = GetRandomSatisfiedChannel("default", "test-model", 0, nil, []int{412})
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	assert.Equal(t, 411, ch.Id, "demoted channel must be selectable via DB fallback after higher tier exhausted")

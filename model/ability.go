@@ -127,7 +127,12 @@ func GetChannel(
 	filters []dto.ChannelFilter,
 ) (*Channel, error) {
 	var abilities []Ability
-	err := DB.Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, model, true).Order("priority DESC, weight DESC").Find(&abilities).Error
+	err := DB.Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, model, true).
+		// Exclude (channel, model) pairs that are model-level disabled. The
+		// subquery is dialect-neutral (SQLite/MySQL/PostgreSQL) and only touches
+		// non-reserved columns.
+		Where("NOT EXISTS (SELECT 1 FROM channel_disabled_models WHERE channel_id = abilities.channel_id AND model = abilities.model)").
+		Order("priority DESC, weight DESC").Find(&abilities).Error
 	if err != nil {
 		return nil, err
 	}

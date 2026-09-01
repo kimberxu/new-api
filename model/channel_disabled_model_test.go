@@ -42,20 +42,20 @@ func TestChannelDisabledModel_DBPathExcludesModel(t *testing.T) {
 	t.Cleanup(func() { common.MemoryCacheEnabled = originalMemoryCacheEnabled })
 
 	// Without a disable record the channel is selectable.
-	ch, err := GetChannel("default", "test-model", 0, "")
+	ch, err := GetChannel("default", "test-model", 0, nil)
 	require.NoError(t, err)
 	require.NotNil(t, ch, "channel should be selectable before model-level disable")
 	assert.Equal(t, 501, ch.Id)
 
 	// Disable the model -> DB path excludes the (channel, model) pair.
 	require.NoError(t, AddChannelDisabledModels(501, []string{"test-model"}, "auto", "model test failure"))
-	ch, err = GetChannel("default", "test-model", 0, "")
+	ch, err = GetChannel("default", "test-model", 0, nil)
 	require.NoError(t, err)
 	assert.Nil(t, ch, "DB path must exclude a model-level disabled channel")
 
 	// Re-enable -> selectable again.
 	require.NoError(t, EnableChannelModelDisabled(501, "test-model", ""))
-	ch, err = GetChannel("default", "test-model", 0, "")
+	ch, err = GetChannel("default", "test-model", 0, nil)
 	require.NoError(t, err)
 	require.NotNil(t, ch, "channel should be selectable after re-enabling the model")
 	assert.Equal(t, 501, ch.Id)
@@ -71,14 +71,14 @@ func TestChannelDisabledModel_CachePathExcludesModel(t *testing.T) {
 	InitChannelCache()
 
 	// The disabled (channel, model) pair must not be in the routing index.
-	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, "", nil)
+	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
 	require.NoError(t, err)
 	assert.Nil(t, ch, "cache path must exclude a model-level disabled channel")
 
 	// Re-enable -> back in the index.
 	require.NoError(t, EnableChannelModelDisabled(502, "test-model", ""))
 	InitChannelCache()
-	ch, err = GetRandomSatisfiedChannel("default", "test-model", 0, "", nil)
+	ch, err = GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	assert.Equal(t, 502, ch.Id)

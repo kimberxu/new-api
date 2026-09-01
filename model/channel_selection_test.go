@@ -80,7 +80,7 @@ func TestGetRandomSatisfiedChannelSamePriorityTierReRoll(t *testing.T) {
 	InitChannelCache()
 
 	// Exclude channel 301 -> should still get p3 (302)
-	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, "", []int{301})
+	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, []int{301})
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	assert.Equal(t, 302, ch.Id, "should return the remaining p3 channel, not cascade to p2")
@@ -107,7 +107,7 @@ func TestGetRandomSatisfiedChannelPriorityCascadeOnTierExhausted(t *testing.T) {
 	InitChannelCache()
 
 	// Exclude all p3 channels -> should cascade to p2
-	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, "", []int{401, 402})
+	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, []int{401, 402})
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	assert.Equal(t, int64(2), *ch.Priority, "should cascade to priority 2 when all p3 channels are excluded")
@@ -130,7 +130,7 @@ func TestGetRandomSatisfiedChannelAllExcludedReturnsNil(t *testing.T) {
 	InitChannelCache()
 
 	// Exclude all channels -> should return nil, nil
-	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, "", []int{501, 502})
+	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, []int{501, 502})
 	require.NoError(t, err)
 	assert.Nil(t, ch, "should return nil when all channels are excluded")
 }
@@ -153,7 +153,7 @@ func TestGetRandomSatisfiedChannelCascadeAcrossThreeTiers(t *testing.T) {
 	InitChannelCache()
 
 	// Exclude p3 and p2
-	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, "", []int{601, 602})
+	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, []int{601, 602})
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	assert.Equal(t, 603, ch.Id, "should cascade to priority 1")
@@ -180,7 +180,7 @@ func TestGetRandomSatisfiedChannelNoExcludeReturnsHighestPriority(t *testing.T) 
 
 	// Multiple calls should all return a priority 4 channel
 	for i := 0; i < 10; i++ {
-		ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, "", nil)
+		ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, ch)
 		assert.Equal(t, int64(4), *ch.Priority, "iteration %d: should always return highest priority with no exclusions", i)
