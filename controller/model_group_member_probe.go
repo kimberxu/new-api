@@ -47,6 +47,13 @@ func TestModelGroupItem(c *gin.Context) {
 	}
 	result := testChannel(requestCtx, channel, testUserID, item.Model, "", shouldUseStreamForAutomaticChannelTest(channel))
 	if result.localErr != nil {
+		// Persist last_error if the model has a ban record, so the UI
+		// shows why the manual test failed.
+		if result.modelName != "" {
+			if banRecord, _ := model.GetChannelDisabledModel(item.ChannelId, result.modelName); banRecord != nil {
+				_ = model.SetChannelDisabledModelError(item.ChannelId, result.modelName, result.localErr.Error())
+			}
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": result.localErr.Error(),
@@ -58,6 +65,13 @@ func TestModelGroupItem(c *gin.Context) {
 	go channel.UpdateResponseTime(milliseconds)
 	consumedTime := float64(milliseconds) / 1000.0
 	if result.newAPIError != nil {
+		// Persist last_error if the model has a ban record, so the UI
+		// shows why the manual test failed.
+		if result.modelName != "" {
+			if banRecord, _ := model.GetChannelDisabledModel(item.ChannelId, result.modelName); banRecord != nil {
+				_ = model.SetChannelDisabledModelError(item.ChannelId, result.modelName, result.newAPIError.ErrorWithStatusCode())
+			}
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"success":    false,
 			"message":    result.newAPIError.Error(),

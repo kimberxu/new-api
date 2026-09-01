@@ -462,7 +462,7 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		}
 		reason := fmt.Sprintf("model disabled: %s", err.ErrorWithStatusCode())
 		gopool.Go(func() {
-			_ = service.DisableChannelModel(channelError.ChannelId, banModel, reason, err.StatusCode)
+			_ = service.DisableChannelModel(channelError.ChannelId, banModel, reason, err.StatusCode, err.ErrorWithStatusCode())
 		})
 	}
 

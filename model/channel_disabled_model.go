@@ -21,6 +21,10 @@ type ChannelDisabledModel struct {
 	// cross-database AutoMigrate churn.
 	Source string `json:"source" gorm:"type:varchar(16)"`
 	Reason string `json:"reason" gorm:"type:text"`
+	// LastError stores the most recent upstream error from a recovery
+	// probe or manual test, so the model-group UI can show why the
+	// ban was extended.
+	LastError string `json:"last_error" gorm:"type:text"`
 	// [personal] BannedUntil is the unix timestamp after which an auto ban
 	// expires (0 = permanent). Only auto-sourced bans carry a deadline; the
 	// periodic recovery probe re-tests the model when it passes.
@@ -119,11 +123,21 @@ func EnableChannelModelDisabled(channelId int, model string, source string) erro
 	return query.Delete(&ChannelDisabledModel{}).Error
 }
 
-// SetChannelDisabledModelBanStage updates the ban stage and deadline of an
-// existing model-level disable record. No-op (nil) when the record is absent.
-func SetChannelDisabledModelBanStage(channelId int, model string, banStage int, bannedUntil int64) error {
+// SetChannelDisabledModelBanStage updates the ban stage, deadline and most
+// recent probe error of an existing model-level disable record. No-op (nil)
+// when the record is absent.
+func SetChannelDisabledModelBanStage(channelId int, model string, banStage int, bannedUntil int64, lastError string) error {
 	return DB.Model(&ChannelDisabledModel{}).
 		Where("channel_id = ? AND model = ?", channelId, model).
 		Update("ban_stage", banStage).
-		Update("banned_until", bannedUntil).Error
+		Update("banned_until", bannedUntil).
+		Update("last_error", lastError).Error
+}
+
+// SetChannelDisabledModelError updates only the last_error field of an existing
+// model-level disable record. No-op when the record is absent.
+func SetChannelDisabledModelError(channelId int, model string, lastError string) error {
+	return DB.Model(&ChannelDisabledModel{}).
+		Where("channel_id = ? AND model = ?", channelId, model).
+		Update("last_error", lastError).Error
 }

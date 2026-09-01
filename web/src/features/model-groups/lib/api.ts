@@ -44,6 +44,8 @@ export interface ModelGroupItem {
     source: string
     reason: string
     banned_until: number
+    // upstream error from the last recovery probe or manual test
+    last_error?: string
     // unix seconds when the model-level disable was recorded
     created_at: number
   } | null
