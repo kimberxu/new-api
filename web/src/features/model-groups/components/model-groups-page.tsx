@@ -36,7 +36,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { getDemotedChannels } from '@/features/channels/api'
 import { ParamOverrideEditorDialog } from '@/features/channels/components/dialogs/param-override-editor-dialog'
+import type { DemotedChannelInfo } from '@/features/channels/types'
 
 import { AddMemberDialog } from './add-member-dialog'
 import { GroupCard } from './group-card'
@@ -92,6 +94,23 @@ export function ModelGroupsPage() {
     queryKey: ['model-groups'],
     queryFn: () => listModelGroups(true),
   })
+  const { data: demotedData } = useQuery({
+    queryKey: ['model-groups', 'demoted'],
+    queryFn: getDemotedChannels,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: false,
+  })
+  const demoted = useMemo(() => {
+    const map = new Map<number, DemotedChannelInfo[]>()
+    const raw = demotedData?.data
+    if (raw) {
+      for (const [channelId, infos] of Object.entries(raw)) {
+        map.set(Number(channelId), infos)
+      }
+    }
+    return map
+  }, [demotedData])
+
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['model-groups'] })
@@ -426,6 +445,7 @@ export function ModelGroupsPage() {
                   group={group}
                   expanded={expanded.has(group.id)}
                   updatingMember={itemUpdateMutation.isPending}
+                  demoted={demoted}
                   onToggleExpanded={toggleExpanded}
                   onToggleEnabled={(id, enabled) =>
                     toggleMutation.mutate({ id, enabled })

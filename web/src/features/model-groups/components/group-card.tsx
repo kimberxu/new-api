@@ -62,6 +62,7 @@ import {
 } from '@/components/ui/tooltip'
 
 import { formatSeconds } from '@/features/channels/lib'
+import type { DemotedChannelInfo } from '@/features/channels/types'
 import { formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -86,6 +87,7 @@ interface GroupCardProps {
   group: ModelGroup
   expanded: boolean
   updatingMember: boolean
+  demoted: Map<number, DemotedChannelInfo[]>
   onToggleExpanded: (id: number) => void
   onToggleEnabled: (id: number, enabled: boolean) => void
   onEditParams: (group: ModelGroup) => void
@@ -105,9 +107,16 @@ interface GroupCardProps {
 
 export function GroupCard(props: GroupCardProps) {
   const { t } = useTranslation()
-  const { group } = props
+  const { group, demoted } = props
   const members = group.members ?? []
   const bannedCount = members.filter((m) => m.disabled).length
+  // Demotion records are keyed by the routable model (the group name), not
+  // the member's real upstream model: for a manual group "ox" containing the
+  // upstream model "gpt-4o", requests arrive as model="ox" and RecordSlowStream
+  // keys on "ox". Auto groups match because their name equals the model name.
+  const demotedCount = members.filter((m) =>
+    demoted.get(m.channel_id)?.some((d) => d.model === group.name)
+  ).length
   const [prioritySort, setPrioritySort] = useState<'asc' | 'desc' | null>(
     null
   )
@@ -227,6 +236,11 @@ export function GroupCard(props: GroupCardProps) {
           {bannedCount > 0 && (
             <StatusBadge variant='warning' size='sm' showDot>
               {t('{{count}} banned', { count: bannedCount })}
+            </StatusBadge>
+          )}
+          {demotedCount > 0 && (
+            <StatusBadge variant='warning' size='sm' showDot>
+              {t('{{count}} demoted', { count: demotedCount })}
             </StatusBadge>
           )}
           <span className='text-muted-foreground ml-auto shrink-0 text-xs'>
@@ -352,6 +366,11 @@ export function GroupCard(props: GroupCardProps) {
                       disabledLabel = t('Banned')
                     }
                   }
+                  // Match on the routable model (group.name), the demotion key
+                  // recorded by RecordSlowStream — see demotedCount above.
+                  const demotion = demoted
+                    .get(item.channel_id)
+                    ?.find((d) => d.model === group.name)
                   return (
                     <TableRow key={item.id}>
                       <TableCell>
@@ -420,6 +439,50 @@ export function GroupCard(props: GroupCardProps) {
                                     item.disabled.source === 'manual' && (
                                       <div>{t('Permanent')}</div>
                                     )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        {demotion && (
+                          <TooltipProvider delay={100}>
+                            <Tooltip>
+                              <TooltipTrigger render={<span />}>
+                                <StatusBadge
+                                  variant='warning'
+                                  size='sm'
+                                  showDot
+                                  className='ml-1 align-middle'
+                                >
+                                  {t('Demoted ({{time}})', {
+                                    time: formatSeconds(
+                                      demotion.remaining_seconds
+                                    ),
+                                  })}
+                                </StatusBadge>
+                              </TooltipTrigger>
+                              <TooltipContent side='top' className='max-w-xs'>
+                                <div className='space-y-1 text-xs'>
+                                  <div className='font-medium'>
+                                    {t('Temporarily demoted (slow latency)')}
+                                  </div>
+                                  <div>
+                                    {(demotion.sources ?? []).length > 0
+                                      ? (demotion.sources ?? [])
+                                          .map((s) =>
+                                            s === 'tps'
+                                              ? t('Slow generation rate')
+                                              : t('Slow first-token latency')
+                                          )
+                                          .join(' + ')
+                                      : t('Slow generation rate')}
+                                  </div>
+                                  <div>
+                                    {t('recovers in')}{' '}
+                                    {formatSeconds(
+                                      demotion.remaining_seconds
+                                    )}
+                                  </div>
                                 </div>
                               </TooltipContent>
                             </Tooltip>
