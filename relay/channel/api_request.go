@@ -49,6 +49,9 @@ func ApplyUpstreamBodyMetadata(req *http.Request, body io.Reader) {
 }
 
 func SetupApiRequestHeader(info *common.RelayInfo, c *gin.Context, req *http.Header) {
+	if ua := operation_setting.GetGeneralSetting().UpstreamUserAgent; ua != "" && req.Get("User-Agent") == "" {
+		req.Set("User-Agent", ua)
+	}
 	if info.RelayMode == constant.RelayModeAudioTranscription || info.RelayMode == constant.RelayModeAudioTranslation {
 		// multipart/form-data
 	} else if info.RelayMode == constant.RelayModeRealtime {
