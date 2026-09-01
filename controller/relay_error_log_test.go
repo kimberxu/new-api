@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -10,8 +11,11 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/relaykit/types"
-
+"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/model"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relaykittypes "github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -61,13 +65,13 @@ func TestProcessChannelErrorUsesSnapshotWithoutLeakingChannelMetadata(t *testing
 	ctx.Set("use_channel", []string{"101"})
 	common.SetContextKey(ctx, constant.ContextKeyRequestStartTime, time.Now().Add(-time.Second))
 
-	channelSnapshot := types.ChannelError{
+	channelSnapshot := relaykittypes.ChannelError{
 		ChannelId:   101,
 		ChannelType: 1,
 		ChannelName: "snapshot-channel",
 		AutoBan:     false,
 	}
-	apiErr := types.NewOpenAIError(errors.New("upstream failed"), types.ErrorCodeBadResponseStatusCode, http.StatusBadGateway)
+	apiErr := relaykittypes.NewOpenAIError(errors.New("upstream failed"), relaykittypes.ErrorCodeBadResponseStatusCode, http.StatusBadGateway)
 
 	processChannelError(ctx, channelSnapshot, apiErr, nil)
 
@@ -96,4 +100,91 @@ func TestProcessChannelErrorUsesSnapshotWithoutLeakingChannelMetadata(t *testing
 	for _, key := range []string{"channel_id", "channel_name", "channel_type"} {
 		assert.NotContains(t, userOther, key)
 	}
+}
+
+// setupErrorLogOtherTestDB 为 processChannelError 的错误日志路径提供内存 SQLite。
+// RecordErrorLog 依赖 LOG_DB（logs 表）与 GetUserSetting（users 表，IP 记录判定）。
+func setupErrorLogOtherTestDB(t *testing.T) {
+	t.Helper()
+	previousDB, previousLogDB := model.DB, model.LOG_DB
+	previousErrorLogEnabled := constant.ErrorLogEnabled
+	previousRedisEnabled := common.RedisEnabled
+
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&model.Log{}, &model.User{}))
+	model.DB = db
+	model.LOG_DB = db
+	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
+	common.RedisEnabled = false
+	constant.ErrorLogEnabled = true
+
+	t.Cleanup(func() {
+		model.DB, model.LOG_DB = previousDB, previousLogDB
+		constant.ErrorLogEnabled = previousErrorLogEnabled
+		common.RedisEnabled = previousRedisEnabled
+	})
+}
+
+func newErrorLogTestContext(t *testing.T) *gin.Context {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	c.Set("original_model", "ox")
+	return c
+}
+func newMappedRelayInfo(originModel, upstreamModel string) *relaycommon.RelayInfo {
+	return &relaycommon.RelayInfo{
+		OriginModelName: originModel,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			UpstreamModelName: upstreamModel,
+			IsModelMapped:     true,
+		},
+	}
+}
+
+func TestProcessChannelErrorLogsMappedModel(t *testing.T) {
+	setupErrorLogOtherTestDB(t)
+	c := newErrorLogTestContext(t)
+	channelError := *relaykittypes.NewChannelError(7, 1, "test-channel", false, "", false)
+	err := relaykittypes.NewOpenAIError(assert.AnError, relaykittypes.ErrorCodeBadResponseStatusCode, http.StatusBadGateway)
+
+	processChannelError(c, channelError, err, newMappedRelayInfo("ox", "deepseek-v4-flash"))
+
+	var count int64
+	require.NoError(t, model.LOG_DB.Model(&model.Log{}).Where("type = ?", model.LogTypeError).Count(&count).Error)
+	require.EqualValues(t, 1, count, "error log should be recorded when ErrorLogEnabled")
+
+	var log model.Log
+	require.NoError(t, model.LOG_DB.Where("type = ?", model.LogTypeError).First(&log).Error)
+	assert.Equal(t, "ox", log.ModelName, "ModelName keeps the downstream request model")
+
+	var other map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(log.Other), &other))
+	assert.Equal(t, true, other["is_model_mapped"])
+	assert.Equal(t, "deepseek-v4-flash", other["upstream_model_name"])
+}
+
+func TestProcessChannelErrorOmitsMappingWhenNotMapped(t *testing.T) {
+	setupErrorLogOtherTestDB(t)
+	c := newErrorLogTestContext(t)
+	channelError := *relaykittypes.NewChannelError(7, 1, "test-channel", false, "", false)
+	err := relaykittypes.NewOpenAIError(assert.AnError, relaykittypes.ErrorCodeBadResponseStatusCode, http.StatusBadGateway)
+
+	info := newMappedRelayInfo("ox", "deepseek-v4-flash")
+	info.IsModelMapped = false
+	processChannelError(c, channelError, err, info)
+
+	var count int64
+	require.NoError(t, model.LOG_DB.Model(&model.Log{}).Where("type = ?", model.LogTypeError).Count(&count).Error)
+	require.EqualValues(t, 1, count)
+
+	var log model.Log
+	require.NoError(t, model.LOG_DB.Where("type = ?", model.LogTypeError).First(&log).Error)
+	var other map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(log.Other), &other))
+	assert.NotContains(t, other, "is_model_mapped")
+	assert.NotContains(t, other, "upstream_model_name")
 }
