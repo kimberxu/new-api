@@ -1,6 +1,6 @@
 # 本地 GitHub Fork 工作流
 
-> 对应分支:`personal` 基线 `317e9ddd`(2026-09-01 刷新至 `badf2e5ee`;`personal` 线同步流程见「同步上游」节)
+> 对应分支:`personal` 基线 `317e9ddd`(2026-09-01 刷新至 `db1f5dae9`;`personal` 线同步流程见「同步上游」节)
 
 ## 标准触发短语
 
@@ -80,7 +80,7 @@ git push --force-with-lease origin deploy
 | `controller/relay.go` | 渠道限流检查、同优先级重试 `ExcludeChannel`、全渠道限流 429 兜底、（新增）模型级禁用分支 | 重试/计费逻辑（如 `PrepareTieredBillingForSelectedGroup`） | `e0b9f243`：2026-08-01 同步 8 提交；重试/计费逻辑拼序采纳、限流检查保留；`cd98b0f8`：2026-08-19 同步 0 提交；`processChannelError` 既有禁用两行包进 else、前插模型级 if 分支（包 else 非纯追加，冲突时按「保留魔改 + 采纳上游语义」手动合并）；`7dccc6db4`：2026-08-31 同步 21 提交；上游把 task 提交重构成 `executeTaskSubmissionWith`（参数注入 submit），魔改 `ExcludeChannel`+`UpdateUpstreamModel` 织入新函数体，`requestId` 因上游把 `service.Start` 移出作用域需在函数头补局部声明；计费断言（settle 事件）按免费语义适配测试 |
 | `controller/channel-test.go` | 模型级禁用/恢复分支、`ShouldDisableChannelWithDecision`、`processChannelError` 第 4 参 `nil` | 上游 `4add708e` 把单渠道测试重构成 `runChannelTestWorkers` worker 池，循环体整体搬家 | `235ae5a7`：2026-08-24 同步 6 提交；上游重构后的新调用点逐处补魔改行（判定换 `WithDecision`、模型级 if/else 包裹、enable 块后插模型级恢复块、`performChannelTests` 调用前插 `recoverExpiredModelBans` 且保留上游新增的 `concurrency` 参数）；`949e1e69`：2026-08-29 同步 6 提交；上游 int32 重构移除 `math.Round`，魔改随机化提交新增 `math/rand/v2` 后 `math` 成孤儿，autosquash 修正 |
 | `service/quota.go` | 计费功能级移除（`PreWssConsumeQuota` 等短路、`strings` import 随之删除） | 上游 `a073f74b` int32 重构把 `math.Round` 换成 `common.QuotaRoundChecked` 并调整 import | `949e1e69`：2026-08-29 同步 6 提交；import 冲突净结果为两侧删除（`math` 被上游移除用法、`strings` 被魔改移除用法），`CalcOpenRouterCacheCreateTokens` 采纳上游 `QuotaRoundChecked` 饱和语义 |
-| `model/ability.go` | `getChannelQuery` 简化（MAX(priority) 顶层、删 getPriority）+ DB 路径注释 | 上游把 `GetChannel` 重构为 `filters []dto.ChannelFilter` + 全量查询 + `filterAbilitiesByConstraints` | `7dccc6db4`：2026-08-31 同步 21 提交；`GetChannel` 采纳上游 filters 形态（魔改 getChannelQuery 顶层查询会丢 filters 语义），魔改同层重滚语义由 cache 主路径 exclude 机制承载；`getChannelQuery` 简化保留（上游已删 getPriority 引用） |
+`model/ability.go` | `getChannelQuery` 简化（MAX(priority) 顶层、删 getPriority）+ DB 路径注释 | 上游把 `GetChannel` 重构为 `filters []dto.ChannelFilter` + 全量查询 + `filterAbilitiesByConstraints` | `7dccc6db4`：2026-08-31 同步 21 提交；`GetChannel` 采纳上游 filters 形态（魔改 getChannelQuery 顶层查询会丢 filters 语义），魔改同层重滚语义由 cache 主路径 exclude 机制承载；`getChannelQuery` 简化保留（上游已删 getPriority 引用）；`db1f5dae9`：2026-09-01 补修；filters 重构时 `GetChannel` 丢失了 `channel_disabled_models` 的 `NOT EXISTS` 过滤（DB 路径模型级禁用失效），现于查询内补回（此前仅 cache 主路径 carry 禁用语义） |
 | `model/channel_cache.go` | `GetRandomSatisfiedChannel` 追加 `excludeChannels` 参数 + exclude 过滤块；模型组接管路由（overrides/effectivePriority/`GetRandomSatisfiedChannelFromGroups` DB fallback） | 上游把签名重构为 `filters []dto.ChannelFilter` + `filterCandidateIDs` | `7dccc6db4`：2026-08-31 同步 21 提交；签名取上游 filters 版再追加 `excludeChannels` 尾参，调用点（service/channel_select.go 两处）拼接 filters+excludeChannels；模型组新增函数块整体保留 |
 | `web/src/features/system-settings/models/routing-reliability-section.tsx` | 滑动窗口禁用 4 字段、慢流/TTFT 降级配置（`channel_slow_stream_setting`） | 上游把 schema 重构为 `createRoutingReliabilitySchema(t)` 工厂 + i18n 化 | `235ae5a7`：2026-08-24 同步 6 提交；schema 一律取上游工厂版再插入魔改字段（含 superRefine 两条采样校验）；i18n locale 冲突用语义三方合并（保留上游新增键、应用魔改键变更） |
 | i18n locale（`web/src/i18n/locales/*.json`） | 魔改 UI 文案键 | 上游同区段增删键导致整块冲突 | `235ae5a7`：2026-08-24 同步 6 提交；用 `scripts/i18n_3way_merge.py` 语义合并（ours 为底 + theirs 增改覆盖），键序以 ours 为准，事后 `bun run i18n:sync` 归位 |
