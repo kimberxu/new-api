@@ -1,245 +1,51 @@
 package service
 
 import (
-	"context"
 	"fmt"
 	"net/http"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/relaykit/types"
 )
 
-// modelLevelKeywords are error message fragments that identify a model-level
-// failure on 400/422 responses. 404 responses are judged more loosely: any
-// message mentioning "model" counts (see IsModelLevelError).
-var modelLevelKeywords = []string{
-	"model not found", "model_not_found", "model does not exist", "model not exist",
-	"no such model", "unknown model", "invalid model", "unsupported model",
-	"missing model", "model is not supported", "model not supported",
-	"模型不存在", "未知模型", "不支持的模型", "模型不可用", "模型已下线",
+// modelBanDurations is the escalating auto-ban duration ladder.
+// Stage index 0..6 → 30min, 1h, 2h, 4h, 8h, 16h, 32h; stage 7 = permanent.
+var modelBanDurations = []time.Duration{
+	30 * time.Minute,
+	1 * time.Hour,
+	2 * time.Hour,
+	4 * time.Hour,
+	8 * time.Hour,
+	16 * time.Hour,
+	32 * time.Hour,
 }
 
-// IsModelLevelError reports whether the error indicates a model-level problem
-// (a specific model is unavailable) as opposed to a channel-level failure.
-//
-// Loose band (user-confirmed): 404 whose message mentions "model" counts as
-// model-level; 400/422 require a keyword match. Other status codes never count.
-func IsModelLevelError(err *types.NewAPIError) bool {
-	if err == nil || err.StatusCode < 100 || err.StatusCode > 599 {
-		return false
+// initialBanStageForStatusCode returns the first ban stage: 401 starts at
+// stage 5 (16h), all other errors at stage 0 (30min).
+func initialBanStageForStatusCode(statusCode int) int {
+	if statusCode == http.StatusUnauthorized {
+		return 5
 	}
-	msg := strings.ToLower(err.Error())
-	if err.StatusCode == http.StatusNotFound {
-		return strings.Contains(msg, "model")
-	}
-	if err.StatusCode == http.StatusBadRequest || err.StatusCode == http.StatusUnprocessableEntity {
-		for _, kw := range modelLevelKeywords {
-			if strings.Contains(msg, kw) {
-				return true
-			}
-		}
-	}
-	return false
+	return 0
 }
-
-// [personal] channelLevelBalanceKeywords are error message fragments that
-// identify a channel-level upstream account/quota problem (key invalid, out
-// of balance). Such errors disable the whole channel, not a single model.
-var channelLevelBalanceKeywords = []string{
-	"insufficient_balance", "insufficient balance", "payment required",
-	"quota exhausted", "insufficient quota", "余额不足", "配额不足", "已欠费",
-	"账户余额", "balance is insufficient",
-}
-
-var channelLevelAuthKeywords = []string{
-	"invalid api key", "authentication", "unauthorized", "permission",
-	"key 无效", "密钥无效",
-}
-
-// [personal] IsChannelLevelError reports whether the error indicates a
-// channel-level problem (upstream key/balance), which disables the whole
-// channel. It is checked BEFORE IsModelLevelError in processChannelError so
-// balance-deficit messages mentioning "model" are never swallowed by the
-// model-level branch. Semantics:
-//   - 402 always channel-level;
-//   - 403 with auth or balance keywords channel-level;
-//   - any other status code with a balance keyword channel-level.
-func IsChannelLevelError(err *types.NewAPIError) bool {
-	if err == nil || err.StatusCode < 100 || err.StatusCode > 599 {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	if err.StatusCode == http.StatusPaymentRequired {
-		return true
-	}
-	hasBalance := false
-	for _, kw := range channelLevelBalanceKeywords {
-		if strings.Contains(msg, kw) {
-			hasBalance = true
-			break
-		}
-	}
-	if hasBalance {
-		return true
-	}
-	if err.StatusCode == http.StatusForbidden {
-		for _, kw := range channelLevelAuthKeywords {
-			if strings.Contains(msg, kw) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-const channelModelDisableWindowRedisNamespace = "channelModelDisableWindow"
-
-var (
-	channelModelDisableWindowMemoryLimiterOnce sync.Once
-	channelModelDisableWindowMemoryLimiter     *common.InMemoryRateLimiter
-)
-
-func getChannelModelDisableWindowMemoryLimiter() *common.InMemoryRateLimiter {
-	channelModelDisableWindowMemoryLimiterOnce.Do(func() {
-		l := &common.InMemoryRateLimiter{}
-		l.Init(10 * time.Minute)
-		channelModelDisableWindowMemoryLimiter = l
-	})
-	return channelModelDisableWindowMemoryLimiter
-}
-
-func channelModelDisableWindowRedisKey(channelID int, modelName string, statusCode int, tier string) string {
-	return fmt.Sprintf("%s:%d:%s:%d:%s", channelModelDisableWindowRedisNamespace, channelID, strings.ToLower(modelName), statusCode, tier)
-}
-
-// channelModelDisableWindowLuaScript atomically pushes a timestamp, trims to
-// the threshold, sets expiry, and returns the current count.
-const channelModelDisableWindowLuaScript = `
-local count = redis.call('LPUSH', KEYS[1], ARGV[1])
-if count > tonumber(ARGV[2]) then
-  redis.call('LTRIM', KEYS[1], 0, tonumber(ARGV[2]) - 1)
-  count = tonumber(ARGV[2])
-end
-redis.call('EXPIRE', KEYS[1], ARGV[3])
-return count
-`
-
-var channelModelDisableWindowLuaSha string
-
-func getChannelModelDisableWindowLuaSha() string {
-	if channelModelDisableWindowLuaSha != "" {
-		return channelModelDisableWindowLuaSha
-	}
-	ctx := context.Background()
-	sha, err := common.RDB.ScriptLoad(ctx, channelModelDisableWindowLuaScript).Result()
-	if err != nil {
-		return ""
-	}
-	channelModelDisableWindowLuaSha = sha
-	return sha
-}
-
-func channelModelDisableWindowRedisTake(channelID int, modelName string, statusCode int, tier string, threshold int, windowSec int64) bool {
-	ctx := context.Background()
-	key := channelModelDisableWindowRedisKey(channelID, modelName, statusCode, tier)
-	now := time.Now().Unix()
-
-	var count int64
-	var err error
-	sha := getChannelModelDisableWindowLuaSha()
-	if sha != "" {
-		count, err = common.RDB.EvalSha(ctx, sha, []string{key}, now, threshold, windowSec).Int64()
-	} else {
-		count, err = common.RDB.Eval(ctx, channelModelDisableWindowLuaScript, []string{key}, now, threshold, windowSec).Int64()
-	}
-	if err != nil {
-		// Allow on error — same fail-open policy as the channel-level window.
-		return false
-	}
-	return count >= int64(threshold)
-}
-
-// CheckAndRecordDisableModel records one model-level error and reports whether
-// the sliding-window threshold has been reached (i.e. the model on this
-// channel should be disabled). The identity key is
-// channelID:modelName:statusCode:tier, so different models, status codes and
-// tiers are counted independently.
-//
-// Classified model-level errors (IsModelLevelError) count on the strict
-// (configured) tier since they are explicit errors; unclassified fallback
-// errors from processChannelError count on the lenient (unconfigured) tier
-// (isConfiguredError=false). The second return value carries the trigger
-// detail (e.g. "3 failures in 60s window (threshold 3)"), empty when not
-// triggered.
-func CheckAndRecordDisableModel(channelID int, modelName string, statusCode int, isConfiguredError bool) (bool, string) {
-	var threshold int
-	var windowSec int64
-	var tier string
-
-	if isConfiguredError {
-		threshold = common.ConfiguredDisableThreshold
-		windowSec = common.ConfiguredDisableWindowSeconds
-		tier = "configured"
-	} else {
-		threshold = common.UnconfiguredDisableThreshold
-		windowSec = common.UnconfiguredDisableWindowSeconds
-		tier = "unconfigured"
-	}
-
-	if threshold <= 0 {
-		// Threshold of 0 means "never disable" — safety guard.
-		return false, ""
-	}
-
-	detail := func() string {
-		return fmt.Sprintf("%d failures in %ds window (threshold %d)", threshold, windowSec, threshold)
-	}
-
-	if common.RedisEnabled && common.RDB != nil {
-		if channelModelDisableWindowRedisTake(channelID, modelName, statusCode, tier, threshold, windowSec) {
-			return true, detail()
-		}
-		return false, ""
-	}
-
-	// In-memory sliding window: allow threshold-1 within the window and
-	// trigger on the threshold-th error. threshold=1 triggers immediately.
-	if threshold == 1 {
-		return true, detail()
-	}
-	key := channelModelDisableWindowRedisKey(channelID, modelName, statusCode, tier)
-	triggered := !getChannelModelDisableWindowMemoryLimiter().Request(key, threshold-1, windowSec)
-	if triggered {
-		return true, detail()
-	}
-	return false, ""
-}
-
-// [personal] modelBanAutoDuration is how long an auto model-level ban lasts
-// before the periodic recovery probe re-tests the model.
-const modelBanAutoDuration = 30 * time.Minute
 
 // DisableChannelModel disables a single model on a channel (source=auto) and
-// rebuilds the channel cache so routing excludes the pair immediately. Auto
-// bans expire after modelBanAutoDuration (BannedUntil); manual bans are
-// permanent (BannedUntil=0).
-func DisableChannelModel(channelID int, modelName string, reason string) error {
-	common.SysLog(fmt.Sprintf("通道 #%d 模型 %s 发生模型级错误，准备禁用该模型，原因：%s", channelID, modelName, common.LocalLogPreview(reason)))
+// rebuilds the channel cache so routing excludes the pair immediately. The
+// initial ban stage is determined by statusCode: 401 errors start at stage 5
+// (16h), all other errors at stage 0 (30min).
+func DisableChannelModel(channelID int, modelName string, reason string, statusCode int) error {
+	common.SysLog(fmt.Sprintf("通道 #%d 模型 %s 请求失败，准备禁用该模型，原因：%s", channelID, modelName, common.LocalLogPreview(reason)))
 
 	now := time.Now()
-	bannedUntil := now.Add(modelBanAutoDuration).Unix()
+	stage := initialBanStageForStatusCode(statusCode)
+	bannedUntil := now.Add(modelBanDurations[stage]).Unix()
 	if err := model.AddChannelDisabledModels(channelID, []string{modelName}, "auto", reason); err != nil {
 		common.SysLog(fmt.Sprintf("failed to add channel disabled model: channel_id=%d, model=%s, error=%v", channelID, modelName, err))
 		return err
 	}
-	// Set the ban deadline on the record (AutoMigrate already added the
-	// column; existing records keep BannedUntil=0 = permanent until now).
-	if err := model.SetChannelDisabledModelBannedUntil(channelID, modelName, bannedUntil); err != nil {
-		common.SysLog(fmt.Sprintf("failed to set banned_until: channel_id=%d, model=%s, error=%v", channelID, modelName, err))
+	if err := model.SetChannelDisabledModelBanStage(channelID, modelName, stage, bannedUntil); err != nil {
+		common.SysLog(fmt.Sprintf("failed to set ban stage: channel_id=%d, model=%s, error=%v", channelID, modelName, err))
 		return err
 	}
 	model.InitChannelCache()
@@ -264,12 +70,22 @@ func EnableChannelModel(channelID int, modelName string, source string) error {
 	return nil
 }
 
-// ExtendChannelModelBan renews the ban deadline of an auto model-level
-// disable record (used when the recovery probe still fails). Does not touch
-// the sliding-window counters: the recovery probe is a single targeted
-// request, not a repeat error storm.
+// ExtendChannelModelBan escalates the ban of an auto model-level disable
+// record (used when the recovery probe still fails). Stage advances one step
+// per call; stage 7 (newStage >= len(modelBanDurations)) means permanent
+// (BannedUntil=0), and the recovery probe will not re-test.
 func ExtendChannelModelBan(channelID int, modelName string) error {
-	if err := model.SetChannelDisabledModelBannedUntil(channelID, modelName, time.Now().Add(modelBanAutoDuration).Unix()); err != nil {
+	record, err := model.GetChannelDisabledModel(channelID, modelName)
+	if err != nil || record == nil {
+		return nil // record gone (manual clear) — nothing to extend
+	}
+	newStage := record.BanStage + 1
+	bannedUntil := int64(0) // permanent
+	if newStage < len(modelBanDurations) {
+		bannedUntil = time.Now().Add(modelBanDurations[newStage]).Unix()
+	}
+	// newStage == len(modelBanDurations) (7) ⇒ bannedUntil stays 0 = permanent
+	if err := model.SetChannelDisabledModelBanStage(channelID, modelName, newStage, bannedUntil); err != nil {
 		common.SysLog(fmt.Sprintf("failed to extend channel disabled model ban: channel_id=%d, model=%s, error=%v", channelID, modelName, err))
 		return err
 	}
