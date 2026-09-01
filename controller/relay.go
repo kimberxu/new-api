@@ -477,12 +477,16 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		if c.Request != nil && c.Request.URL != nil {
 			other.SetPublic("request_path", c.Request.URL.Path)
 		}
-other.SetPublic("error_type", err.GetErrorType())
+		other.SetPublic("error_type", err.GetErrorType())
 		other.SetPublic("error_code", err.GetErrorCode())
 		other.SetPublic("status_code", err.StatusCode)
 		service.AppendRelayLogAdminInfo(c, relayInfo, other)
 		if relayInfo != nil {
 			service.AppendRequestDebugAdminInfo(relayInfo, other, false)
+		}
+		if relayInfo != nil && relayInfo.IsModelMapped {
+			other.SetPublic("is_model_mapped", true)
+			other.SetPublic("upstream_model_name", relayInfo.UpstreamModelName)
 		}
 		service.AppendTaskPluginContextAuditInfo(c, other)
 		startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
