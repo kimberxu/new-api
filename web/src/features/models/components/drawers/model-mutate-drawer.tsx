@@ -334,10 +334,6 @@ export function ModelMutateDrawer({
       AutomaticDisableStatusCodes: '401',
       AutomaticRetryStatusCodes:
         '100-199,300-399,401-407,409-499,500-503,505-523,525-599',
-      ConfiguredDisableWindowSeconds: 600,
-      ConfiguredDisableThreshold: 2,
-      UnconfiguredDisableWindowSeconds: 300,
-      UnconfiguredDisableThreshold: 3,
       'channel_slow_stream_setting.enabled': true,
       'channel_slow_stream_setting.min_tps': 8,
       'channel_slow_stream_setting.window_seconds': 300,

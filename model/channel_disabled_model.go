@@ -1,7 +1,10 @@
 package model
 
 import (
+	"errors"
+
 	"github.com/samber/lo"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -16,13 +19,16 @@ type ChannelDisabledModel struct {
 	// Source is "manual" or "auto"; the default is applied in code
 	// (AddChannelDisabledModels) rather than via a gorm default tag to avoid
 	// cross-database AutoMigrate churn.
-	Source    string `json:"source" gorm:"type:varchar(16)"`
-	Reason    string `json:"reason" gorm:"type:text"`
+	Source string `json:"source" gorm:"type:varchar(16)"`
+	Reason string `json:"reason" gorm:"type:text"`
 	// [personal] BannedUntil is the unix timestamp after which an auto ban
 	// expires (0 = permanent). Only auto-sourced bans carry a deadline; the
 	// periodic recovery probe re-tests the model when it passes.
 	BannedUntil int64 `json:"banned_until" gorm:"bigint;default:0"`
-	CreatedAt   int64 `json:"created_at" gorm:"bigint;autoCreateTime"`
+	// BanStage is the escalation stage of an auto ban: 0..6 map to
+	// modelBanDurations, 7 = permanent. Manual bans keep 0 and BannedUntil=0.
+	BanStage  int   `json:"ban_stage" gorm:"default:0"`
+	CreatedAt int64 `json:"created_at" gorm:"bigint;autoCreateTime"`
 }
 
 // AddChannelDisabledModels inserts model-level disable records, ignoring
@@ -84,6 +90,17 @@ func GetChannelDisabledModels(channelId int) ([]ChannelDisabledModel, error) {
 	return records, err
 }
 
+// GetChannelDisabledModel reads a single model-level disable record.
+// Returns nil, nil when absent (gorm.ErrRecordNotFound swallowed).
+func GetChannelDisabledModel(channelId int, model string) (*ChannelDisabledModel, error) {
+	var record ChannelDisabledModel
+	err := DB.Where("channel_id = ? AND model = ?", channelId, model).First(&record).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return &record, err
+}
+
 // GetAllChannelDisabledModels returns every model-level disable record (used
 // to build the in-memory channel cache).
 func GetAllChannelDisabledModels() ([]ChannelDisabledModel, error) {
@@ -102,10 +119,11 @@ func EnableChannelModelDisabled(channelId int, model string, source string) erro
 	return query.Delete(&ChannelDisabledModel{}).Error
 }
 
-// SetChannelDisabledModelBannedUntil updates the ban deadline of an existing
-// model-level disable record. No-op (nil) when the record is absent.
-func SetChannelDisabledModelBannedUntil(channelId int, model string, bannedUntil int64) error {
+// SetChannelDisabledModelBanStage updates the ban stage and deadline of an
+// existing model-level disable record. No-op (nil) when the record is absent.
+func SetChannelDisabledModelBanStage(channelId int, model string, banStage int, bannedUntil int64) error {
 	return DB.Model(&ChannelDisabledModel{}).
 		Where("channel_id = ? AND model = ?", channelId, model).
+		Update("ban_stage", banStage).
 		Update("banned_until", bannedUntil).Error
 }

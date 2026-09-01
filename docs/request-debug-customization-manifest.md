@@ -33,11 +33,11 @@
 | 上游模型自动删除与筛选 | `f10d688f` | 中（`controller/channel_upstream_update.go`、`relaykit/dto/channel_settings.go`、前端渠道抽屉） | `内联`（channel_upstream_update.go 既有魔改文件内扩展）→ 待迁移 | 否 |
 | 额度显示模式切换修复 | `484d024c` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
 | token 大数 K/M/B 分级显示 | `99cc5e56`、`cda0a61f` | 低（`web/src/lib/currency.ts`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
-| 滑动窗口渠道自动禁用 | `c0272220`、`9edda449` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） | `独立文件`（service/channel_disable_window.go）+ `挂载点`（channel.go/relay.go/channel-test.go） | 否 |
+| 滑动窗口渠道自动禁用（deploy 线；personal 线 2026-09-01 退役） | `c0272220`、`9edda449` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） | `独立文件`（service/channel_disable_window.go）+ `挂载点`（channel.go/relay.go/channel-test.go）；personal 线已整体删除，详见详情章节退役注 | 否 |
 | 日志 t/s 计算排除 TTFT | `33f8aa0f` | 低（`web/src/features/usage-logs/`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
 | 渠道流速率降级（含首字延迟 TTFT 降级） | `088876eb`、`7832b0e9`、`f9198749` | 中（`model/channel_cache.go`、`model/model_group_select.go`、`service/quota.go`、`service/text_quota.go`、`web/src/features/system-settings/models/routing-reliability-section.tsx`） | `独立文件`（pkg/channel_slowstream/）+ `挂载点`（channel_cache.go/model_group_select.go/服务计费） | 否 |
 | 渠道流速率降级——模型组页降级标识（前端展示） | `c84e1d82` | 低（`web/src/features/model-groups/`） | `内联`（前端，复用既有 `/api/channel/demoted`）→ 待迁移（低风险可不迁） | 否 |
-| 模型级路由表前台化与模型级禁用（含 auto-ban 细化） | `cd98b0f8`、`9edda449` | 中（`controller/relay.go`、`model/channel_cache.go`、`model/ability.go`、`controller/channel-test.go`） | `独立文件`（model/channel_disabled_model.go、service/channel_model_disable.go、controller/channel_ability.go、web/src/features/channel-abilities/）+ `挂载点`（channel_cache.go、ability.go、relay.go、channel-test.go、channel.go、main.go、channel-router.go） | 否 |
+| 模型级路由表前台化与模型级禁用（含 auto-ban 细化；2026-09-01 personal 统一封禁重写） | `cd98b0f8`、`9edda449` | 中（`controller/relay.go`、`model/channel_cache.go`、`model/ability.go`、`controller/channel-test.go`） | `独立文件`（model/channel_disabled_model.go、service/channel_model_disable.go、controller/channel_ability.go、web/src/features/channel-abilities/）+ `挂载点`（channel_cache.go、ability.go、relay.go、channel-test.go、channel.go、main.go、channel-router.go）；personal 线 2026-09-01 重写为阶梯式统一模型级封禁（30min→…→32h→永久，401 起步 16h） | 否 |
 | 渠道密钥查看放开安全验证 | `dbde0b31`（cherry-pick 自 deploy `570561d1`） | 低（`router/channel-router.go`） | `内联`（纯删一行中间件，无可迁移逻辑） | 否 |
 
 > **标注口径**：「扩展点形态」按各功能详情章节文件清单判定（`独立文件`=新文件承载全部逻辑；`挂载点`=既有文件仅插入少量挂载调用；`内联`=逻辑直接改在既有文件中，为负债项，后续同步冲突时优先迁移）；「上游实现替代」以实施时 `remotes/upstream/*` 可见主题为准，发现新对应分支即改标 `待观察` 并注明分支名。
@@ -404,7 +404,9 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 ---
 
-## 滑动窗口渠道自动禁用
+## 滑动窗口渠道自动禁用（deploy 线；personal 线 2026-09-01 退役）
+
+> **2026-09-01（personal 线）**：渠道级自动禁用/恢复整体退役（`service/channel_disable_window.go`、`ShouldDisableChannelWithDecision`、`DisableDecision`、`CheckAndRecordDisable`、4 个窗口常量与前端 4 输入框全部删除），relay 请求失败只走模型级封禁（见「模型级路由表前台化与模型级禁用」节的统一重写条目）。本章描述保留为 deploy 线功能登记。`AutomaticDisableChannelEnabled`/`AutomaticEnableChannelEnabled`/`AutomaticDisableStatusCodes`/`AutomaticDisableKeywords`/`ChannelDisableThreshold` 五个配置变量与 option round-trip 保留（后端无消费方，仅设置保存 schema 兼容）。
 
 ### 功能概述
 
@@ -556,6 +558,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 - **禁用粒度细化为「渠道×模型」**：新增独立禁用表 `channel_disabled_models`（channel_id × model，source=manual|auto，reason），路由构建（内存缓存 `InitChannelCache` 与 DB 路径 `getChannelQuery` NOT EXISTS）排除被禁的 (channel, model) 对。独立表隔离于「channel.status ↔ ability.enabled」既有同步不变式——渠道重新启用不会抹掉模型级禁用。
 - **auto-ban 模型级判定**：`processChannelError` 对明确模型类错误（404 消息含 model，或 400/422 命中模型关键词）只禁该渠道该模型（source=auto），不再整个渠道禁；模型维度独立滑动窗口，key = `channelID:modelName:statusCode:tier`——明确模型类错误按 configured 严格档计数，未分类兜底错误按 unconfigured 宽容档计数（2026-08-24 兜底模型级化）。
 - **2026-08-22 增强（原因前缀 + 渠道列表徽章）**：模型级禁用原因加 `model disabled:` 前缀并携带窗口详情（`N failures in Ws window (threshold T)`），存入 `channel_disabled_models.reason`；新增 `GET /api/channel/disabled_models`（ChannelRead）返回全部禁用记录；渠道列表名称旁新增 Ban 徽章（30s 轮询），悬停列出各模型的来源 auto/manual、原因、剩余封禁时长或永久——此前模型级禁用在渠道页完全不可见，与渠道级自动禁用无法区分。
+- **2026-09-01 统一模型级封禁重写（personal 线）**：彻底脱离渠道级封禁——`processChannelError` 不再区分错误类型，任何上游错误（skip-retry 本地/客户端错误除外）只禁失败的模型（单次失败即触发，滑动窗口计数取消）；封禁键仍经 `ResolveModelGroupUpstreamModel` 解析为成员真实上游模型。新增封禁阶梯：`BanStage` 0..6 → 30min/1h/2h/4h/8h/16h/32h（`modelBanDurations`），stage 7 = 永久；401 错误首封从 stage 5（16h）起步。到期恢复探测（`recoverExpiredModelBans`）仍失败时 `ExtendChannelModelBan` 阶梯升级一档，32h 档再失败落 stage 7 永久（`BannedUntil=0`，不再自动探测解封，手动测试/解禁仍可清）。健康检查 `testChannelForHealthCheck` 同步重写：测试失败只禁该模型、响应时间超阈值假错误分支与渠道级 enable/disable 分支删除。task relay 提交失败改传 `relayInfo`（同样走模型级封禁）。测试文件重写为 `service/channel_model_disable_test.go`（阶梯/401 起步/升级到永久/重复禁用刷新/记录消失 no-op）。
 - **测试语义细化到模型级**：测试模型 A 通过只恢复 A（手动测试恢复任意来源，自动周期仅恢复 auto 来源）；渠道级禁用仍由任一模型测试通过整体恢复，语义不变。
 - **2026-08-24 兜底模型级化**：`processChannelError` 中渠道级/模型级判定均不命中的未分类错误，原兜底进渠道级宽容窗口（反复裸 404 会拖垮整个渠道），现改为兜底进**模型级宽容窗口**（`CheckAndRecordDisableModel(..., false)`，默认 5 分钟 3 次禁该模型，封禁键同样经 `ResolveModelGroupUpstreamModel` 解析）；管理员显式配置的规则（状态码范围 / 关键词 / channel-error）仍走渠道级严格窗口，skip-retry 错误任何层级都不计数。分类逻辑抽为 `service.IsConfiguredDisableError` 供决策函数与兜底分支共用。
 
@@ -668,6 +671,8 @@ new-api 公共默认转发链路（`relay/channel/api_request.go` 的 `SetupApiR
 **手动组组名开放编辑（2026-08-31，`55032e6b`）**：组名（= 路由模型名）此前创建后不可改，现开放手动组重命名：新端点 `PATCH /api/model-groups/:id/name`（`controller.UpdateModelGroup`），仅 `source=manual` 组可改名（auto 组系统管理、名称跟随渠道模型，拒绝）；校验与创建一致（非空、无空格/逗号/分号、组名唯一），改回自身同名放行，成功后 `InitChannelCache()` 重建路由索引。前端组头名称仅对手动组可点击（悬停下划线 + 铅笔图标 + tooltip），`stopPropagation` 防止触发折叠；弹出重命名对话框（预填当前名，复用创建对话框的说明文案与占位符），空值/未变化时禁用保存。i18n 新增 4 键七语言。回归测试 `controller/model_group_rename_test.go`：手动组改名成功（组成员保持）、auto 组拒绝、重名拒绝、非法名拒绝、同名放行。
 
 **折叠三角可展开 + 组内成员按优先级排序（2026-08-31，`0985c75a9` + `c555a188a`）**：①修复模型组卡片折叠——全局 `button:active { transform: scale(0.98) }` 的按键微交互会把整行触发按钮（约 900px 宽）左右各缩约 9px，导致点击左侧折叠三角时，`mousedown` 落点随按钮收缩让位给父 `p-3` div，`click` 目标解析到 div、触发按钮 `onClick` 不触发、组无法展开。将全局规则改为排除 `[data-slot='collapsible-trigger']`（`web/src/styles/index.css`），同批次修复聊天侧栏/引用区等所有同款折叠触发器。②组内成员表新增按优先级排序：点击 `Priority` 表头循环 `desc→asc→默认`，高优先级在前（对齐后端 `effectivePriorityWith` 降序选路语义），纯前端重排 `group.members`；成员继承项取 `priority ?? channel_priority`，未设置按 0 参与排序。排序比较器抽至 `web/src/features/model-groups/lib/priority-sort.ts` 并补 6 条单测（desc/asc 方向、成员覆盖优先于渠道继承、null 回落渠道值、全空按 0、输入不变性）。i18n 新增 `Sort by priority` 键七语言。
+
+**统一模型级封禁重写（2026-09-01）**：渠道级自动禁用/恢复退役，relay 失败与渠道测试失败统一走模型级封禁：单次失败即禁（无滑动窗口），阶梯 `BanStage` 0..6 → 30min/1h/2h/4h/8h/16h/32h、stage 7 永久；401 首封起步 16h；到期探测失败逐档升级，32h 后永久不再自动探测。`service/channel_disable_window.go`、`channel_disable_window_test.go` 删除；`service/channel_model_disable.go` 重写（`modelBanDurations`/`initialBanStageForStatusCode`/`SetChannelDisabledModelBanStage`）；`processChannelError` 收敛为单一模型级分支（`IsSkipRetryError` 门控）+ task relay 传 `relayInfo`；`testChannelForHealthCheck`/`performChannelTests`/`runChannelTestTask` 签名收敛（去 allowDisable/disableThreshold）；`common/constants.go`/`model/option.go` 删 4 窗口常量；前端 routing-reliability-section/types/index/section-registry/model-mutate-drawer 删 4 字段。测试重写 `service/channel_model_disable_test.go`（7 例：阶梯/401/升级到永久/重复禁用刷新/no-op）。
 
 ### 文件清单
 
