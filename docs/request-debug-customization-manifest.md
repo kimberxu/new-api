@@ -1,6 +1,6 @@
 # 定制功能清单（deploy / personal 分支）
 
-> 对应分支：`personal` 基线 `317e9ddd`（2026-09-01 刷新至 `c84e1d82`；deploy 线功能部分，可用 `git diff upstream/main...317e9ddd` 核对。注意：`deploy` 分支自分叉点 `2ffa3979`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
+> 对应分支：`personal` 基线 `317e9ddd`（2026-09-01 刷新至 `badf2e5ee`；deploy 线功能部分，可用 `git diff upstream/main...317e9ddd` 核对。注意：`deploy` 分支自分叉点 `2ffa3979`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
 > 以下功能均为魔改线相对 `upstream/main` 的定制；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `317e9ddd` 的改动。
 > 魔改提交：`f10d688f`（上游模型自动删除开关与筛选模型）→ `ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日…
 
@@ -622,7 +622,28 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 > 对应分支：`personal`（基于基线 `317e9ddd`，原 deploy-model 分支已退役，2026-08-24 更新）
 > 本小节登记 `personal` 相对基线 `317e9ddd` 的半重构（`git log 317e9ddd..personal` 核对）。
-> 魔改提交序列：`cfddd71b`（模型组接管路由）→ `b6925d13`（错误分级与模型级到期恢复）→ `d0f1ea52`（计费功能级移除）→ `a7e70937`（前端计费 UI 删除）→ `1ee3129d`（i18n 孤儿 key 清理）→ `6745718c`（移除 Ollama 渠道）→ `1219dfc6`（订阅后端残留清理）→ `d2c72bfe`（移除 OAuth/Passkey 登录）→ `b962fc25`（移除开放注册与 OAuth/Passkey 前端残余）→ `c99427f3`（新建模型组前端 feature）→ `c58905d9`（模型组列表工具栏）→ `5b797304`（模型组列表关键词筛选 + 排序工具栏）→ `b7419616`（GHCR 构建支持分支前缀镜像 tag）→ `9f70c191`（修复成员优先级/权重继承失效）→ `30fb8c53`（上游请求改用成员真实上游模型）→ `076db805`（移除系统设置 Billing 页残留）→ `a2473546`（模型组引用成员开放编辑）→ `66a000ae`（添加成员界面全量列表化 + 搜索）→ `8727d3ce`（勾选多选批量添加）→ `fe9cc024`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `ea91c322`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `b1d030b6`（禁用徽章悬停显示级别/原因/时间）→ `8d34b68b`（成员测试按钮 + 测试通过即解禁）→ `711a845c`（未分类错误兜底改走模型级宽容窗口）→ `55032e6b`（模型组手动组组名开放编辑）→ `7dccc6db4`（同步上游 21 提交：冲突归位 + 免费计费测试语义适配）→ `0985c75a9`（折叠三角可展开 + 组内成员按优先级排序）→ `c555a188a`（排序逻辑提取 lib + 补单测）
+> 魔改提交序列：`cfddd71b`（模型组接管路由）→ `b6925d13`（错误分级与模型级到期恢复）→ `d0f1ea52`（计费功能级移除）→ `a7e70937`（前端计费 UI 删除）→ `1ee3129d`（i18n 孤儿 key 清理）→ `6745718c`（移除 Ollama 渠道）→ `1219dfc6`（订阅后端残留清理）→ `d2c72bfe`（移除 OAuth/Passkey 登录）→ `b962fc25`（移除开放注册与 OAuth/Passkey 前端残余）→ `c99427f3`（新建模型组前端 feature）→ `c58905d9`（模型组列表工具栏）→ `5b797304`（模型组列表关键词筛选 + 排序工具栏）→ `b7419616`（GHCR 构建支持分支前缀镜像 tag）→ `9f70c191`（修复成员优先级/权重继承失效）→ `30fb8c53`（上游请求改用成员真实上游模型）→ `076db805`（移除系统设置 Billing 页残留）→ `a2473546`（模型组引用成员开放编辑）→ `66a000ae`（添加成员界面全量列表化 + 搜索）→ `8727d3ce`（勾选多选批量添加）→ `fe9cc024`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `ea91c322`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `b1d030b6`（禁用徽章悬停显示级别/原因/时间）→ `8d34b68b`（成员测试按钮 + 测试通过即解禁）→ `711a845c`（未分类错误兜底改走模型级宽容窗口）→ `55032e6b`（模型组手动组组名开放编辑）→ `7dccc6db4`（同步上游 21 提交：冲突归位 + 免费计费测试语义适配）→ `0985c75a9`（折叠三角可展开 + 组内成员按优先级排序）→ `c555a188a`（排序逻辑提取 lib + 补单测）→ `badf2e5ee`（可配置上游默认 User-Agent）
+
+## 可配置上游默认 User-Agent（隐藏 new-api 转发特征）
+
+### 功能概述
+
+new-api 公共默认转发链路（`relay/channel/api_request.go` 的 `SetupApiRequestHeader`）此前从不设置 User-Agent，Go `net/http` transport 自动填充 `Go-http-client/1.1`（HTTP/2 为 `Go-http-client/2.0`），对上游暴露「请求发自 Go 转发程序」特征。系统设置新增「Upstream User-Agent」配置项，默认 `OpenAI/Go 3.54.0`（openai-go 官方 UA 格式与真实版本号），仅应用于公共默认转发链路；渠道特设头（openrouter `HTTP-Referer`/`X-OpenRouter-Title`、codex、aws SDK 等）与 Header Override 优先级均不受影响。
+
+### 行为
+
+- `== ""` 守卫：适配器后续显式设置 UA 时不被默认值覆盖；Header Override 在 `SetupRequestHeader` 之后应用，仍最高优先级
+- 空字符串 = 不设置 UA（回到 Go 默认 `Go-http-client/1.1`），用户可随时恢复现状
+- 配置存 `general_setting.upstream_user_agent`，反射存取自动覆盖，无 DB 迁移
+
+### 文件清单
+
+- `setting/operation_setting/general_setting.go` - `GeneralSetting.UpstreamUserAgent` 字段 + 包级默认值
+- `relay/channel/api_request.go` - `SetupApiRequestHeader` 默认 UA 注入点（全部 30+ 适配器公共入口）
+- `web/src/features/system-settings/models/global-settings-card.tsx`、`index.tsx`、`section-registry.tsx`、`types.ts` - 系统设置表单 + 默认值 + 扁平键映射
+- `web/src/i18n/locales/*.json` - 新增 2 键七语言
+- 测试：`relay/channel/api_request_test.go`（`TestSetupApiRequestHeaderDefaultUserAgent`：默认注入 + 预置 UA 不被覆盖）
+
 
 ## 模型组路由表（一等公民）
 
