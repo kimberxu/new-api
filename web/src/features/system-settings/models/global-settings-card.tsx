@@ -96,6 +96,7 @@ const schema = z.object({
   general_setting: z.object({
     ping_interval_enabled: z.boolean(),
     ping_interval_seconds: z.coerce.number().min(1),
+    upstream_user_agent: z.string(),
   }),
 })
 
@@ -108,6 +109,7 @@ type FlatGlobalModelSettings = {
   'global.chat_completions_to_responses_policy': string
   'general_setting.ping_interval_enabled': boolean
   'general_setting.ping_interval_seconds': number
+  'general_setting.upstream_user_agent': string
 }
 
 const flattenGlobalValues = (
@@ -127,6 +129,8 @@ const flattenGlobalValues = (
     values.general_setting.ping_interval_enabled,
   'general_setting.ping_interval_seconds':
     values.general_setting.ping_interval_seconds,
+  'general_setting.upstream_user_agent':
+    values.general_setting.upstream_user_agent,
 })
 
 function normalizeJsonText(value: string, fallback: string) {
@@ -367,6 +371,31 @@ export function GlobalSettingsCard({ defaultValues }: GlobalSettingsCardProps) {
                 <FormDescription>
                   {t(
                     'Recommended to keep this high to avoid upstream throttling.'
+                  )}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name='general_setting.upstream_user_agent'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Upstream User-Agent')}</FormLabel>
+                <FormControl>
+                  <Input
+                    className='w-full'
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'Default User-Agent sent to upstream providers. Leave empty to keep the Go default.'
                   )}
                 </FormDescription>
                 <FormMessage />

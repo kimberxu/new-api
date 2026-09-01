@@ -30,6 +30,7 @@ const defaultModelSettings: ModelSettings = {
   'global.chat_completions_to_responses_policy': '{}',
   'general_setting.ping_interval_enabled': false,
   'general_setting.ping_interval_seconds': 60,
+  'general_setting.upstream_user_agent': 'OpenAI/Go 3.54.0',
   'gemini.safety_settings': '',
   'gemini.version_settings': '',
   'gemini.supported_imagine_models': '',

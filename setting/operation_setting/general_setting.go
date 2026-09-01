@@ -20,6 +20,9 @@ type GeneralSetting struct {
 	CustomCurrencySymbol string `json:"custom_currency_symbol"`
 	// 自定义货币与美元汇率（1 USD = X Custom）
 	CustomCurrencyExchangeRate float64 `json:"custom_currency_exchange_rate"`
+	// UpstreamUserAgent 是转发到上游渠道时的默认 User-Agent；
+	// 空字符串表示不设置（保留 Go 默认 Go-http-client/1.1）。
+	UpstreamUserAgent string `json:"upstream_user_agent"`
 }
 
 // 默认配置
@@ -30,6 +33,7 @@ var generalSetting = GeneralSetting{
 	QuotaDisplayType:           QuotaDisplayTypeUSD,
 	CustomCurrencySymbol:       "¤",
 	CustomCurrencyExchangeRate: 1.0,
+	UpstreamUserAgent:          "OpenAI/Go 3.54.0",
 }
 
 func init() {
