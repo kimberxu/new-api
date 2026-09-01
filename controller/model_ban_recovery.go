@@ -84,7 +84,7 @@ func recoverExpiredModelBans(ctx context.Context, testUserID int) (int, error) {
 			recovered++
 			logger.LogDebug(ctx, "recoverExpiredModelBans: recovered channel #%d model %s", record.ChannelId, record.Model)
 		case decision.Extended:
-			if err := service.ExtendChannelModelBan(record.ChannelId, record.Model); err != nil {
+			if err := service.ExtendChannelModelBan(record.ChannelId, record.Model, result.localErr.Error()); err != nil {
 				logger.LogError(ctx, fmt.Sprintf("recoverExpiredModelBans: extend failed channel #%d model %s: %v", record.ChannelId, record.Model, err))
 				continue
 			}
