@@ -9,6 +9,9 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+
+	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
 
 func TestNewTaskAPIRequestInheritsClientCancellation(t *testing.T) {
@@ -204,4 +207,27 @@ func TestProcessHeaderOverride_PassHeadersTemplateSetsRuntimeHeaders(t *testing.
 	require.Equal(t, "Codex CLI", upstreamReq.Header.Get("Originator"))
 	require.Equal(t, "sess-123", upstreamReq.Header.Get("Session_id"))
 	require.Empty(t, upstreamReq.Header.Get("X-Codex-Beta-Features"))
+}
+
+func TestSetupApiRequestHeaderDefaultUserAgent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	gs := operation_setting.GetGeneralSetting()
+	origUA := gs.UpstreamUserAgent
+	require.NoError(t, config.UpdateConfigFromMap(gs, map[string]string{"upstream_user_agent": "OpenAI/Go 3.54.0"}))
+	defer func() { _ = config.UpdateConfigFromMap(gs, map[string]string{"upstream_user_agent": origUA}) }()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	info := &relaycommon.RelayInfo{}
+	reqHeader := &http.Header{}
+	SetupApiRequestHeader(info, c, reqHeader)
+	require.Equal(t, "OpenAI/Go 3.54.0", reqHeader.Get("User-Agent"))
+
+	// 预先设置 UA 时默认值不得覆盖（== "" 守卫生效）
+	reqHeader.Set("User-Agent", "custom")
+	SetupApiRequestHeader(info, c, reqHeader)
+	require.Equal(t, "custom", reqHeader.Get("User-Agent"))
 }
