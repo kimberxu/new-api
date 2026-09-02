@@ -3874,6 +3874,28 @@ export function ChannelMutateDrawer({
                                 </FormItem>
                               )}
                             />
+                            <FormField
+                              control={form.control}
+                              name='capture_real_request_test'
+                              render={({ field }) => (
+                                <FormItem className='flex items-center justify-between'>
+                                  <div className='space-y-0.5'>
+                                    <FormLabel>{t('Use Real Requests for Testing')}</FormLabel>
+                                    <FormDescription>
+                                      {t(FIELD_DESCRIPTIONS.CAPTURE_REAL_REQUESTS)}
+                                    </FormDescription>
+                                  </div>
+                                  <FormControl>
+                                    <Switch
+                                      checked={field.value === 1}
+                                      onCheckedChange={(checked) =>
+                                        field.onChange(checked ? 1 : 0)
+                                      }
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
                           </div>
 
                           <div
