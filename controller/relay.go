@@ -252,6 +252,10 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		service.UpdateUpstreamModel(requestId, relayInfo.GetUpstreamModelName())
 
 		if newAPIError == nil {
+			// [personal] 真实请求测活：捕获成功 chat 请求的消息用于重建测活请求
+			if channel.GetCaptureRealRequestTest() {
+				CaptureTestMessages(channel.Id, relayInfo.Request)
+			}
 			relayInfo.LastError = nil
 			return
 		}

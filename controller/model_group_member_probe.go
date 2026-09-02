@@ -45,7 +45,7 @@ func TestModelGroupItem(c *gin.Context) {
 	if c.Request != nil {
 		requestCtx = c.Request.Context()
 	}
-	result := testChannel(requestCtx, channel, testUserID, item.Model, "", shouldUseStreamForAutomaticChannelTest(channel))
+	result := testChannelWithCapturedFallback(requestCtx, channel, testUserID, item.Model, "", shouldUseStreamForAutomaticChannelTest(channel))
 	if result.localErr != nil {
 		// Persist last_error if the model has a ban record, so the UI
 		// shows why the manual test failed.
