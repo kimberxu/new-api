@@ -149,7 +149,8 @@ func GetCapturedTestMessages(channelID int) []dto.Message {
 		return nil
 	}
 	idx := rand.IntN(len(pool))
-	return pool[idx]
+	tmp := append([]dto.Message(nil), pool[idx]...)
+	return tmp
 }
 
 // ClearCapturedTestMessages 清除该渠道全部捕获。
