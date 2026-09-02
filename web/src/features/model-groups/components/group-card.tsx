@@ -406,7 +406,7 @@ export function GroupCard(props: GroupCardProps) {
                                 </StatusBadge>
                               </TooltipTrigger>
                               <TooltipContent side='top' className='max-w-xs'>
-                                <div className='space-y-1 text-xs'>
+                                <div className='w-full min-w-0 space-y-1 text-xs'>
                                   <div className='font-medium'>
                                     {t('Model-level disabled')}
                                   </div>
@@ -416,7 +416,7 @@ export function GroupCard(props: GroupCardProps) {
                                       : t('Manual')}
                                   </div>
                                   {item.disabled.reason && (
-                                    <div>
+                                    <div className='break-words'>
                                       {t('Reason:')} {item.disabled.reason}
                                     </div>
                                   )}
