@@ -73,7 +73,7 @@ func recoverExpiredModelBans(ctx context.Context, testUserID int) (int, error) {
 			continue
 		}
 
-		result := testChannel(ctx, channel, testUserID, record.Model, "", shouldUseStreamForAutomaticChannelTest(channel))
+		result := testChannelWithCapturedFallback(ctx, channel, testUserID, record.Model, "", shouldUseStreamForAutomaticChannelTest(channel))
 		decision := decideModelBanRecovery(&record, result.localErr == nil)
 		switch {
 		case decision.Recovered:

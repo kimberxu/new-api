@@ -1,8 +1,8 @@
 # 定制功能清单（deploy / personal 分支）
 
-> 对应分支：`personal` 基线 `317e9ddd`（2026-09-01 刷新至 `551330c09`；deploy 线功能部分，可用 `git diff upstream/main...317e9ddd` 核对。注意：`deploy` 分支自分叉点 `2ffa3979`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
+> 对应分支：`personal` 基线 `317e9ddd`（2026-09-02 刷新至 `1ca4358c6`；deploy 线功能部分，可用 `git diff upstream/main...317e9ddd` 核对。注意：`deploy` 分支自分叉点 `2ffa3979`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
 > 以下功能均为魔改线相对 `upstream/main` 的定制；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `317e9ddd` 的改动。
-> 魔改提交：`f10d688f`（上游模型自动删除开关与筛选模型）→ `ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日…
+> 魔改提交：`f10d688f`（上游模型自动删除开关与筛选模型）→ `ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日… → `1ca4358c6`（真实请求测活）
 
 ## 魔改开发约定（合并上游友好）
 
@@ -39,6 +39,7 @@
 | 渠道流速率降级——模型组页降级标识（前端展示） | `c84e1d82` | 低（`web/src/features/model-groups/`） | `内联`（前端，复用既有 `/api/channel/demoted`）→ 待迁移（低风险可不迁） | 否 |
 | 模型级路由表前台化与模型级禁用（含 auto-ban 细化；2026-09-01 personal 统一封禁重写） | `cd98b0f8`、`9edda449` | 中（`controller/relay.go`、`model/channel_cache.go`、`model/ability.go`、`controller/channel-test.go`） | `独立文件`（model/channel_disabled_model.go、service/channel_model_disable.go、controller/channel_ability.go、web/src/features/channel-abilities/）+ `挂载点`（channel_cache.go、ability.go、relay.go、channel-test.go、channel.go、main.go、channel-router.go）；personal 线 2026-09-01 重写为阶梯式统一模型级封禁（30min→…→32h→永久，401 起步 16h） | 否 |
 | 渠道密钥查看放开安全验证 | `dbde0b31`（cherry-pick 自 deploy `570561d1`） | 低（`router/channel-router.go`） | `内联`（纯删一行中间件，无可迁移逻辑） | 否 |
+| 真实请求测活（重建模式） | `1ca4358c6` | 中（`controller/relay.go`、`controller/channel-test.go`） | `独立文件`（controller/captured_request_pool.go、channel_captured_request.go）+ `挂载点`（relay.go、channel-test.go、model/channel.go） | 否 |
 
 > **标注口径**：「扩展点形态」按各功能详情章节文件清单判定（`独立文件`=新文件承载全部逻辑；`挂载点`=既有文件仅插入少量挂载调用；`内联`=逻辑直接改在既有文件中，为负债项，后续同步冲突时优先迁移）；「上游实现替代」以实施时 `remotes/upstream/*` 可见主题为准，发现新对应分支即改标 `待观察` 并注明分支名。
 
@@ -621,6 +622,51 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 
 ---
 
+## 真实请求测活（重建模式）
+
+### 功能概述
+
+渠道设置新增独立开关「Use Real Requests for Testing」（位于 Auto Ban 下方），开启后测活请求改用**真实下游请求重建**：relay 成功响应后从已解析的 `*dto.GeneralOpenAIRequest` 提取消息（跳过 tool 消息与含 tool_calls 的 assistant 消息、多模态仅取 text parts、单条截断 200 字符、以最后一条 user 文本消息为终点向前取最近 4 条），存入内存环形缓冲（key=channelID，每渠道最近 4 条）；测活时随机挑一条重建 chat 请求（仅 model/stream/messages/max_tokens 族字段，天然剥离 tools/reasoning/thinking 参数），规避合成问句池的文本指纹与请求结构指纹（固定回放同一内容、随测活周期规律出现亦是指纹，故随机挑选）。默认关闭，关闭时行为与现状完全一致。
+
+无捕获或重建测活失败（localErr/newAPIError 非空）→ 回退现有标准构造探测；用户显式指定端点类型（embedding/rerank 等，endpointType != ""）时跳过重建直接标准探测（重建仅支持 chat）。捕获仅限 chat completions（Responses/Claude 原生入口请求不捕获，此类渠道测活回退标准探测）。
+
+### 设计决策
+
+- **池维度为 channelID 而非 (channel, model)**：重建文本与模型无关；按模型分桶在渠道自定义 test_model 或模型组映射下会零命中
+- **不按最小择优**：收敛到琐碎短 prompt 是指纹；随机挑选避免固定回放
+- **池生命周期 = 进程内存**：无持久化、渠道删除后残留条目按 channelID 不可达（<20KB/渠道）
+- **`buildTestRequestFromMessages` 的 max_tokens 分支与 `buildTestRequest` 保持同步**：o1 → MaxCompletionTokens 16；thinking 非 claude → MaxTokens 50；gemini → MaxTokens 3000；否则随机 [16,64]。上游迭代若背离，以 buildTestRequest 为准同步更新
+
+### 文件清单
+
+**新增：**
+- `controller/captured_request_pool.go` - `extractTestMessages` 提取规则 + `globalCapturedPool` 环形缓冲 + `CaptureTestMessages`/`GetCapturedTestMessages`/`ClearCapturedTestMessages`
+- `controller/channel_captured_request.go` - `buildTestRequestFromMessages`（max_tokens 分支镜像 buildTestRequest）+ `testChannelWithCapturedFallback` 统一回退入口
+- `controller/captured_request_pool_test.go` - 提取规则（tool/多模态/截断/无 user/窗口选择）、环形缓冲淘汰、随机挑选覆盖、重建请求分支与无 reasoning/tools 字段回归
+
+**改动（挂载点/最小插入）：**
+- `model/channel.go` - `CaptureRealRequestTest *int` 字段 + `GetCaptureRealRequestTest()`（AutoBan 同模式）
+- `controller/relay.go` - 成功分支（`newAPIError == nil`）内插入 4 行捕获调用
+- `controller/channel-test.go` - `testChannel` 签名末尾追加 `capturedMessages []dto.Message`；request 构建处分支；4 个调用点（TestChannel/testChannelForHealthCheck）换 `testChannelWithCapturedFallback`
+- `controller/model_ban_recovery.go` - 封禁到期恢复调用点换 `testChannelWithCapturedFallback`
+- `controller/model_group_member_probe.go` - 成员测试调用点换 `testChannelWithCapturedFallback`
+- `web/src/features/channels/types.ts` - `channelSchema` 新增 `capture_real_request_test`
+- `web/src/features/channels/constants.ts` - `FIELD_DESCRIPTIONS.CAPTURE_REAL_REQUESTS`
+- `web/src/features/channels/lib/channel-form.ts` - schema/默认值/双向转换（transformChannelToFormDefaults、两个 payload）共 5 处追加
+- `web/src/features/channels/components/drawers/channel-mutate-drawer.tsx` - Auto Ban Switch 之后插入新开关（布局一致）
+- `web/src/i18n/locales/*.json` - 新增 2 键七语言
+
+### 验证
+
+- `go build ./...` + `cd relaykit && GOWORK=off go build ./...` 干净
+  - PostgreSQL ✓（Supabase：AutoMigrate 后确认列 bigint DEFAULT 0；免费档网络极慢导致两次启动均在迁移中途超时被 kill，但 ADD COLUMN 幂等、第二次启动前的迁移已生效）
+- `bun run build` 前端构建通过
+- 3-DB AutoMigrate 验证（`capture_real_request_test` 新列，`*int` + `gorm:"default:0"` 与 AutoBan 同模式）：
+  - SQLite ✓（`/tmp/newapi-sqlite-test` 实例启动 AutoMigrate 无错，列 INTEGER DEFAULT 0）
+  - PostgreSQL ✓（Supabase：AutoMigrate 后确认列 bigint DEFAULT 0；免�档网络极慢导致两次启动均在迁移中途超时被 kill，但 ADD COLUMN 幂等、第二次启动前的迁移已生效）
+  - MySQL ✗（本机无实例，用户选择跳过；字段模式与 AutoBan `*int default:1` 完全一致，风险极低）
+
+---
 # personal 分支半重构登记（模型组路由 + 计费/Ollama/订阅/OAuth/注册移除）
 
 > 对应分支：`personal`（基于基线 `317e9ddd`，2026-09-01 更新）

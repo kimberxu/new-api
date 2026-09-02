@@ -71,7 +71,7 @@ func resolveChannelTestUserID(c *gin.Context) (int, error) {
 	return rootUser.Id, nil
 }
 
-func testChannel(ctx context.Context, channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool) (result testResult) {
+func testChannel(ctx context.Context, channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool, capturedMessages []dto.Message) (result testResult) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -233,7 +233,12 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 		}
 	}
 
-	request := buildTestRequest(testModel, endpointType, channel, isStream)
+	var request dto.Request
+	if len(capturedMessages) > 0 {
+		request = buildTestRequestFromMessages(testModel, capturedMessages)
+	} else {
+		request = buildTestRequest(testModel, endpointType, channel, isStream)
+	}
 
 	info, err := relaycommon.GenRelayInfo(c, relayFormat, request, nil)
 
@@ -912,7 +917,7 @@ func TestChannel(c *gin.Context) {
 	if c.Request != nil {
 		requestCtx = c.Request.Context()
 	}
-	result := testChannel(requestCtx, channel, testUserID, testModel, endpointType, isStream)
+	result := testChannelWithCapturedFallback(requestCtx, channel, testUserID, testModel, endpointType, isStream)
 	if result.localErr != nil {
 		resp := gin.H{
 			"success": false,
@@ -963,7 +968,7 @@ type channelTestSummary struct {
 func testChannelForHealthCheck(ctx context.Context, channel *model.Channel, testUserID int) channelTestSummary {
 	summary := channelTestSummary{}
 	tik := time.Now()
-	result := testChannel(ctx, channel, testUserID, "", "", shouldUseStreamForAutomaticChannelTest(channel))
+	result := testChannelWithCapturedFallback(ctx, channel, testUserID, "", "", shouldUseStreamForAutomaticChannelTest(channel))
 	milliseconds := time.Since(tik).Milliseconds()
 	if ctx.Err() != nil {
 		return summary
