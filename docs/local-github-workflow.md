@@ -195,6 +195,8 @@ curl -s "https://api.github.com/repos/<owner>/new-api/actions/runs?event=push&pe
 
 - `status`: `queued` / `in_progress` / `completed`
 - `conclusion`: 完成后为 `success` / `failure`；进行中为 `null`
+- 按 tag 过滤：`?event=push&branch=personal-image` 或 `branch=deploy-image`（`head_branch` 即触发 tag 名）
+- 轮询建议：每 30~60 秒一次，直到 `status == "completed"`；`conclusion == "success"` 即构建成功，可通知部署机拉取新镜像
 - 已完成构建与 tag 指向可能落后分支 HEAD：纯文档提交不触发构建、amend 会替换哈希，`personal-image` tag 常滞后 HEAD 数个纯文档提交；判断「镜像是否最新」以 tag 所指 commit 的父链上是否含你关心的代码提交为准，勿以 HEAD/tag 重合判断
 - 若已配置 `GITHUB_TOKEN`/`GH_TOKEN`：`curl -H "Authorization: Bearer $GITHUB_TOKEN" ...` 或 `gh auth login` 后走 `gh` 路径，限流更宽松
 
