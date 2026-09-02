@@ -118,7 +118,7 @@ cd web && systemd-run --user --scope -p MemoryMax=1G -- bun run test
 
 ## 部署
 
-> **强约束：只有用户明确要求触发构建/发布时才执行本流程。** 纯文档改动（`docs/`、`AGENTS.md`、manifest 登记、说明性提交）不触发构建——只 `git push origin <branch>` 即可，不推送任何 `deploy*` / `personal*` tag。判断依据：改动是否影响运行产物（Go 源码、前端源码、Dockerfile、依赖清单等）；仅文档/注释变更视为不触发。
+> **强约束：只有用户明确要求触发构建/发布时才执行本流程。** 纯文档改动（`docs/`、`AGENTS.md`、manifest 登记、说明性提交）不触发构建——只 `git push origin <branch>` 即可，不推送任何 `deploy*` / `personal*` tag。判断依据：改动是否影响运行产物（Go 源码、前端源码、Dockerfile、依赖清单等）；仅文档/注释变更视为不触发。**已误触发的冗余构建不取消，让其完成**（结果不影响部署，镜像 tag 语义仍正确）；后续纯文档提交勿再推 tag。
 
 `.github/workflows/deploy-image-ghcr.yml` 统一服务 deploy / personal 两条线，镜像 tag 由构建来源动态推导：
 
@@ -161,6 +161,16 @@ git tag -f deploy-image && git push -f origin deploy-image     # 覆盖滚动 ta
    - 回滚：拉上一个已知良好的 `:<prefix>-<short_sha>`
 4. 两条线 Prune 独立：deploy 构建只清理带 `deploy*` tag 的历史版本，personal 构建只清理带 `personal*` tag 的历史版本，各保留最近 3 个
 
+### 部署机拉取与验证
+
+```bash
+docker pull ghcr.io/<owner>/new-api:personal
+# 重启容器后核对镜像内版本标记（应显示 personal-<short_sha>）
+curl -s http://<host>:3000/api/status | jq -r .data.version
+```
+
+> 纯文档提交不构建镜像，故版本标记可能落后 git HEAD（如 HEAD 已是后续文档修正提交）——属预期，镜像与最新代码提交的功能内容一致即可。
+
 ### 确认构建状态
 
 **已登录 `gh` 时（优先，限流 5000 次/小时）：**
@@ -185,8 +195,7 @@ curl -s "https://api.github.com/repos/<owner>/new-api/actions/runs?event=push&pe
 
 - `status`: `queued` / `in_progress` / `completed`
 - `conclusion`: 完成后为 `success` / `failure`；进行中为 `null`
-- 按 tag 过滤：`?event=push&branch=personal-image` 或 `branch=deploy-image`（`head_branch` 即触发 tag 名）
-- 轮询建议：每 30~60 秒一次，直到 `status == "completed"`；`conclusion == "success"` 即构建成功，可通知部署机拉取新镜像
+- 已完成构建与 tag 指向可能落后分支 HEAD：纯文档提交不触发构建、amend 会替换哈希，`personal-image` tag 常滞后 HEAD 数个纯文档提交；判断「镜像是否最新」以 tag 所指 commit 的父链上是否含你关心的代码提交为准，勿以 HEAD/tag 重合判断
 - 若已配置 `GITHUB_TOKEN`/`GH_TOKEN`：`curl -H "Authorization: Bearer $GITHUB_TOKEN" ...` 或 `gh auth login` 后走 `gh` 路径，限流更宽松
 
 ## 定制功能分支合并
