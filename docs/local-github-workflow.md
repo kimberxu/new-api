@@ -1,6 +1,6 @@
 # 本地 GitHub Fork 工作流
 
-> 对应分支:`personal` 基线 `317e9ddd`(2026-09-02 刷新至 `1965f03cb`;`personal` 线同步流程见「同步上游」节)
+> 对应分支:`personal` 基线 `317e9ddd`(2026-09-02 刷新至 `604b5cdcc`;`personal` 线同步流程见「同步上游」节)
 
 ## 标准触发短语
 
@@ -16,14 +16,14 @@
 |------|------|------|
 | `main` | 贴近上游 | 仅保留少量本地改动（如 GHCR workflow 文件），几乎与上游同步 |
 | `deploy` | 部署分支 | 承载全部魔改功能；GHCR 部署镜像由它构建 |
-| `personal` | 个人开发线 | 历史前段（至 `317e9ddd`，原 deploy-model 中间态分支，已退役并入）承载：deploy 同步战略改造、模型级路由表前台化、model group 管理接口；其后叠加：模型组路由全套 + 计费/Ollama/订阅/OAuth/开放注册移除。与 `deploy` 共同祖先为 `2ffa3979`（原 deploy-re，已退役）。不构建镜像、不打 tag |
+| `personal` | 个人开发线（主力） | 历史前段（至 `317e9ddd`，原 deploy-model 中间态分支，已退役并入）承载：deploy 同步战略改造、模型级路由表前台化、model group 管理接口；其后叠加：模型组路由全套 + 计费/Ollama/订阅/OAuth/开放注册移除。与 `deploy` 共同祖先为 `2ffa3979`（原 deploy-re，已退役）。GHCR 镜像由 `personal-image` / `personal-image-<short_sha>` 构建，与 `deploy` 对称 |
 | `local/<feature>` | 本地定制功能分支 | 开发完成后合并进目标魔改分支 |
 
 魔改功能清单见 `request-debug-customization-manifest.md`；魔改功能不在 `main` 上。`deploy` 与 `personal` 线已分叉，各自独立维护与同步上游；manifest 中 deploy 线功能登记以 personal 基线 `317e9ddd`（原 deploy-model，已退役）为基准，personal 改动单独登记在「personal 分支半重构登记」小节。
 
 ## 同步上游
 
-### personal（rebase 原则同 deploy）
+### personal（rebase 原则同 deploy；已支持 `personal-image` 构建）
 
 ```bash
 git fetch upstream
@@ -34,7 +34,7 @@ git push --force-with-lease origin personal
 ```
 
 - personal 线的魔改提交序列是自包含线性链，逐提交重放原则与 deploy 一致。
-- personal 不触发 GHCR 构建，无需打 tag。
+- personal 已支持 GHCR 构建：推送分支本身不触发构建，需另推 `personal-image` 滚动 tag（见「部署」节）。
 
 ### main（一般无冲突，直接合并）
 
@@ -61,10 +61,9 @@ git push --force-with-lease origin deploy
 补充说明（决策与影响）：
 
 - **为何 rebase 而非 merge**：冲突从「一大坨对冲」变为「逐魔改 commit 的小冲突」，定位靠 `git log --oneline upstream/main..deploy` 预扫；失败可整体回退（merge 只能回滚合并）。代价是重写 deploy 历史。
-- **force-push 影响面**：GHCR 镜像由 `deploy-image` / `deploy-image-<sha>` git tag 触发构建，tag 不随分支重写；部署机只从 GHCR 拉镜像，不受分支历史重写影响。文档头部 commit 标记在每次同步后更新即可。
+- **force-push 影响面**：GHCR 镜像由 `*-image` / `*-image-<short_sha>` git tag 触发构建（`deploy-image`/`personal-image`），tag 不随分支重写；部署机只从 GHCR 拉镜像，不受分支历史重写影响。文档头部 commit 标记在每次同步后更新即可。
 - **push 命令用 `--force-with-lease` 而非 `-f`**，防止覆盖他人/他机推送。
 - 「合并后验证」三件套（root go build / relaykit build / bun build）在 rebase 完成后照常执行，位置不变。
-
 #### 冲突处理原则
 
 魔改与上游改动重叠时：**保留魔改功能 + 采纳上游语义**。逐处判断：
@@ -162,9 +161,21 @@ git tag -f deploy-image && git push -f origin deploy-image     # 覆盖滚动 ta
    - 回滚：拉上一个已知良好的 `:<prefix>-<short_sha>`
 4. 两条线 Prune 独立：deploy 构建只清理带 `deploy*` tag 的历史版本，personal 构建只清理带 `personal*` tag 的历史版本，各保留最近 3 个
 
-### 确认构建状态（无需 GitHub token）
+### 确认构建状态
 
-本机无 GitHub token / gh CLI 时，无法命令行直查 Actions 页面，但仓库是公开的，可用 GitHub 公开 API 定时轮询构建状态（未认证限流 60 次/小时，足够轮询）：
+**已登录 `gh` 时（优先，限流 5000 次/小时）：**
+
+```bash
+# 列出最近构建（workflow 文件名 deploy-image-ghcr.yml，展示名 Build branch image (GHCR)）
+gh run list --repo <owner>/new-api --workflow deploy-image-ghcr.yml --limit 5
+# 或精确查询指定 tag 触发的构建（head_branch 即 tag 名）
+gh api "repos/<owner>/new-api/actions/runs?event=push&branch=personal-image&per_page=5" \
+  --jq '.workflow_runs[] | {name, tag: .head_branch, sha: (.head_sha[0:7]), status, conclusion, url: .html_url}'
+# 查看单次运行详情
+gh api repos/<owner>/new-api/actions/runs/<run_id> --jq '{name, tag: .head_branch, status, conclusion}'
+```
+
+**未登录 / 无 token 时（仓库公开，限流 60 次/小时）：**
 
 ```bash
 # 查询最近按 tag push 触发的构建（head_branch 即 tag 名）
@@ -174,8 +185,9 @@ curl -s "https://api.github.com/repos/<owner>/new-api/actions/runs?event=push&pe
 
 - `status`: `queued` / `in_progress` / `completed`
 - `conclusion`: 完成后为 `success` / `failure`；进行中为 `null`
-- 按 tag 过滤：`?event=push&branch=deploy-image`（`head_branch` 即触发 tag 名）
+- 按 tag 过滤：`?event=push&branch=personal-image` 或 `branch=deploy-image`（`head_branch` 即触发 tag 名）
 - 轮询建议：每 30~60 秒一次，直到 `status == "completed"`；`conclusion == "success"` 即构建成功，可通知部署机拉取新镜像
+- 若已配置 `GITHUB_TOKEN`/`GH_TOKEN`：`curl -H "Authorization: Bearer $GITHUB_TOKEN" ...` 或 `gh auth login` 后走 `gh` 路径，限流更宽松
 
 ## 定制功能分支合并
 
