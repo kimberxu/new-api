@@ -115,8 +115,8 @@ func newRelayHTTPTransport() *http.Transport {
 		transport.ResponseHeaderTimeout = time.Duration(seconds) * time.Second
 	}
 	transport.ForceAttemptHTTP2 = true
-	if common.TLSInsecureSkipVerify {
-		transport.TLSClientConfig = common.InsecureTLSConfig
+	if common.RelayDisableKeepAlives {
+		transport.DisableKeepAlives = true
 	}
 	return transport
 }
