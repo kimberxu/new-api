@@ -1,8 +1,8 @@
 # 定制功能清单（deploy / personal 分支）
 
-> 对应分支：`personal` 基线 `317e9ddd`（2026-09-03 刷新至 `8f5ab8e40`；deploy 线功能部分，可用 `git diff upstream/main...317e9ddd` 核对。注意：`deploy` 分支自分叉点 `2ffa3979`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
+> 对应分支：`personal` 基线 `317e9ddd`（2026-09-03 刷新至 `0fbbbf76b`；deploy 线功能部分，可用 `git diff upstream/main...317e9ddd` 核对。注意：`deploy` 分支自分叉点 `2ffa3979`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
 > 以下功能均为魔改线相对 `upstream/main` 的定制；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `317e9ddd` 的改动。
-> 魔改提交：`f10d688f`（上游模型自动删除开关与筛选模型）→ `ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日志 t/s 计算排除 TTFT）→ `c8940a305`（模型组成员封禁悬停显示上次探测错误 + 永久封禁标识）→ `1d1034fcf`（封禁原因 tooltip 文字溢出框体）→ `0906c8354`（真实请求测活（重建模式））→ `1965f03cb`（修复真实请求测活池并发写穿）→ `604b5cdcc`（刷新三文档头部至 1965f03cb 并登记真实请求测活）→ `34f9a336c`（刷新三文档头部至 604b5cdcc 并校正构建说明）
+> 魔改提交：`f10d688f`（上游模型自动删除开关与筛选模型）→ `ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日志 t/s 计算排除 TTFT）→ `c8940a305`（模型组成员封禁悬停显示上次探测错误 + 永久封禁标识）→ `1d1034fcf`（封禁原因 tooltip 文字溢出框体）→ `0906c8354`（真实请求测活（重建模式））→ `1965f03cb`（修复真实请求测活池并发写穿）→ `604b5cdcc`（刷新三文档头部至 1965f03cb 并登记真实请求测活）→ `34f9a336c`（刷新三文档头部至 604b5cdcc 并校正构建说明）→ `c3721f95d`（RELAY_DISABLE_KEEP_ALIVE 与代理日志）→ `0fbbbf76b`（恢复 TLSInsecureSkipVerify 回归）
 
 ## 魔改开发约定（合并上游友好）
 
@@ -42,6 +42,7 @@
 | 模型级路由表前台化与模型级禁用（含 auto-ban 细化；2026-09-01 personal 统一封禁重写） | `cd98b0f8`、`9edda449` | 中（`controller/relay.go`、`model/channel_cache.go`、`model/ability.go`、`controller/channel-test.go`） | `独立文件`（model/channel_disabled_model.go、service/channel_model_disable.go、controller/channel_ability.go、web/src/features/channel-abilities/）+ `挂载点`（channel_cache.go、ability.go、relay.go、channel-test.go、channel.go、main.go、channel-router.go）；personal 线 2026-09-01 重写为阶梯式统一模型级封禁（30min→…→32h→永久，401 起步 16h） | 否 |
 | 渠道密钥查看放开安全验证 | `dbde0b31`（cherry-pick 自 deploy `570561d1`） | 低（`router/channel-router.go`） | `内联`（纯删一行中间件，无可迁移逻辑） | 否 |
 | 真实请求测活（重建模式） | `0906c8354` | 中（`controller/relay.go`、`controller/channel-test.go`） | `独立文件`（controller/captured_request_pool.go、channel_captured_request.go）+ `挂载点`（relay.go、channel-test.go、model/channel.go） | 否 |
+| RELAY_DISABLE_KEEP_ALIVE 与代理日志 | `c3721f95d`、`0fbbbf76b` | 低（`common/`、`service/http_client.go`、`relay/common/relay_info.go`） | `内联`（三文件各 1-3 行开关/日志） | 否 |
 
 > **标注口径**：「扩展点形态」按各功能详情章节文件清单判定（`独立文件`=新文件承载全部逻辑；`挂载点`=既有文件仅插入少量挂载调用；`内联`=逻辑直接改在既有文件中，为负债项，后续同步冲突时优先迁移）；「上游实现替代」以实施时 `remotes/upstream/*` 可见主题为准，发现新对应分支即改标 `待观察` 并注明分支名。
 
@@ -671,9 +672,9 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 ---
 # personal 分支半重构登记（模型组路由 + 计费/Ollama/订阅/OAuth/注册移除）
 
-> 对应分支：`personal`（基于基线 `317e9ddd`，2026-09-03 刷新至 `8f5ab8e40`）
+> 对应分支：`personal`（基于基线 `317e9ddd`，2026-09-03 刷新至 `0fbbbf76b`）
 > 本小节登记 `personal` 相对基线 `317e9ddd` 的半重构（`git log 317e9ddd..personal` 核对）。
-> 魔改提交序列：`cfddd71b`（模型组接管路由）→ `b6925d13`（错误分级与模型级到期恢复）→ `d0f1ea52`（计费功能级移除）→ `a7e70937`（前端计费 UI 删除）→ `1ee3129d`（i18n 孤儿 key 清理）→ `6745718c`（移除 Ollama 渠道）→ `1219dfc6`（订阅后端残留清理）→ `d2c72bfe`（移除 OAuth/Passkey 登录）→ `b962fc25`（移除开放注册与 OAuth/Passkey 前端残余）→ `c99427f3`（新建模型组前端 feature）→ `c58905d9`（模型组列表工具栏）→ `5b797304`（模型组列表关键词筛选 + 排序工具栏）→ `b7419616`（GHCR 构建支持分支前缀镜像 tag）→ `9f70c191`（修复成员优先级/权重继承失效）→ `30fb8c53`（上游请求改用成员真实上游模型）→ `076db805`（移除系统设置 Billing 页残留）→ `a2473546`（模型组引用成员开放编辑）→ `66a000ae`（添加成员界面全量列表化 + 搜索）→ `8727d3ce`（勾选多选批量添加）→ `fe9cc024`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `ea91c322`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `b1d030b6`（禁用徽章悬停显示级别/原因/时间）→ `8d34b68b`（成员测试按钮 + 测试通过即解禁）→ `711a845c`（未分类错误兜底改走模型级宽容窗口）→ `55032e6b`（模型组手动组组名开放编辑）→ `7dccc6db4`（同步上游 21 提交：冲突归位 + 免费计费测试语义适配）→ `0985c75a9`（模型组折叠三角可展开 + 组内优先级排序）→ `c555a188a`（成员优先级排序逻辑提取与单测）→ `c84e1d82c`（模型组降级徽章）→ `badf2e5ee`（可配置上游默认 User-Agent）→ `acc91ab4f`（统一模型级封禁重写：渠道级自动禁用退役）→ `551330c09`（错误日志记录实际上游模型）→ `5e413558f`（成员封禁悬停显示上次探测错误 + 永久封禁标识）→ `1d1034fcf`（封禁原因 tooltip 文字溢出框体）→ `0906c8354`（真实请求测活（重建模式））→ `1965f03cb`（修复真实请求测活池并发写穿）→ `604b5cdcc`（刷新三文档头部至 1965f03cb 并登记真实请求测活）→ `34f9a336c`（刷新三文档头部至 604b5cdcc 并校正构建说明）
+> 魔改提交序列：`cfddd71b`（模型组接管路由）→ `b6925d13`（错误分级与模型级到期恢复）→ `d0f1ea52`（计费功能级移除）→ `a7e70937`（前端计费 UI 删除）→ `1ee3129d`（i18n 孤儿 key 清理）→ `6745718c`（移除 Ollama 渠道）→ `1219dfc6`（订阅后端残留清理）→ `d2c72bfe`（移除 OAuth/Passkey 登录）→ `b962fc25`（移除开放注册与 OAuth/Passkey 前端残余）→ `c99427f3`（新建模型组前端 feature）→ `c58905d9`（模型组列表工具栏）→ `5b797304`（模型组列表关键词筛选 + 排序工具栏）→ `b7419616`（GHCR 构建支持分支前缀镜像 tag）→ `9f70c191`（修复成员优先级/权重继承失效）→ `30fb8c53`（上游请求改用成员真实上游模型）→ `076db805`（移除系统设置 Billing 页残留）→ `a2473546`（模型组引用成员开放编辑）→ `66a000ae`（添加成员界面全量列表化 + 搜索）→ `8727d3ce`（勾选多选批量添加）→ `fe9cc024`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `ea91c322`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `b1d030b6`（禁用徽章悬停显示级别/原因/时间）→ `8d34b68b`（成员测试按钮 + 测试通过即解禁）→ `711a845c`（未分类错误兜底改走模型级宽容窗口）→ `55032e6b`（模型组手动组组名开放编辑）→ `7dccc6db4`（同步上游 21 提交：冲突归位 + 免费计费测试语义适配）→ `0985c75a9`（模型组折叠三角可展开 + 组内优先级排序）→ `c555a188a`（成员优先级排序逻辑提取与单测）→ `c84e1d82c`（模型组降级徽章）→ `badf2e5ee`（可配置上游默认 User-Agent）→ `acc91ab4f`（统一模型级封禁重写：渠道级自动禁用退役）→ `c3721f95d`（RELAY_DISABLE_KEEP_ALIVE 与代理日志）→ `0fbbbf76b`（恢复 TLSInsecureSkipVerify 回归）→ `551330c09`（错误日志记录实际上游模型）→ `5e413558f`（成员封禁悬停显示上次探测错误 + 永久封禁标识）→ `1d1034fcf`（封禁原因 tooltip 文字溢出框体）→ `0906c8354`（真实请求测活（重建模式））→ `1965f03cb`（修复真实请求测活池并发写穿）→ `604b5cdcc`（刷新三文档头部至 1965f03cb 并登记真实请求测活）→ `34f9a336c`（刷新三文档头部至 604b5cdcc 并校正构建说明）
 
 ## 可配置上游默认 User-Agent（隐藏 new-api 转发特征）
 
@@ -694,6 +695,25 @@ new-api 公共默认转发链路（`relay/channel/api_request.go` 的 `SetupApiR
 - `web/src/features/system-settings/models/global-settings-card.tsx`、`index.tsx`、`section-registry.tsx`、`types.ts` - 系统设置表单 + 默认值 + 扁平键映射
 - `web/src/i18n/locales/*.json` - 新增 2 键七语言
 - 测试：`relay/channel/api_request_test.go`（`TestSetupApiRequestHeaderDefaultUserAgent`：默认注入 + 预置 UA 不被覆盖）
+
+## RELAY_DISABLE_KEEP_ALIVE 与代理日志
+
+### 功能概述
+
+诊断 `socks5[h]/http` 代理复用导致的观测失真：同渠道成员测活多次仅在 sing-box/http 代理侧记录一次建连，误判为“部分模型未走代理”。新增两项最小内联改动（`c3721f95d` + `0fbbbf76b` 修复共 4 文件约 10 行）：① 中继日志 `RelayInfo.ToString` 的 `ChannelMeta` 段暴露脱敏 `Proxy`（`relay/common/relay_info.go: SanitizeProxyForLog` 剥 userinfo，仅留 `scheme://host[:port]`）便于 `testing channel ... info ...` 日志直接判定是否带代理；② 新增环境开关 `RELAY_DISABLE_KEEP_ALIVE`（`common/constants.go` + `common/init.go` + `service/http_client.go:newRelayHTTPTransport`，默认 `false` 保持 keep-alive 复用，`true` 时置 `transport.DisableKeepAlives=true` 使每次中继出站新建 TCP→SOCKS/CONNECT→TLS，sing-box 每条请求均有建连日志）。
+
+### 行为与影响
+
+- 默认 `false` 保持现状（`newRelayHTTPTransport` 复用 `MaxIdleConns/PerHost/IdleConnTimeout` 池），仅日志永久生效
+- `RELAY_DISABLE_KEEP_ALIVE=true` 为诊断态，对所有中继出站生效（含未配代理渠道），握手开销显著，仅临时启用
+- `0fbbbf76b` 为 `c3721f95d` 的回归修复：补回被编辑丢失的 `TLSInsecureSkipVerify` transport 块（`ForceAttemptHTTP2 → DisableKeepAlives → TLSInsecureSkipVerify → return`）
+
+### 文件清单
+
+- `common/constants.go` - `RelayDisableKeepAlives bool`
+- `common/init.go` - `GetEnvOrDefaultBool("RELAY_DISABLE_KEEP_ALIVE", false)`
+- `service/http_client.go` - `newRelayHTTPTransport` 内 `DisableKeepAlives` 分支（与 `ForceAttemptHTTP2`、`TLSInsecureSkipVerify` 共序）
+- `relay/common/relay_info.go` - `SanitizeProxyForLog` + `ToString.ChannelMeta.Proxy` 字段
 
 
 ## 模型组路由表（一等公民）
