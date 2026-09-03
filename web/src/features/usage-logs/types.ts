@@ -144,6 +144,7 @@ export interface LogOtherData {
     reject_reason?: string
     request_debug?: RequestDebugSnapshot
     task_plugin?: TaskPluginInfo
+  }
   root_info?: {
     task_plugin?: TaskPluginRuntimeInfo
     upstream_task_id?: string
