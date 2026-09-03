@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -280,6 +281,23 @@ func (info *RelayInfo) InitChannelMeta(c *gin.Context) {
 		info.Request.SetModelName(info.OriginModelName)
 	}
 }
+// SanitizeProxyForLog 脱敏代理 URL：隐藏 userinfo（可能含账号密码），保留 scheme://host[:port]。
+// 未配置或无法解析时原样返回，输出均去除首尾空格便于日志对比。
+func SanitizeProxyForLog(rawProxy string) string {
+	trimmed := strings.TrimSpace(rawProxy)
+	if trimmed == "" {
+		return ""
+	}
+	parsedURL, err := url.Parse(trimmed)
+	if err != nil {
+		return trimmed
+	}
+	if parsedURL.User != nil {
+		parsedURL.User = nil
+		return parsedURL.String()
+	}
+	return trimmed
+}
 
 func (info *RelayInfo) ToString() string {
 	if info == nil {
@@ -333,8 +351,8 @@ func (info *RelayInfo) ToString() string {
 	// Channel metadata (mask ApiKey)
 	if info.ChannelMeta != nil {
 		cm := info.ChannelMeta
-		fmt.Fprintf(b, "ChannelMeta{ Type: %d, Id: %d, IsMultiKey: %t, MultiKeyIndex: %d, BaseURL: %q, ApiType: %d, ApiVersion: %q, Organization: %q, CreateTime: %d, UpstreamModelName: %q, IsModelMapped: %t, SupportStreamOptions: %t, ApiKey: ***masked*** }, ",
-			cm.ChannelType, cm.ChannelId, cm.ChannelIsMultiKey, cm.ChannelMultiKeyIndex, cm.ChannelBaseUrl, cm.ApiType, cm.ApiVersion, cm.Organization, cm.ChannelCreateTime, cm.UpstreamModelName, cm.IsModelMapped, cm.SupportStreamOptions)
+		fmt.Fprintf(b, "ChannelMeta{ Type: %d, Id: %d, IsMultiKey: %t, MultiKeyIndex: %d, BaseURL: %q, ApiType: %d, ApiVersion: %q, Organization: %q, CreateTime: %d, UpstreamModelName: %q, IsModelMapped: %t, SupportStreamOptions: %t, Proxy: %q, ApiKey: ***masked*** }, ",
+			cm.ChannelType, cm.ChannelId, cm.ChannelIsMultiKey, cm.ChannelMultiKeyIndex, cm.ChannelBaseUrl, cm.ApiType, cm.ApiVersion, cm.Organization, cm.ChannelCreateTime, cm.UpstreamModelName, cm.IsModelMapped, cm.SupportStreamOptions, SanitizeProxyForLog(cm.ChannelSetting.Proxy))
 	}
 
 	// Responses usage info (non-sensitive)
