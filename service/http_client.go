@@ -118,6 +118,9 @@ func newRelayHTTPTransport() *http.Transport {
 	if common.RelayDisableKeepAlives {
 		transport.DisableKeepAlives = true
 	}
+	if common.TLSInsecureSkipVerify {
+		transport.TLSClientConfig = common.InsecureTLSConfig
+	}
 	return transport
 }
 
