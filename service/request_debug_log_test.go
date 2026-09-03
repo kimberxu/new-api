@@ -28,8 +28,8 @@ func TestGenerateTextOtherInfoAddsRequestDebugToAdminInfo(t *testing.T) {
 	}
 
 	other := GenerateTextOtherInfo(ctx, info, 1, 1, 1, 0, 0, 0, 1)
-
-	adminInfo, ok := other["admin_info"].(map[string]interface{})
+	m := other.Snapshot()
+	adminInfo, ok := m["admin_info"].(map[string]interface{})
 	require.True(t, ok)
 	assert.Same(t, info.RequestDebugSnapshot, adminInfo["request_debug"])
 }
@@ -52,8 +52,8 @@ func TestGenerateTextOtherInfoSkipsErrorOnlyRequestDebugOnSuccess(t *testing.T) 
 	}
 
 	other := GenerateTextOtherInfo(ctx, info, 1, 1, 1, 0, 0, 0, 1)
-
-	adminInfo, ok := other["admin_info"].(map[string]interface{})
+	m := other.Snapshot()
+	adminInfo, ok := m["admin_info"].(map[string]interface{})
 	require.True(t, ok)
 	_, exists := adminInfo["request_debug"]
 	assert.False(t, exists)
@@ -62,9 +62,10 @@ func TestGenerateTextOtherInfoSkipsErrorOnlyRequestDebugOnSuccess(t *testing.T) 
 func TestAppendRequestDebugAdminInfoAddsErrorOnlySnapshotOnFailure(t *testing.T) {
 	snapshot := &relaycommon.RequestDebugSnapshot{Mode: "error_only"}
 	info := &relaycommon.RelayInfo{RequestDebugSnapshot: snapshot}
-	adminInfo := map[string]interface{}{}
-
-	AppendRequestDebugAdminInfo(info, adminInfo, false)
-
+	other := GenerateTextOtherInfo(&gin.Context{}, &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}, 1, 1, 1, 0, 0, 0, 1)
+	AppendRequestDebugAdminInfo(info, other, false)
+	m := other.Snapshot()
+	adminInfo, ok := m["admin_info"].(map[string]interface{})
+	require.True(t, ok)
 	assert.Same(t, snapshot, adminInfo["request_debug"])
 }
