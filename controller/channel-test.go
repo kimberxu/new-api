@@ -27,6 +27,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	hosttypes "github.com/QuantumNous/new-api/types"
 
@@ -54,26 +55,183 @@ func normalizeChannelTestEndpoint(channel *model.Channel, endpointType string) s
 	return normalized
 }
 // shouldForceResponsesForTest reports whether a chat test should be upgraded
-// to the responses endpoint so that the test mirrors real traffic handled by
-// TextHelper/ClaudeHelper via ShouldChatCompletionsUseResponsesGlobal.
+// to the responses endpoint so that the test mirrors real traffic.  The
+// decision MUST be outbound: the model actually sent upstream after model-
+// group member mapping + channel model_mapping (including 1:N weighted)
+// resolution.  Checking OriginModelName alone diverges when a routable group
+// name (e.g. all-text-only) maps to a responses-only upstream
+// (e.g. muse-spark-...).
 func shouldForceResponsesForTest(channel *model.Channel, testModel string) bool {
 	if channel == nil || strings.TrimSpace(testModel) == "" {
 		return false
 	}
-	lower := strings.ToLower(testModel)
-	if strings.Contains(lower, "rerank") {
-		return false
-	}
-	if strings.Contains(lower, "embedding") || strings.HasPrefix(testModel, "m3e") || strings.Contains(testModel, "bge-") || strings.Contains(lower, "embed") {
+	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || channel.GetSetting().PassThroughBodyEnabled {
 		return false
 	}
 	if channel.Type == constant.ChannelTypeMokaAI {
 		return false
 	}
-	if channel.Type == constant.ChannelTypeVolcEngine && strings.Contains(testModel, "seedream") {
-		return false
+	for _, candidate := range candidateOutboundModelsForTest(channel, testModel) {
+		lower := strings.ToLower(candidate)
+		if strings.Contains(lower, "rerank") {
+			continue
+		}
+		if strings.Contains(lower, "embedding") || strings.HasPrefix(candidate, "m3e") || strings.Contains(candidate, "bge-") || strings.Contains(lower, "embed") {
+			continue
+		}
+		if channel.Type == constant.ChannelTypeVolcEngine && strings.Contains(candidate, "seedream") {
+			continue
+		}
+		// Mirror the real handler: it runs ApplyReasoningModelSuffix first,
+		// so the policy sees only the suffix-stripped outbound base.
+		stripped := normalizeTestOutboundModel(channel, testModel, candidate)
+		if service.ShouldChatCompletionsUseResponsesGlobal(channel.Id, channel.Type, stripped) {
+			return true
+		}
 	}
-	return service.ShouldChatCompletionsUseResponsesGlobal(channel.Id, channel.Type, testModel)
+	return false
+}
+
+// normalizeTestOutboundModel applies the same reasoning-suffix normalization
+// the real handlers get from ApplyReasoningModelSuffix, reusing that helper
+// on a throwaway RelayInfo so test gating never drifts from real traffic.
+func normalizeTestOutboundModel(channel *model.Channel, testModel, candidate string) string {
+	mapped := candidate != testModel
+	info := testOutboundRelayInfo(channel, testModel, candidate, mapped)
+	if err := helper.ApplyReasoningModelSuffix(info); err != nil {
+		return candidate
+	}
+	if info.UpstreamModelName != "" {
+		return info.UpstreamModelName
+	}
+	return candidate
+}
+
+// testOutboundRelayInfo builds the minimal RelayInfo ApplyReasoningModelSuffix
+// needs: origin + upstream names plus the channel's passthrough flags so its
+// early-return mirrors the real handlers. ChannelType/Id are copied so
+// ConvOptions().OpenRouterDialect (ChannelType==OpenRouter) matches real
+// traffic — otherwise a throwaway GetChannelType()==0 would diverge on
+// -thinking stripping (relay/helper/reasoning_suffix.go:parseHostModelSuffix).
+func testOutboundRelayInfo(channel *model.Channel, testModel, candidate string, mapped bool) *relaycommon.RelayInfo {
+	info := &relaycommon.RelayInfo{
+		OriginModelName: testModel,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelType:       0,
+			ChannelId:         0,
+			UpstreamModelName: candidate,
+			IsModelMapped:     mapped,
+		},
+	}
+	if channel != nil {
+		info.ChannelMeta.ChannelType = channel.Type
+		info.ChannelMeta.ChannelId = channel.Id
+		info.ChannelSetting = channel.GetSetting()
+		info.ChannelOtherSettings = channel.GetOtherSettings()
+	}
+	return info
+}
+
+// candidateOutboundModelsForTest enumerates the possible upstream models that
+// ModelMappedHelper could produce for testModel on channel: member-group
+// merge + 1:1 chain + 1:N weighted expansion.  A BFS is used so any branch
+// that maps differently is considered — if any final candidate needs
+// chat→responses, the test must use /v1/responses to mirror real traffic
+// that would randomly hit that branch.
+func candidateOutboundModelsForTest(channel *model.Channel, testModel string) []string {
+	effectiveJSON := model.ApplyModelGroupMemberMapping(channel.GetModelMapping(), testModel, channel.Id)
+	if strings.TrimSpace(effectiveJSON) == "" || strings.TrimSpace(effectiveJSON) == "{}" {
+		return []string{testModel}
+	}
+	var modelMap map[string]any
+	if err := common.UnmarshalJsonStr(effectiveJSON, &modelMap); err != nil || len(modelMap) == 0 {
+		return []string{testModel}
+	}
+	type node struct {
+		cur     string
+		visited map[string]bool
+	}
+	frontier := []node{{cur: testModel, visited: map[string]bool{testModel: true}}}
+	var finals []string
+	// Cap expansion to avoid pathological maps; depth 8 + width 32 is plenty.
+	for iter := 0; iter < 8 && len(frontier) > 0; iter++ {
+		var nextFrontier []node
+		for _, n := range frontier {
+			raw, ok := modelMap[n.cur]
+			if !ok || raw == nil {
+				finals = append(finals, n.cur)
+				continue
+			}
+			switch v := raw.(type) {
+			case string:
+				mapped := strings.TrimSpace(v)
+				if mapped == "" || n.visited[mapped] {
+					finals = append(finals, n.cur)
+					continue
+				}
+				visited2 := make(map[string]bool, len(n.visited)+1)
+				for k := range n.visited {
+					visited2[k] = true
+				}
+				visited2[mapped] = true
+				nextFrontier = append(nextFrontier, node{cur: mapped, visited: visited2})
+			case []any:
+				if len(v) == 0 {
+					finals = append(finals, n.cur)
+					continue
+				}
+				expanded := false
+				for _, item := range v {
+					m, ok := item.(map[string]any)
+					if !ok {
+						continue
+					}
+					rawModel, _ := m["model"].(string)
+					mapped := strings.TrimSpace(rawModel)
+					if mapped == "" || n.visited[mapped] {
+						continue
+					}
+					expanded = true
+					visited2 := make(map[string]bool, len(n.visited)+1)
+					for k := range n.visited {
+						visited2[k] = true
+					}
+					visited2[mapped] = true
+					nextFrontier = append(nextFrontier, node{cur: mapped, visited: visited2})
+					if len(nextFrontier) >= 32 {
+						break
+					}
+				}
+				if !expanded {
+					finals = append(finals, n.cur)
+				}
+			default:
+				finals = append(finals, n.cur)
+			}
+		}
+		if len(nextFrontier) == 0 {
+			break
+		}
+		frontier = nextFrontier
+	}
+	if len(finals) == 0 {
+		for _, n := range frontier {
+			finals = append(finals, n.cur)
+		}
+	}
+	// Deduplicate.
+	seen := make(map[string]bool, len(finals))
+	uniq := make([]string, 0, len(finals))
+	for _, m := range finals {
+		if !seen[m] {
+			seen[m] = true
+			uniq = append(uniq, m)
+		}
+	}
+	if len(uniq) == 0 {
+		return []string{testModel}
+	}
+	return uniq
 }
 
 func resolveChannelTestUserID(c *gin.Context) (int, error) {
