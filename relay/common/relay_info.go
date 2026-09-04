@@ -817,6 +817,23 @@ func (info *RelayInfo) GetUpstreamModelName() string {
 	return info.UpstreamModelName
 }
 
+// GetOutboundModelName returns the model name actually sent upstream:
+// the mapped upstream model when present, otherwise the downstream origin
+// name (unmapped requests initialize UpstreamModelName to the origin, but
+// callers that run before InitChannelMeta may see an empty upstream).
+// chat→responses policy and other outbound decisions MUST use this, never
+// OriginModelName alone — under model-group routing the downstream group
+// name may not exist upstream at all.
+func (info *RelayInfo) GetOutboundModelName() string {
+	if upstream := info.GetUpstreamModelName(); upstream != "" {
+		return upstream
+	}
+	if info == nil {
+		return ""
+	}
+	return info.OriginModelName
+}
+
 func (info *RelayInfo) HasChannelMeta() bool { return info != nil && info.ChannelMeta != nil }
 
 func (info *RelayInfo) GetChannelID() int {
