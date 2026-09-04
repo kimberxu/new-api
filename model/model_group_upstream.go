@@ -31,6 +31,9 @@ func ResolveModelGroupUpstreamModel(routableModel string, channelId int) string 
 		}
 		return ""
 	}
+	if DB == nil {
+		return ""
+	}
 	var m string
 	err := DB.Table("model_group_items").
 		Select("model_group_items.model").
