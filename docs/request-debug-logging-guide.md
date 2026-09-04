@@ -16,7 +16,7 @@ docker-compose 配置示例：
 # docker-compose.yml（示意）
 services:
   new-api:
-    image: ghcr.io/<owner>/new-api:deploy
+    image: ghcr.io/<owner>/new-api:personal
     environment:
       - REQUEST_DEBUG_LOGGING=error_only
       - REQUEST_DEBUG_MAX_BODY_BYTES=65536

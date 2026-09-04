@@ -1,7 +1,7 @@
-# 定制功能清单（deploy / personal 分支）
+# 定制功能清单（personal 分支）
 
-> 对应分支：`personal` 基线 `317e9ddd`（2026-09-03 刷新至 `34f0a9a4d`；deploy 线功能部分，可用 `git diff upstream/main...317e9ddd` 核对。注意：`deploy` 分支自分叉点 `2ffa3979`（原 deploy-re，已退役）后已另行演进，分支拓扑见 `docs/local-github-workflow.md`）
-> 以下功能均为魔改线相对 `upstream/main` 的定制；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `317e9ddd` 的改动。
+> 对应分支：`personal` 基线 `317e9ddd`（2026-09-03 刷新至 `34f0a9a4d`；历史 deploy 功能部分可用 `git diff upstream/main...317e9ddd` 核对。`deploy` 分支已于 2026-09-04 删除，留档 tag `deploy-image-*` 仅历史回滚，分支拓扑见 `docs/local-github-workflow.md`）
+> 以下功能均为 `personal` 魔改线相对 `upstream/main` 的定制（含历史 deploy 登记）；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `317e9ddd` 的半重构。
 > 魔改提交：`f10d688f`（上游模型自动删除开关与筛选模型）→ `ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日志 t/s 计算排除 TTFT）→ `c8940a305`（模型组成员封禁悬停显示上次探测错误 + 永久封禁标识）→ `1d1034fcf`（封禁原因 tooltip 文字溢出框体）→ `0906c8354`（真实请求测活（重建模式））→ `1965f03cb`（修复真实请求测活池并发写穿）→ `604b5cdcc`（刷新三文档头部至 1965f03cb 并登记真实请求测活）→ `34f9a336c`（刷新三文档头部至 604b5cdcc 并校正构建说明）→ `c3721f95d`（RELAY_DISABLE_KEEP_ALIVE 与代理日志）→ `0fbbbf76b`（恢复 TLSInsecureSkipVerify 回归）→ `551330c09`（错误日志记录实际上游模型）→ `4638278c2`（成员封禁：last_error 持久化与永久封禁标识）→ `34f0a9a4d`（渠道测试复用 chat→responses 全局策略：测试与真实转发一致）
 
 ## 魔改开发约定（合并上游友好）
@@ -13,7 +13,7 @@
 - **扩展点织入是改动最小化的执行形态**：新魔改必须过两道审查——①能否完全新文件承载；②必须动既有文件时，是否只插入「挂载点行」（函数调用 / 中间件 / context key / 路由行），魔改逻辑本体是否全部在新增文件中。两者都过才允许动既有文件。
 - 每项魔改在总览表「扩展点形态」列登记实际形态；`内联` 形态为负债项，后续同步出现冲突时优先顺手迁移（把逻辑抽到新文件、原位置留挂载点调用）。
 - **头部与序列登记规范**：三文档头部「刷新至 `<sha>`」指本次文档刷新提交的**父提交**，即恒滞后 HEAD 一位、不追 HEAD、不自指（amend 换哈希，自指不可能）；manifest 序列尾所指哈希若被 amend 重写，按先例 `e887bf93e`/`1a1278a8f` 以新 commit 改引新哈希，该修正 commit 本身不入序列。
-- **序列行完整性**：manifest 序列行是单行长链（第 5 行 / 第 674 行），严禁中途截断。提交前用 `python3 -c "print(open('docs/request-debug-customization-manifest.md').readlines()[4].count('…'))"` 裸验为 0；用 `read:5-5:raw` 或 `grep '…'` 复核非显示截断。
+- **序列行完整性**：manifest 序列行是单行长链（第 5 行 / 第 677 行），严禁中途截断。提交前用 `python3 -c "print(open('docs/request-debug-customization-manifest.md').readlines()[4].count('…'))"` 裸验为 0；用 `read:5-5:raw` 或 `grep '…'` 复核非显示截断。
 - 例外不变：`docs/` 与 `AGENTS.md` 登记类改动不受最小化约束。
 
 ## 功能总览
@@ -35,18 +35,18 @@
 | 上游模型自动删除与筛选 | `f10d688f` | 中（`controller/channel_upstream_update.go`、`relaykit/dto/channel_settings.go`、前端渠道抽屉） | `内联`（channel_upstream_update.go 既有魔改文件内扩展）→ 待迁移 | 否 |
 | 额度显示模式切换修复 | `484d024c` | 低（`web/src/features/system-settings/general/pricing-section.tsx`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
 | token 大数 K/M/B 分级显示 | `99cc5e56`、`cda0a61f` | 低（`web/src/lib/currency.ts`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
-| 滑动窗口渠道自动禁用（deploy 线；personal 线 2026-09-01 退役） | `c0272220`、`9edda449` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） | `独立文件`（service/channel_disable_window.go）+ `挂载点`（channel.go/relay.go/channel-test.go）；personal 线已整体删除，详见详情章节退役注 | 否 |
+| 滑动窗口渠道自动禁用（历史 deploy 功能；personal 线 2026-09-01 退役） | `c0272220`、`9edda449` | 中（`service/channel.go`、`controller/relay.go`、`controller/channel-test.go`、系统设置前端） | `独立文件`（service/channel_disable_window.go）+ `挂载点`（channel.go/relay.go/channel-test.go）；personal 线已整体删除，详见详情章节退役注 | 否 |
 | 日志 t/s 计算排除 TTFT | `33f8aa0f` | 低（`web/src/features/usage-logs/`） | `内联`（前端）→ 待迁移（低风险可不迁） | 否 |
 | 渠道流速率降级（含首字延迟 TTFT 降级） | `088876eb`、`7832b0e9`、`f9198749` | 中（`model/channel_cache.go`、`model/model_group_select.go`、`service/quota.go`、`service/text_quota.go`、`web/src/features/system-settings/models/routing-reliability-section.tsx`） | `独立文件`（pkg/channel_slowstream/）+ `挂载点`（channel_cache.go/model_group_select.go/服务计费） | 否 |
 | 渠道流速率降级——模型组页降级标识（前端展示） | `c84e1d82` | 低（`web/src/features/model-groups/`） | `内联`（前端，复用既有 `/api/channel/demoted`）→ 待迁移（低风险可不迁） | 否 |
 | 模型级路由表前台化与模型级禁用（含 auto-ban 细化；2026-09-01 personal 统一封禁重写） | `cd98b0f8`、`9edda449` | 中（`controller/relay.go`、`model/channel_cache.go`、`model/ability.go`、`controller/channel-test.go`） | `独立文件`（model/channel_disabled_model.go、service/channel_model_disable.go、controller/channel_ability.go、web/src/features/channel-abilities/）+ `挂载点`（channel_cache.go、ability.go、relay.go、channel-test.go、channel.go、main.go、channel-router.go）；personal 线 2026-09-01 重写为阶梯式统一模型级封禁（30min→…→32h→永久，401 起步 16h） | 否 |
-| 渠道密钥查看放开安全验证 | `dbde0b31`（cherry-pick 自 deploy `570561d1`） | 低（`router/channel-router.go`） | `内联`（纯删一行中间件，无可迁移逻辑） | 否 |
+| 渠道密钥查看放开安全验证 | `dbde0b31`（cherry-pick 自历史 deploy `570561d1`） | 低（`router/channel-router.go`） | `内联`（纯删一行中间件，无可迁移逻辑） | 否 |
 | 真实请求测活（重建模式） | `0906c8354` | 中（`controller/relay.go`、`controller/channel-test.go`） | `独立文件`（controller/captured_request_pool.go、channel_captured_request.go）+ `挂载点`（relay.go、channel-test.go、model/channel.go） | 否 |
 | RELAY_DISABLE_KEEP_ALIVE 与代理日志 | `c3721f95d`、`0fbbbf76b` | 低（`common/`、`service/http_client.go`、`relay/common/relay_info.go`） | `内联`（三文件各 1-3 行开关/日志） | 否 |
 
 > **标注口径**：「扩展点形态」按各功能详情章节文件清单判定（`独立文件`=新文件承载全部逻辑；`挂载点`=既有文件仅插入少量挂载调用；`内联`=逻辑直接改在既有文件中，为负债项，后续同步冲突时优先迁移）；「上游实现替代」以实施时 `remotes/upstream/*` 可见主题为准，发现新对应分支即改标 `待观察` 并注明分支名。
 
-> **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`，`deploy` 与上游文件一致。
+> **已上游化（非 fork 定制，无需维护）**：OIDC 自定义显示名称、`CustomEvent.Mutex` 锁移除——截至 2026-08-01 均已存在于 `upstream/main`。
 
 ---
 
@@ -158,13 +158,13 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 ### 功能概述
 
-`.github/workflows/deploy-image-ghcr.yml` 构建并推送镜像后，自动删除 GHCR 上的旧镜像版本。同一 workflow 服务 `deploy` / `personal` 两条分支线，镜像 tag 前缀由构建来源推导（`deploy-image` tag / dispatch `deploy` → `:deploy`；`personal-image` tag / dispatch `personal` → `:personal`），清理**只对带本次构建前缀 tag** 的版本计数，各前缀家族独立保留最近 `KEEP=3` 个（含滚动 tag 指向的当前版本与最近两个留档版本），其余删除，跨前缀互不挤占。
+`.github/workflows/deploy-image-ghcr.yml` 构建并推送镜像后，自动删除 GHCR 上的旧镜像版本。仅服务 `personal` 单线，镜像 tag 前缀由构建来源推导（`personal-image` tag / dispatch `personal` → `:personal`），清理**只对带本次构建前缀 tag** 的版本计数，保留最近 `KEEP=3` 个（含滚动 tag 指向的当前版本与最近两个留档版本），其余删除。历史 `deploy` 线镜像（`:deploy` / `deploy-image-*`）已随分支删除停止更新，仅留档回滚。
 
 ### 背景与关键点
 
-- 每次 buildx 构建会在 GHCR 产生 **3 个 digest version**：1 个带 tag 的主 index digest（`deploy` + `deploy-<short_sha>`）+ 2 个无 tag 的平台辅助 digest（amd64 平台 manifest + attestation manifest）。
-- 清理只对**带 `deploy*` tag** 的 version 计数保留（最新 KEEP=3 个）；无 tag 的辅助 digest 不是可回滚版本，不占名额、**一律跳过不删**（见下方事故记录）。
-- 历史教训（2026-08-14）：早期版本按 `created_at` 全局排序取前 3，导致无 tag 辅助 digest 挤占保留名额、误删真实留档（如 `deploy-d57f803`）。`3db875f5` 起改为"带 tag 版本独立编号"。
+- 每次 buildx 构建会在 GHCR 产生 **3 个 digest version**：1 个带 tag 的主 index digest（`personal` + `personal-<short_sha>`）+ 2 个无 tag 的平台辅助 digest（amd64 平台 manifest + attestation manifest）。
+- 清理只对**带 `personal*` tag** 的 version 计数保留（最新 KEEP=3 个）；无 tag 的辅助 digest 不是可回滚版本，不占名额、**一律跳过不删**（见下方事故记录）。
+- 历史教训（2026-08-14）：早期版本按 `created_at` 全局排序取前 3，导致无 tag 辅助 digest 挤占保留名额、误删真实留档（如 `personal-d57f803`，原 `deploy-d57f803`）。`3db875f5` 起改为"带 tag 版本独立编号"。
 - **事故记录（2026-08-15）：删除无 tag 辅助 digest 导致 index 悬空。** 原实现"无 tag 辅助 digest 一律删除"，但这两个 digest 正是被带 tag index 引用的子 manifest（amd64 平台 manifest、attestation manifest）。删除后 index 引用悬空：curl 请求 index 返回 200（index 仍在），docker pull 解析 index 后请求子 manifest 得 404 → `manifest unknown`。症状：最新一次构建的版本可拉（辅助 digest 因 GHCR 列表最终一致性延迟逃过当次清理），**所有更早版本全部不可拉**，与镜像格式、docker 版本、网络均无关。修复：无 tag 版本一律跳过，只清理带 tag 版本；被清理 index 的孤儿辅助 manifest 仅数 KB，可忽略。
 - 不使用 `gh api --paginate` + `--jq` 组合（gh CLI 逐页应用 jq 的已知问题，cli/cli#10459），先拉取完整 JSON 再本地 jq 决策。
 - 清理决策写入 step summary 便于核对；删除失败仅警告不阻断构建。
@@ -408,9 +408,9 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 ---
 
-## 滑动窗口渠道自动禁用（deploy 线；personal 线 2026-09-01 退役）
+## 滑动窗口渠道自动禁用（历史功能；personal 线 2026-09-01 退役）
 
-> **2026-09-01（personal 线）**：渠道级自动禁用/恢复整体退役（`service/channel_disable_window.go`、`ShouldDisableChannelWithDecision`、`DisableDecision`、`CheckAndRecordDisable`、4 个窗口常量与前端 4 输入框全部删除），relay 请求失败只走模型级封禁（见「模型级路由表前台化与模型级禁用」节的统一重写条目）。本章描述保留为 deploy 线功能登记。`AutomaticDisableChannelEnabled`/`AutomaticEnableChannelEnabled`/`AutomaticDisableStatusCodes`/`AutomaticDisableKeywords`/`ChannelDisableThreshold` 五个配置变量与 option round-trip 保留（后端无消费方，仅设置保存 schema 兼容）。
+> **2026-09-01（personal 线）**：渠道级自动禁用/恢复整体退役（`service/channel_disable_window.go`、`ShouldDisableChannelWithDecision`、`DisableDecision`、`CheckAndRecordDisable`、4 个窗口常量与前端 4 输入框全部删除），relay 请求失败只走模型级封禁（见「模型级路由表前台化与模型级禁用」节的统一重写条目）。本章描述保留为历史 deploy 功能登记。`AutomaticDisableChannelEnabled`/`AutomaticEnableChannelEnabled`/`AutomaticDisableStatusCodes`/`AutomaticDisableKeywords`/`ChannelDisableThreshold` 五个配置变量与 option round-trip 保留（后端无消费方，仅设置保存 schema 兼容）。
 
 ### 功能概述
 
