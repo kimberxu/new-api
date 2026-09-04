@@ -4,22 +4,22 @@ DO NOT send optional commentary
 
 ## 分支体系与魔改文档指引
 
-本仓库多条分支承载魔改：`deploy`（部署线）与 `personal`（主力开发线：模型组路由全套 + 计费/Ollama/订阅/OAuth/开放注册移除；其历史前段 `317e9ddd` 及之前为原 deploy 线魔改基线，早期中间态分支 `deploy-model` 已退役并入）。两者 GHCR 镜像均由 `*-image` 滚动 tag 构建（`deploy-image`/`personal-image`）。它们相对 `upstream/main` 存在**独有魔改功能与文档**。开始作业前，**必须先读取**以下魔改文档并遵循其约定：
+本仓库魔改承载于 `personal`（主力开发线：模型组路由全套 + 计费/Ollama/订阅/OAuth/开放注册移除；其历史前段 `317e9ddd` 及之前为原 deploy 线魔改基线，早期中间态分支 `deploy-model` 与 `deploy` 分支均已删除退役，仅留档 tag `deploy-image-*`）。GHCR 镜像由 `personal-image` 滚动 tag 构建。它相对 `upstream/main` 存在**独有魔改功能与文档**。开始作业前，**必须先读取**以下魔改文档并遵循其约定：
 
 | 文档 | 内容 | 何时必须读 |
 |------|------|------------|
-| `docs/local-github-workflow.md` | 分支工作流：分支拓扑、同步上游、冲突处理原则、**tag 触发构建规范**（`deploy-image`/`personal-image` 滚动 tag / `*-<short_sha>` 留档，适用 `deploy`/`personal` 双线）、部署流程 | 每次作业开始、涉及 git 操作/构建发布时 |
-| `docs/request-debug-customization-manifest.md` | **定制功能清单**：deploy 线全部魔改功能 + 「personal 分支半重构登记」小节（模型组路由、计费/Ollama/订阅/OAuth/注册移除）、引入提交、上游冲突风险文件、功能详情与文件清单 | 每次作业开始；新增魔改功能时必须在此登记；需要核对既有魔改时 |
+| `docs/local-github-workflow.md` | 分支工作流：分支拓扑、同步上游、冲突处理原则、**tag 触发构建规范**（`personal-image` 滚动 tag / `personal-image-<short_sha>` 留档）、部署流程 | 每次作业开始、涉及 git 操作/构建发布时 |
+| `docs/request-debug-customization-manifest.md` | **定制功能清单**：personal 魔改功能（含历史 deploy 功能登记） + 「personal 分支半重构登记」小节（模型组路由、计费/Ollama/订阅/OAuth/注册移除）、引入提交、上游冲突风险文件、功能详情与文件清单 | 每次作业开始；新增魔改功能时必须在此登记；需要核对既有魔改时 |
 | `docs/request-debug-logging-guide.md` | 请求调试日志部署指南（环境变量、日志清理、生产建议） | 作业涉及请求调试/日志相关功能时 |
 | `docs/superpowers/specs/2026-07-19-request-debug-logging-design.md` | 请求调试日志设计文档（架构、安全） | 作业涉及请求调试模块设计/改动时 |
 
-deploy 线作业约定：
+personal 线作业约定（`deploy` 分支已删除，留档 tag `deploy-image-*` 仅作历史回滚）：
 
-- **核心设计目标**：deploy/personal 面向将众多免费/公益站上游整合到 new-api 的场景，上游不稳定是可预见的常态。所有魔改功能的设计标准之一是：通过 new-api 的重试、渠道选择、限流、滑动窗口禁用等机制，消减上游不稳定性，为下游提供尽可能稳定的访问（如渠道流速率降级、滑动窗口渠道自动禁用、同优先级重试）。
+- **核心设计目标**：personal 面向将众多免费/公益站上游整合到 new-api 的场景，上游不稳定是可预见的常态。所有魔改功能的设计标准之一是：通过 new-api 的重试、渠道选择、限流、滑动窗口禁用等机制，消减上游不稳定性，为下游提供尽可能稳定的访问（如渠道流速率降级、滑动窗口渠道自动禁用、同优先级重试）。
 - **改动最小化（合并上游的硬约束）**：新增魔改功能时，独立逻辑**优先用新增文件承载**（新 service/controller/middleware/组件/API 客户端），避免改动既有文件；必须改动既有文件时，限制为**最小必要 diff**——只做纯追加/局部插入，不修改、不删除、不重排已有代码，能不改就不改。改动文件越少、越偏向新增文件，后续合并 `upstream/main` 冲突越少、越轻松。任何改动方案先按此原则审查：先问「这个文件能不能不动」，再问「改动能不能再小」。**「扩展点织入」：魔改逻辑优先进入新增文件，既有文件只保留最小挂载点调用（详见 manifest「魔改开发约定」）；与本上游的同步采用 rebase 线性重放（见 docs/local-github-workflow.md）**。
-- 魔改功能**必须**登记进 `docs/request-debug-customization-manifest.md`（功能总览表 + 详情章节，deploy 线功能登记在 deploy 小节、personal 专属改动登记在「personal 分支半重构登记」小节），并更新其头部 `对应分支` commit 标记与魔改提交序列；`docs/local-github-workflow.md`、`docs/request-debug-logging-guide.md` 头部 commit 标记同步刷新。`personal` 分支的改动相对其基线 `317e9ddd` 登记（`git log 317e9ddd..personal` 核对）。
+- 魔改功能**必须**登记进 `docs/request-debug-customization-manifest.md`（功能总览表 + 详情章节，历史 deploy 功能保留原小节、personal 专属改动登记在「personal 分支半重构登记」小节），并更新其头部 `对应分支` commit 标记与魔改提交序列；`docs/local-github-workflow.md`、`docs/request-debug-logging-guide.md` 头部 commit 标记同步刷新。`personal` 分支的改动相对其基线 `317e9ddd` 登记（`git log 317e9ddd..personal` 核对）。
 - 涉及 `controller/relay.go`、`relay/common/relay_info.go`、`web/src/features/usage-logs/components/dialogs/details-dialog.tsx` 等已知高风险冲突文件时，遵循 `docs/local-github-workflow.md` 的冲突处理原则（保留魔改 + 采纳上游语义）。
-- 构建/发布（强约束）：**仅当用户明确要求触发构建/发布时才执行** tag 推送流程。纯文档改动（`docs/`、`AGENTS.md`、manifest 登记、说明性提交）**禁止触发构建**——只提交推送对应分支即可，不推送任何 `deploy*` / `personal*` tag。触发方式见 `docs/local-github-workflow.md`：`deploy*` / `personal*` git tag（滚动 `-image` / 留档 `-image-<short_sha>`）或 Actions 页面手动 `workflow_dispatch`（workflow 名 `Build branch image (GHCR)`，文件 `.github/workflows/deploy-image-ghcr.yml`）。无 `gh` 登录时可用公开 API 定时轮询确认构建状态（方法见该文档「确认构建状态」）；已登录 `gh` 时直接用 `gh run list --workflow deploy-image-ghcr.yml` / `gh api repos/<owner>/new-api/actions/runs` 查询。
+- 构建/发布（强约束）：**仅当用户明确要求触发构建/发布时才执行** tag 推送流程。纯文档改动（`docs/`、`AGENTS.md`、manifest 登记、说明性提交）**禁止触发构建**——只提交推送对应分支即可，不推送任何 `personal*` tag。触发方式见 `docs/local-github-workflow.md`：`personal*` git tag（滚动 `-image` / 留档 `-image-<short_sha>`）或 Actions 页面手动 `workflow_dispatch`（workflow 名 `Build branch image (GHCR)`，文件 `.github/workflows/deploy-image-ghcr.yml`）。无 `gh` 登录时可用公开 API 定时轮询确认构建状态（方法见该文档「确认构建状态」）；已登录 `gh` 时直接用 `gh run list --workflow deploy-image-ghcr.yml` / `gh api repos/<owner>/new-api/actions/runs` 查询。
 
 ## Overview
 

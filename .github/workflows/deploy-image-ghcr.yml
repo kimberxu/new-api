@@ -3,12 +3,11 @@ name: Build branch image (GHCR)
 on:
   push:
     tags:
-      - 'deploy*'
       - 'personal*'
   workflow_dispatch:
     inputs:
       branch:
-        description: "Branch to build (deploy / personal)"
+        description: "Branch to build (personal)"
         required: true
         default: "personal"
         type: string
@@ -38,7 +37,7 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
           IMAGE="ghcr.io/${OWNER}/new-api"
           # 镜像 tag 前缀来源：手动触发用 branch 输入；tag 触发用 tag 名去 -image 后缀
-          # （deploy-image → deploy，personal-image → personal），deploy 线历史镜像 tag 不变
+          # （personal-image → personal）
           if [ -n "$DISPATCH_BRANCH" ]; then
             RAW_PREFIX="$DISPATCH_BRANCH"
           else
@@ -112,7 +111,7 @@ jobs:
             }
           fi
           # 每次构建在 GHCR 产生 1 个带 tag 的主 digest + 2 个无 tag 的平台辅助 digest。
-          # 只有带本次构建前缀（IMAGE_PREFIX，如 deploy/personal）tag 的 version 才是可回滚版本；
+          # 只有带本次构建前缀（IMAGE_PREFIX，即 personal）tag 的 version 才是可回滚版本；
           # 无 tag 辅助 digest 不占名额。各分支前缀家族独立计数、互不挤占。
           # 带 tag 版本独立编号，按创建时间倒序保留最近 KEEP 个（滚动 tag holder 恒为最新，
           # 必在被保留之列；仍显式保护以防异常）。
@@ -157,5 +156,5 @@ jobs:
             fi
           done < /tmp/prune_plan.tsv
           echo '```' >> "$SUMMARY"
-          echo "共删除 ${deleted} 个版本，保留最新 ${KEEP} 个带 deploy tag 的版本"
+          echo "共删除 ${deleted} 个版本，保留最新 ${KEEP} 个带 ${IMAGE_PREFIX} tag 的版本"
           echo "共删除 ${deleted} 个版本" >> "$SUMMARY"
