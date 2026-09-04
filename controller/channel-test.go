@@ -53,6 +53,28 @@ func normalizeChannelTestEndpoint(channel *model.Channel, endpointType string) s
 	}
 	return normalized
 }
+// shouldForceResponsesForTest reports whether a chat test should be upgraded
+// to the responses endpoint so that the test mirrors real traffic handled by
+// TextHelper/ClaudeHelper via ShouldChatCompletionsUseResponsesGlobal.
+func shouldForceResponsesForTest(channel *model.Channel, testModel string) bool {
+	if channel == nil || strings.TrimSpace(testModel) == "" {
+		return false
+	}
+	lower := strings.ToLower(testModel)
+	if strings.Contains(lower, "rerank") {
+		return false
+	}
+	if strings.Contains(lower, "embedding") || strings.HasPrefix(testModel, "m3e") || strings.Contains(testModel, "bge-") || strings.Contains(lower, "embed") {
+		return false
+	}
+	if channel.Type == constant.ChannelTypeMokaAI {
+		return false
+	}
+	if channel.Type == constant.ChannelTypeVolcEngine && strings.Contains(testModel, "seedream") {
+		return false
+	}
+	return service.ShouldChatCompletionsUseResponsesGlobal(channel.Id, channel.Type, testModel)
+}
 
 func resolveChannelTestUserID(c *gin.Context) (int, error) {
 	if c != nil {
@@ -115,6 +137,9 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 	defer func() { result.modelName = testModel }()
 
 	endpointType = normalizeChannelTestEndpoint(channel, endpointType)
+	if endpointType == "" && shouldForceResponsesForTest(channel, testModel) {
+		endpointType = string(constant.EndpointTypeOpenAIResponse)
+	}
 
 	requestPath := "/v1/chat/completions"
 
@@ -234,7 +259,9 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 	}
 
 	var request dto.Request
-	if len(capturedMessages) > 0 {
+	if len(capturedMessages) > 0 && endpointType == string(constant.EndpointTypeOpenAIResponse) {
+		request = buildTestRequest(testModel, endpointType, channel, false)
+	} else if len(capturedMessages) > 0 {
 		request = buildTestRequestFromMessages(testModel, capturedMessages)
 	} else {
 		request = buildTestRequest(testModel, endpointType, channel, isStream)
