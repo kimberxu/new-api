@@ -114,18 +114,22 @@ func normalizeTestOutboundModel(channel *model.Channel, testModel, candidate str
 // traffic — otherwise a throwaway GetChannelType()==0 would diverge on
 // -thinking stripping (relay/helper/reasoning_suffix.go:parseHostModelSuffix).
 func testOutboundRelayInfo(channel *model.Channel, testModel, candidate string, mapped bool) *relaycommon.RelayInfo {
+	channelType := 0
+	channelID := 0
+	if channel != nil {
+		channelType = channel.Type
+		channelID = channel.Id
+	}
 	info := &relaycommon.RelayInfo{
 		OriginModelName: testModel,
 		ChannelMeta: &relaycommon.ChannelMeta{
-			ChannelType:       0,
-			ChannelId:         0,
+			ChannelType:       channelType,
+			ChannelId:         channelID,
 			UpstreamModelName: candidate,
 			IsModelMapped:     mapped,
 		},
 	}
 	if channel != nil {
-		info.ChannelMeta.ChannelType = channel.Type
-		info.ChannelMeta.ChannelId = channel.Id
 		info.ChannelSetting = channel.GetSetting()
 		info.ChannelOtherSettings = channel.GetOtherSettings()
 	}
