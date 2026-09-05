@@ -179,7 +179,7 @@ func TestGetRandomSatisfiedChannelNoExcludeReturnsHighestPriority(t *testing.T) 
 	InitChannelCache()
 
 	// Multiple calls should all return a priority 4 channel
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, ch)
