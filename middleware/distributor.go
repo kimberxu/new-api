@@ -684,8 +684,12 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	// [personal] The routable model-group name may not exist upstream; merge
 	// the selected member's real upstream model into the channel mapping so
 	// ModelMappedHelper rewrites the request model as usual.
-	common.SetContextKey(c, constant.ContextKeyChannelModelMapping,
-		model.ApplyModelGroupMemberMapping(channel.GetModelMapping(), modelName, channel.Id))
+	selectedUpstream := common.GetContextKeyString(c, constant.ContextKeySelectedUpstreamModel)
+	mapping := model.ApplyModelGroupMemberMappingWithUpstream(channel.GetModelMapping(), modelName, selectedUpstream)
+	if selectedUpstream == "" {
+		mapping = model.ApplyModelGroupMemberMapping(channel.GetModelMapping(), modelName, channel.Id)
+	}
+	common.SetContextKey(c, constant.ContextKeyChannelModelMapping, mapping)
 	common.SetContextKey(c, constant.ContextKeyChannelStatusCodeMapping, channel.GetStatusCodeMapping())
 
 	key, index, newAPIError := channel.GetNextEnabledKey()

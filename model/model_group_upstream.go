@@ -24,12 +24,7 @@ func ResolveModelGroupUpstreamModel(routableModel string, channelId int) string 
 	if common.MemoryCacheEnabled {
 		channelSyncLock.RLock()
 		defer channelSyncLock.RUnlock()
-		for _, perChannel := range modelGroupItemOverrides[routableModel] {
-			if o, ok := perChannel[channelId]; ok && o.model != "" && o.model != routableModel {
-				return o.model
-			}
-		}
-		return ""
+		return resolveBestUpstream(channelId, routableModel, channelsIDM, modelGroupItemOverrides)
 	}
 	if DB == nil {
 		return ""
@@ -38,8 +33,11 @@ func ResolveModelGroupUpstreamModel(routableModel string, channelId int) string 
 	err := DB.Table("model_group_items").
 		Select("model_group_items.model").
 		Joins("JOIN model_groups ON model_group_items.group_id = model_groups.id").
-		Where("model_groups.name = ? AND model_group_items.channel_id = ? AND model_group_items.enabled = ?",
-			routableModel, channelId, true).
+		Joins("JOIN channels ON model_group_items.channel_id = channels.id").
+		Where("model_groups.name = ? AND model_groups.enabled = ? AND model_group_items.channel_id = ? AND model_group_items.enabled = ? AND channels.status = ?",
+			routableModel, true, channelId, true, common.ChannelStatusEnabled).
+		Where("NOT EXISTS (SELECT 1 FROM channel_disabled_models WHERE channel_id = model_group_items.channel_id AND model = model_group_items.model)").
+		Order("COALESCE(model_group_items.priority, channels.priority, 0) DESC, COALESCE(model_group_items.weight, channels.weight, 0) DESC, model_group_items.model ASC").
 		Take(&m).Error
 	if err != nil || m == "" || m == routableModel {
 		return ""
@@ -54,6 +52,30 @@ func ResolveModelGroupUpstreamModel(routableModel string, channelId int) string 
 func ApplyModelGroupMemberMapping(mappingJSON string, routableModel string, channelId int) string {
 	upstream := ResolveModelGroupUpstreamModel(routableModel, channelId)
 	if upstream == "" {
+		return mappingJSON
+	}
+	modelMap := make(map[string]interface{}, 2)
+	if mappingJSON != "" && mappingJSON != "{}" {
+		if err := common.UnmarshalJsonStr(mappingJSON, &modelMap); err != nil {
+			return mappingJSON
+		}
+	}
+	if _, ok := modelMap[routableModel]; ok {
+		return mappingJSON // explicit channel mapping wins
+	}
+	modelMap[routableModel] = upstream
+	data, err := common.Marshal(modelMap)
+	if err != nil {
+		return mappingJSON
+	}
+	return string(data)
+}
+
+// ApplyModelGroupMemberMappingWithUpstream merges an already-selected upstream
+// model into the channel mapping JSON. The row-level selector calls this so
+// Setup no longer re-guesses among sibling members on the same channel.
+func ApplyModelGroupMemberMappingWithUpstream(mappingJSON string, routableModel string, upstream string) string {
+	if upstream == "" || upstream == routableModel {
 		return mappingJSON
 	}
 	modelMap := make(map[string]interface{}, 2)

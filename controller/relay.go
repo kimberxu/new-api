@@ -456,12 +456,14 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 	// 不封禁——模型无责。
 	if channelError.AutoBan && relayInfo != nil && relayInfo.OriginModelName != "" &&
 		!types.IsSkipRetryError(err) {
-		// The ban key must be the routing-entry model: under model-group
-		// routing the requested name is the group name, while cache exclusion
-		// keys on the member's real upstream model. Resolve it so the ban
-		// actually excludes routing.
+		// The ban key must be the failed member's real upstream model: prefer
+		// the final mapped model on RelayInfo (never gin context: this path
+		// also runs asynchronously after the request context is stale),
+		// fall back to the tier-defining member when unmapped.
 		banModel := relayInfo.OriginModelName
-		if upstream := model.ResolveModelGroupUpstreamModel(relayInfo.OriginModelName, channelError.ChannelId); upstream != "" {
+		if upstream := relayInfo.GetUpstreamModelName(); upstream != "" && upstream != relayInfo.OriginModelName {
+			banModel = upstream
+		} else if upstream := model.ResolveModelGroupUpstreamModel(relayInfo.OriginModelName, channelError.ChannelId); upstream != "" {
 			banModel = upstream
 		}
 		reason := fmt.Sprintf("model disabled: %s", err.ErrorWithStatusCode())
