@@ -107,6 +107,7 @@ func InitChannelCache() {
 		}
 	}
 	newGroup2model2channels := make(map[string]map[string][]int)
+	seenGroupModelChannel := make(map[string]map[string]map[int]struct{})
 	for groupName, items := range enabledGroups {
 		for _, item := range items {
 			channel, ok := newChannelId2channel[item.ChannelId]
@@ -135,6 +136,16 @@ func InitChannelCache() {
 				if _, ok := newGroup2model2channels[group][groupName]; !ok {
 					newGroup2model2channels[group][groupName] = make([]int, 0)
 				}
+				if seenGroupModelChannel[group] == nil {
+					seenGroupModelChannel[group] = make(map[string]map[int]struct{})
+				}
+				if seenGroupModelChannel[group][groupName] == nil {
+					seenGroupModelChannel[group][groupName] = make(map[int]struct{})
+				}
+				if _, exists := seenGroupModelChannel[group][groupName][channel.Id]; exists {
+					continue
+				}
+				seenGroupModelChannel[group][groupName][channel.Id] = struct{}{}
 				newGroup2model2channels[group][groupName] = append(newGroup2model2channels[group][groupName], channel.Id)
 			}
 		}
@@ -201,9 +212,9 @@ func GetRandomSatisfiedChannel(
 	// It drops already-tried channels, targets the highest effective
 	// priority tier, and draws weighted within the tier.
 	if !common.MemoryCacheEnabled {
-return GetRandomSatisfiedChannelFromGroups(group, model, excludeChannels)
+		ch, _, err := GetRandomSatisfiedChannelFromGroups(group, model, excludeChannels)
+		return ch, err
 	}
-
 	channelSyncLock.RLock()
 	defer channelSyncLock.RUnlock()
 
@@ -335,20 +346,14 @@ return GetRandomSatisfiedChannelFromGroups(group, model, excludeChannels)
 // channel's own priority. The overrides map is passed in so both the cache
 // build (before the global swap) and the selector can share the logic.
 func effectivePriorityWith(channelId int, model string, chanById map[int]*Channel, overrides map[string]map[string]map[int]modelGroupItemOverride) int64 {
-	if groupModelMap, ok := overrides[model]; ok {
-		if modelChanMap, ok := groupModelMap[model]; ok {
-			if o, ok := modelChanMap[channelId]; ok && o.priority != nil {
-				return *o.priority
-			}
+	if best := bestMemberOverride(channelId, model, chanById, overrides); best != nil {
+		if best.priority != nil {
+			return *best.priority
 		}
-		// Fall back: a manual group may hold a member whose model differs from
-		// the group name (routable name). Any member override of this channel
-		// in the group applies.
-		for _, modelChanMap := range groupModelMap {
-			if o, ok := modelChanMap[channelId]; ok && o.priority != nil {
-				return *o.priority
-			}
+		if ch, ok := chanById[channelId]; ok {
+			return ch.GetPriority()
 		}
+		return 0
 	}
 	if ch, ok := chanById[channelId]; ok {
 		return ch.GetPriority()
@@ -364,17 +369,14 @@ func effectivePriority(channelId int, model string) int64 {
 
 // [personal] effectiveWeightWith mirrors effectivePriorityWith for weights.
 func effectiveWeightWith(channelId int, model string, chanById map[int]*Channel, overrides map[string]map[string]map[int]modelGroupItemOverride) int {
-	if groupModelMap, ok := overrides[model]; ok {
-		if modelChanMap, ok := groupModelMap[model]; ok {
-			if o, ok := modelChanMap[channelId]; ok && o.weight != nil {
-				return int(*o.weight)
-			}
+	if best := bestMemberOverride(channelId, model, chanById, overrides); best != nil {
+		if best.weight != nil {
+			return int(*best.weight)
 		}
-		for _, modelChanMap := range groupModelMap {
-			if o, ok := modelChanMap[channelId]; ok && o.weight != nil {
-				return int(*o.weight)
-			}
+		if ch, ok := chanById[channelId]; ok {
+			return ch.GetWeight()
 		}
+		return 0
 	}
 	if ch, ok := chanById[channelId]; ok {
 		return ch.GetWeight()
