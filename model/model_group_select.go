@@ -46,8 +46,9 @@ func (r selectRow) weight() int {
 // tier a member is drawn weighted by COALESCE(member.weight, channel.weight).
 // Excluded channels (already tried in the retry loop) are dropped before the
 // tier computation. `group` is the channel group field, `model` the routable
-// model name (= model group name).
-func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChannels []int) (*Channel, error) {
+// model name (= model group name). Returns the selected channel and its
+// best-member upstream model ("" when no rewrite is needed).
+func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChannels []int) (*Channel, string, error) {
 	q := DB.Table("model_group_items").
 		Select("model_group_items.channel_id as channel_id, model_group_items.model as model, "+
 			"model_group_items.priority as item_priority, model_group_items.weight as item_weight, "+
@@ -65,15 +66,35 @@ func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChan
 
 	var rows []selectRow
 	if err := q.Find(&rows).Error; err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if len(rows) == 0 {
-		return nil, nil
+		return nil, "", nil
+	}
+
+	// Aggregate to one best member per channel: max effective priority,
+	// then max effective weight, then min model — same rule as cache path
+	// bestMemberOverride. This prevents a channel with N members from
+	// counting its weight N times and keeps DB/cache tier semantics aligned.
+	bestByChannel := make(map[int]selectRow, len(rows))
+	for _, r := range rows {
+		if cur, ok := bestByChannel[r.ChannelId]; !ok {
+			bestByChannel[r.ChannelId] = r
+		} else {
+			pr, pw := r.priority(), r.weight()
+			cpr, cpw := cur.priority(), cur.weight()
+			if pr > cpr || (pr == cpr && (pw > cpw || (pw == cpw && r.Model < cur.Model))) {
+				bestByChannel[r.ChannelId] = r
+			}
+		}
+	}
+	bestRows := make([]selectRow, 0, len(bestByChannel))
+	for _, r := range bestByChannel {
+		bestRows = append(bestRows, r)
 	}
 
 	// Highest effective priority tier, with slow-stream demotion applied
-	// per (requested model, channel): mirrors the memory-cache path so
-	// demotion stays effective when MemoryCache is disabled.
+	// once per channel on the aggregated best priority (mirrors cache path).
 	effectivePriority := func(r selectRow) int64 {
 		p := r.priority()
 		if demoted, dp := channelslowstream.GetDemotedPriority(r.ChannelId, model, p); demoted {
@@ -81,8 +102,8 @@ func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChan
 		}
 		return p
 	}
-	highest := effectivePriority(rows[0])
-	for _, r := range rows[1:] {
+	highest := effectivePriority(bestRows[0])
+	for _, r := range bestRows[1:] {
 		if p := effectivePriority(r); p > highest {
 			highest = p
 		}
@@ -91,18 +112,19 @@ func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChan
 	type draw struct {
 		channelId int
 		weight    int
+		model     string
 	}
 	var top []draw
 	sumWeight := 0
-	for _, r := range rows {
+	for _, r := range bestRows {
 		if effectivePriority(r) == highest {
 			w := r.weight()
 			sumWeight += w
-			top = append(top, draw{r.ChannelId, w})
+			top = append(top, draw{r.ChannelId, w, r.Model})
 		}
 	}
 	if len(top) == 0 {
-		return nil, errors.New("no channel found, group: " + group + ", model: " + model)
+		return nil, "", errors.New("no channel found, group: " + group + ", model: " + model)
 	}
 
 	// Weighted random draw, mirroring the memory-path smoothing: when the
@@ -114,18 +136,27 @@ func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChan
 		}
 	}
 	drawN := rand.IntN(sumWeight)
-	picked := -1
-	for _, t := range top {
+	pickedIdx := -1
+	for i, t := range top {
 		drawN -= t.weight
 		if drawN < 0 {
-			picked = t.channelId
+			pickedIdx = i
 			break
 		}
 	}
-	if picked < 0 {
-		return nil, errors.New("no channel found, group: " + group + ", model: " + model)
+	if pickedIdx < 0 {
+		return nil, "", errors.New("no channel found, group: " + group + ", model: " + model)
 	}
+	picked := top[pickedIdx]
 	// selectAll=true: the relay needs the key for the upstream Authorization
 	// header; the legacy DB path also loaded the full row.
-	return GetChannelById(picked, true)
+	ch, err := GetChannelById(picked.channelId, true)
+	if err != nil {
+		return nil, "", err
+	}
+	upstream := picked.model
+	if upstream == model {
+		upstream = ""
+	}
+	return ch, upstream, nil
 }

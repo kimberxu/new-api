@@ -216,6 +216,18 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			return nil, param.TokenGroup, err
 		}
 	}
+	// [personal] Row-level passthrough: record the selected member's upstream
+	// model so SetupContextForSelectedChannel and the ban path reuse it
+	// instead of re-guessing among sibling members on the same channel.
+	// ResolveModelGroupUpstreamModel is deterministic per (model, channel):
+	// cache path reads the best member override, DB path takes the single
+	// best row via ORDER BY … LIMIT 1 with the same
+	// (priority → weight → model ASC) rule as the selectors' per-channel
+	// aggregation, so no second random roll happens here.
+	// param.ModelName is the routable model in both branches (auto or not).
+	if channel != nil && param != nil && param.Ctx != nil && param.ModelName != "" {
+		common.SetContextKey(param.Ctx, constant.ContextKeySelectedUpstreamModel, model.ResolveModelGroupUpstreamModel(param.ModelName, channel.Id))
+	}
 	return channel, selectGroup, nil
 }
 

@@ -39,9 +39,11 @@ const (
 	ContextKeyChannelIsMultiKey        ContextKey = "channel_is_multi_key"
 	ContextKeyChannelMultiKeyIndex     ContextKey = "channel_multi_key_index"
 	ContextKeyChannelKey               ContextKey = "channel_key"
-
 	ContextKeyAutoGroup      ContextKey = "auto_group"
 	ContextKeyAutoGroupIndex ContextKey = "auto_group_index"
+	// ContextKeySelectedUpstreamModel carries the upstream model chosen by the
+	// row-level selector so mapping and ban reuse it without re-guessing.
+	ContextKeySelectedUpstreamModel ContextKey = "selected_upstream_model"
 
 	/* user related keys */
 	ContextKeyUserId      ContextKey = "id"
