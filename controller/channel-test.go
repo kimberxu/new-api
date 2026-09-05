@@ -54,6 +54,7 @@ func normalizeChannelTestEndpoint(channel *model.Channel, endpointType string) s
 	}
 	return normalized
 }
+
 // shouldForceResponsesForTest reports whether a chat test should be upgraded
 // to the responses endpoint so that the test mirrors real traffic.  The
 // decision MUST be outbound: the model actually sent upstream after model-
@@ -98,7 +99,7 @@ func shouldForceResponsesForTest(channel *model.Channel, testModel string) bool 
 func normalizeTestOutboundModel(channel *model.Channel, testModel, candidate string) string {
 	mapped := candidate != testModel
 	info := testOutboundRelayInfo(channel, testModel, candidate, mapped)
-	if err := helper.ApplyReasoningModelSuffix(info); err != nil {
+	if err := helper.ApplyReasoningModelSuffix(nil, info); err != nil {
 		return candidate
 	}
 	if info.UpstreamModelName != "" {
