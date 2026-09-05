@@ -76,10 +76,7 @@ git push origin main
 | `relay/helper/model_mapped.go` | 加权模型映射（1:N，`resolveModelMappingValue`/`pickWeightedModel`，`map[string]any` + 链式循环检测） | 上游 `7c044d7c5` 把解析换 `rootcommon.Unmarshal` + 查表前 `hostreasoning.BaseModelName` 回退（`@修饰符` 剥离语义） | `397bddf2d`：2026-09-05 同步 6 提交；取加权 `map[string]any` 本体 + `common.UnmarshalJsonStr`（AGENTS JSON wrapper 约定，不留 `encoding/json`）+ `math/rand/v2`，直接键缺失时对 `baseModel` 再 resolve 一次，循环体沿加权检测语义 |
 | `web/src/features/usage-logs/components/dialogs/details-dialog.tsx` | 请求调试快照面板 | 日志详情功能（如 stream status） | `7dccc6db4`：2026-08-31 同步 21 提交；上游新增 task_plugin 计费展示块（BillingBreakdown/DynamicPricingBreakdown/usage-facts），按计费移除语义整块弃用；魔改 request_debug 面板与上游 PluginAuthorLink 共存，import 拼接保留两侧 |
 | `model/main.go` | PostgreSQL 连接强制 `PreferSimpleProtocol: true`（兼容 PgBouncer/Neon/Supabase）+ `normalizePostgresDSN` 兜底 `client_encoding=UTF8` + `standard_conforming_strings=on` | 上游新增 `ensureUserQuotaColumns`、`migratePrefillGroupUniqueness`（参数化 raw SQL）与 `migrateDBFast` 删除 | `7667fe5b3`：2026-09-01 fix；上游 `migratePrefillGroupUniqueness` 的 `db.Raw(...to_regclass(?) ...)` 参数化查询在 personal `PreferSimpleProtocol` + PG 连接编码非 UTF8 环境触发 pgx `sanitizeForSimpleQuery` 强制 `client_encoding=UTF8` 与 `standard_conforming_strings=on`（conn.go:1265-1269）→ 启动 FATAL；新增 `normalizePostgresDSN` 兜底给 DSN 追加两 runtime param，已显式携带时尊重用户值不覆盖 |
-
-#### 冲突决策记录规则
-
-每次 rebase/merge 解完冲突后，把「上游改了啥 / 本地怎么拼 / 结论一句话」追加到对应文件行的「解决决策记录」列（格式：`<提交短SHA>：<日期> 同步 N 提交；<本次决策一句话>`）。列内多记录用 `；` 分隔。记忆原则：同类冲突再次出现时，先查本表照抄决策，不再重新设计。
+每次 rebase/merge 解完冲突后，把「上游改了啥 / 本地怎么拼 / 结论一句话」追加到对应文件行的「解决决策记录」列（格式：`<提交短SHA>：<日期> 同步 N 提交；<本次决策一句话>`）。列内多记录用 `；` 分隔。拼法照抄 `scripts/sync-decision-template.md`（签名变更/BREAKING 跟随/locale 三方/JSON 归一/字段分类五类模板；同 PR 同轮次不另起行：`i18n/keys.go` 归 locale 行、probe 归源码行）。记忆原则：同类冲突再次出现时，先查本表照抄决策，不再重新设计。
 
 历史参考：2026-08-01 同步 8 个上游提交时，前两个文件各产生一处冲突，处理方式记录在合并提交 `e0b9f243`。
 
@@ -100,9 +97,11 @@ git diff origin/<branch> -- <冲突文件>
 /usr/local/go/bin/go build ./...                                 # 根模块（需 Go >= 1.25）
 cd relaykit && GOWORK=off /usr/local/go/bin/go build ./...       # relaykit 独立模块（须独立可构建）
 cd web && bun run build                                          # 前端
-systemd-run --user --scope -p MemoryMax=1G -- /usr/local/go/bin/go test ./controller/... ./service/... ./relay/... ./common/... ./pkg/billingexpr/...
+systemd-run --user --scope -p MemoryMax=1G -- /usr/local/go/bin/go test -count=1 ./controller/... ./service/... ./relay/... ./common/... ./pkg/billingexpr/...   # 一律 -count=1，禁缓存假绿
 cd web && systemd-run --user --scope -p MemoryMax=1G -- bun run test
 ```
+
+> push 前门禁（未提交就推 = 丢修复）：`scripts/sync-gate.sh`（quick：status/gofmt/vet/locale/controller 测试）；全量三构建口径用 `scripts/sync-gate.sh --full`。红即停，不进 push/docs。
 
 > 构建只证明可编译；计费/禁用/结算路径的合并正确性由测试兜底（AGENTS.md 计费不变量有回归要求）。已知预存在失败用例需先在旧线终态复跑确认非本次回归（`git worktree add /tmp/old origin/<旧tip>` 后同命令复跑），并在同步报告中注明。
 
