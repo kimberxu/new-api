@@ -1,6 +1,6 @@
 # 定制功能清单（personal 分支）
 
-> 对应分支：`personal` 基线 `317e9ddd`（2026-09-03 刷新至 `6c8f665fd`；历史 deploy 功能部分可用 `git diff upstream/main...317e9ddd` 核对。`deploy` 分支已于 2026-09-04 删除，留档 tag `deploy-image-*` 仅历史回滚，分支拓扑见 `docs/local-github-workflow.md`）
+> 对应分支：`personal` 基线 `317e9ddd`（2026-09-05 刷新至 `661874c`；历史 deploy 功能部分可用 `git diff upstream/main...317e9ddd` 核对。`deploy` 分支已于 2026-09-04 删除，留档 tag `deploy-image-*` 仅历史回滚，分支拓扑见 `docs/local-github-workflow.md`）
 > 以下功能均为 `personal` 魔改线相对 `upstream/main` 的定制（含历史 deploy 登记）；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `317e9ddd` 的半重构。
 > 魔改提交：`f10d688f`（上游模型自动删除开关与筛选模型）→ `ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日志 t/s 计算排除 TTFT）→ `c8940a305`（模型组成员封禁悬停显示上次探测错误 + 永久封禁标识）→ `1d1034fcf`（封禁原因 tooltip 文字溢出框体）→ `0906c8354`（真实请求测活（重建模式））→ `1965f03cb`（修复真实请求测活池并发写穿）→ `604b5cdcc`（刷新三文档头部至 1965f03cb 并登记真实请求测活）→ `34f9a336c`（刷新三文档头部至 604b5cdcc 并校正构建说明）→ `c3721f95d`（RELAY_DISABLE_KEEP_ALIVE 与代理日志）→ `0fbbbf76b`（恢复 TLSInsecureSkipVerify 回归）→ `551330c09`（错误日志记录实际上游模型）→ `4638278c2`（成员封禁：last_error 持久化与永久封禁标识）→ `34f0a9a4d`（渠道测试复用 chat→responses 全局策略：测试与真实转发一致）→ `6c8f665fd`（chat→responses 出站统一：组名映射/加权/后缀全枚举）
 
@@ -672,7 +672,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 ---
 # personal 分支半重构登记（模型组路由 + 计费/Ollama/订阅/OAuth/注册移除）
 
-> 对应分支：`personal`（基于基线 `317e9ddd`，2026-09-03 刷新至 `6c8f665fd`）
+> 对应分支：`personal`（基于基线 `317e9ddd`，2026-09-05 刷新至 `661874c`）
 > 本小节登记 `personal` 相对基线 `317e9ddd` 的半重构（`git log 317e9ddd..personal` 核对）。
 > 魔改提交序列：`cfddd71b`（模型组接管路由）→ `b6925d13`（错误分级与模型级到期恢复）→ `d0f1ea52`（计费功能级移除）→ `a7e70937`（前端计费 UI 删除）→ `1ee3129d`（i18n 孤儿 key 清理）→ `6745718c`（移除 Ollama 渠道）→ `1219dfc6`（订阅后端残留清理）→ `d2c72bfe`（移除 OAuth/Passkey 登录）→ `b962fc25`（移除开放注册与 OAuth/Passkey 前端残余）→ `c99427f3`（新建模型组前端 feature）→ `c58905d9`（模型组列表工具栏）→ `5b797304`（模型组列表关键词筛选 + 排序工具栏）→ `b7419616`（GHCR 构建支持分支前缀镜像 tag）→ `9f70c191`（修复成员优先级/权重继承失效）→ `30fb8c53`（上游请求改用成员真实上游模型）→ `076db805`（移除系统设置 Billing 页残留）→ `a2473546`（模型组引用成员开放编辑）→ `66a000ae`（添加成员界面全量列表化 + 搜索）→ `8727d3ce`（勾选多选批量添加）→ `fe9cc024`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `ea91c322`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `b1d030b6`（禁用徽章悬停显示级别/原因/时间）→ `8d34b68b`（成员测试按钮 + 测试通过即解禁）→ `711a845c`（未分类错误兜底改走模型级宽容窗口）→ `55032e6b`（模型组手动组组名开放编辑）→ `7dccc6db4`（同步上游 21 提交：冲突归位 + 免费计费测试语义适配）→ `0985c75a9`（模型组折叠三角可展开 + 组内优先级排序）→ `c555a188a`（成员优先级排序逻辑提取与单测）→ `c84e1d82c`（模型组降级徽章）→ `badf2e5ee`（可配置上游默认 User-Agent）→ `acc91ab4f`（统一模型级封禁重写：渠道级自动禁用退役）→ `c3721f95d`（RELAY_DISABLE_KEEP_ALIVE 与代理日志）→ `0fbbbf76b`（恢复 TLSInsecureSkipVerify 回归）→ `551330c09`（错误日志记录实际上游模型）→ `5e413558f`（成员封禁悬停显示上次探测错误 + 永久封禁标识）→ `1d1034fcf`（封禁原因 tooltip 文字溢出框体）→ `0906c8354`（真实请求测活（重建模式））→ `1965f03cb`（修复真实请求测活池并发写穿）→ `604b5cdcc`（刷新三文档头部至 1965f03cb 并登记真实请求测活）→ `34f9a336c`（刷新三文档头部至 604b5cdcc 并校正构建说明）→ `34f0a9a4d`（渠道测试复用 chat→responses 全局策略：测试与真实转发一致）→ `6c8f665fd`（chat→responses 出站统一：组名映射/加权/后缀全枚举）
 
@@ -756,7 +756,7 @@ new-api 公共默认转发链路（`relay/channel/api_request.go` 的 `SetupApiR
 - `model/model_group_repair.go` - 一次性数据修复 `repairModelGroupItemInheritance`：成员 Priority/Weight 曾带 gorm `default:0`，GORM 对 nil 指针省列并回填 0，把「继承渠道值」（NULL）落库成显式 0 覆盖；修复去掉 tag 并把存量 0 值重置为 NULL（options 表 flag 保证只跑一次，修复后的显式 0 覆盖不受影响）
 - `model/model_group_upstream.go` - `ResolveModelGroupUpstreamModel`/`ApplyModelGroupMemberMapping`：路由名（组名）与上游模型解耦——手动组（如 ox）成员记录真实上游模型，选渠后把 `{组名: 上游模型}` 合并进该渠道 `model_mapping`，由既有 ModelMappedHelper 完成请求改写；显式渠道映射同名条目优先；内存缓存路径读 `modelGroupItemOverrides`（结构新增 model 字段），无缓存路径直接查表
 - `controller/model_group_member_probe.go` - `TestModelGroupItem` handler（成员测试端点，探测成功清任意来源模型级禁用）；配套 `model.GetModelGroupItem`（纯追加于 model_group.go）
-
+- `model/model_group_row.go` - 通道级路由收敛：`bestMemberOverride` 按有效优先级→有效权重→模型名 ASC 为每渠道选唯一 best 行（nil 指针字段继承渠道值），`resolveBestUpstream` 包装为路由复用；配套本次修复的内存缓存去重、DB 选择器通道级聚合、`ResolveModelGroupUpstreamModel` 禁用排除与确定性排序。
 **改动（挂载点/最小插入）：**
 - `model/main.go` - AutoMigrate 注册 `&ModelGroup{}`/`&ModelGroupItem{}`；`migrateDB` 挂载 `repairModelGroupItemInheritance`
 - `model/ability.go` - `GetGroupEnabledModels`/`GetEnabledModels` 数据源改模型组（/v1/models）
@@ -893,3 +893,29 @@ new-api 公共默认转发链路（`relay/channel/api_request.go` 的 `SetupApiR
 - `go vet ./controller ./relay ./relay/common ./service` 干净；`go build ./...` + `cd relaykit && GOWORK=off go build ./...` 干净
 - `go test ./controller -run TestShouldForceResponsesForTest|TestCandidateOutboundModels -count=1 -v` 6/6 通过；`go test ./relay/common ./service` 全绿
 - `POST /api/channel/test/53?model=all-text-only`（`model_mapping: {"all-text-only":"muse-spark-1.3-contributor-free"}` + `model_patterns:["muse-spark"]`）探测走 `RelayModeResponses` 直调 `/v1/responses`，与真实转发一致；`TestChannelFieldsAreClassified` 仍 `FAIL` 为基线预存在，与本改动无关
+
+## 模型组路由通道级收敛（`661874c`）
+
+同渠道多成员时内存/DB 两条选路曾分叉：内存索引按渠道去重后单权重、DB 选择器按行加权导致同渠道权重重复累加；上游解析 DB 分支缺模型级禁用排除，命中禁用成员仍会经 `SetupContextForSelectedChannel` 写回 `model_mapping`。本次按通道级语义收敛，不扩 `GetRandomSatisfiedChannel (*Channel,error)` 签名：
+
+### 文件清单
+
+**新增：**
+- `model/model_group_row.go` - `bestMemberOverride`（有效优先级→有效权重→模型名 ASC 为每渠道选唯一 best 行，nil 指针字段继承渠道值）+ `resolveBestUpstream`（路由复用包装）
+
+**改动（挂载点/最小插入）：**
+- `model/channel_cache.go` - `InitChannelCache` 加 `seenGroupModelChannel` 去重（同组名+组+渠道只 append 一次）；`effectivePriorityWith`/`effectiveWeightWith` 改调 `bestMemberOverride`（删 map 随机回退）
+- `model/model_group_select.go` - `GetRandomSatisfiedChannelFromGroups` 先按 `channelId→bestRow` 聚合（与 `bestMemberOverride` 同规则），再算最高优先级层与加权抽样；签名为 `(*Channel,string,error)`，上游直接返回 `bestRow.Model`（`GetRandomSatisfiedChannel` 保持 `(*Channel,error)` Wrapper 解包兼容）
+- `model/model_group_upstream.go` - `ResolveModelGroupUpstreamModel` DB 分支加 `NOT EXISTS channel_disabled_models` 排除 + `COALESCE(priority) DESC, COALESCE(weight) DESC, model ASC` 确定性排序；新增 `ApplyModelGroupMemberMappingWithUpstream`
+- `model/channel_satisfy.go` - `isChannelEnabledForGroupModelDB` 改查 `model_group_items JOIN model_groups JOIN channels` + `NOT EXISTS channel_disabled_models`
+- `constant/context_key.go` - `ContextKeySelectedUpstreamModel`
+- `service/channel_select.go` - 选渠后写 `ContextKeySelectedUpstreamModel`（`param != nil && param.Ctx != nil` 守卫）
+- `middleware/distributor.go` - `SetupContextForSelectedChannel` 优先 `ApplyModelGroupMemberMappingWithUpstream`，回退旧 `ApplyModelGroupMemberMapping`
+- `controller/relay.go` - `processChannelError` 优先 `relayInfo.GetUpstreamModelName()`（异步不读 gin context），回退 `ResolveModelGroupUpstreamModel`
+
+### 验证
+
+- `go1.26.1 / glebarez/sqlite v1.9.0 / postgres v1.5.9 / mysql v1.5.7`；`go vet ./model ./service` 干净
+- SQLite：`go test ./model -run 'TestGetRandomSatisfiedChannel|TestApplyModelGroupMemberMapping|TestChannelDisabledModel' -count=1` 13/13 通过（`0.054s`）
+- PostgreSQL 17.4（Supabase `db.djfnafgoszislyumucpi`，直连 IPv6，`PreferSimpleProtocol`）：一次性 `PG_ROUTING_FIX_TEST=1` 多成员用例通过后即删（未入提交）——双次 `AutoMigrate` 幂等 ok；`pg-mm` 组（9201 双成员 m-a pri8/w1 + m-b pri7/w100，9202 m-c pri7/w100，9203 m-d pri5/w100 被模型级禁用）20 次抽样全中 9201/m-a，排除 9201 级联 9202/m-c，`Resolve(9201)==m-a` 与聚合同序，亲和性 9201 true / 9203 false（`61.58s PASS`）
+- MySQL：本机无实例（`which mysql/psql/docker` 均无），阻塞未测；本次 SQL 仅标准 `COALESCE/JOIN/NOT EXISTS`，SQLite 与 PG 已验语法兼容
