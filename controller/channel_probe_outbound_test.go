@@ -105,22 +105,32 @@ func TestShouldForceResponsesForTest_OpenRouterThinkingStripped(t *testing.T) {
 	policy := model_setting.ChatCompletionsToResponsesPolicy{
 		Enabled:       true,
 		AllChannels:   true,
-		ModelPatterns: []string{`^qwen2\.5-7b-instruct$`},
+		ModelPatterns: []string{`^qwen2\.5-7b-instruct$`, `^claude-3-5-sonnet$`},
 	}
 	withTestPolicy(t, policy, func() {
+		// 7c044d7c5 BREAKING: OpenRouter generic "-thinking" alias removed.
+		// Only whitelisted families (gpt-*/o-series, claude-*, gemini-*) strip
+		// -thinking; qwen-max and similar stay opaque. So qwen2.5 on
+		// OpenRouter no longer strips and neither path should force responses.
 		ch := &model.Channel{
 			Id:           53,
 			Type:         constant.ChannelTypeOpenRouter,
 			ModelMapping: lo.ToPtr(`{"all-text-only":"qwen2.5-7b-instruct-thinking"}`),
 		}
-		require.True(t, shouldForceResponsesForTest(ch, "all-text-only"))
-		// Non-OpenRouter must NOT strip generic -thinking.
+		assert.False(t, shouldForceResponsesForTest(ch, "all-text-only"))
 		chNonOR := &model.Channel{
 			Id:           53,
 			Type:         constant.ChannelTypeOpenAI,
 			ModelMapping: lo.ToPtr(`{"all-text-only":"qwen2.5-7b-instruct-thinking"}`),
 		}
 		assert.False(t, shouldForceResponsesForTest(chNonOR, "all-text-only"))
+		// Whitelisted family still strips: claude-3-5-sonnet-thinking -> claude-3-5-sonnet on OpenRouter.
+		chWhitelisted := &model.Channel{
+			Id:           53,
+			Type:         constant.ChannelTypeOpenRouter,
+			ModelMapping: lo.ToPtr(`{"all-text-only":"claude-3-5-sonnet-thinking"}`),
+		}
+		assert.True(t, shouldForceResponsesForTest(chWhitelisted, "all-text-only"))
 	})
 }
 func TestCandidateOutboundModelsExpandsMappingChain(t *testing.T) {
