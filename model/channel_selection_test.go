@@ -187,3 +187,43 @@ func TestGetRandomSatisfiedChannelNoExcludeReturnsHighestPriority(t *testing.T) 
 		assert.Equal(t, 702, ch.Id)
 	}
 }
+
+func TestGetRandomSatisfiedChannelMultiMemberPerChannelAggregatesSingleWeight(t *testing.T) {
+	// Same channel hosts two members: m-a pri8/w1 is the best row (max
+	// priority → max weight → min model). The second member m-b pri7/w100
+	// must not cause the channel weight to be double-counted, and
+	// Resolve must return the best member's upstream (m-a).
+	orig := common.MemoryCacheEnabled
+	common.MemoryCacheEnabled = true
+	t.Cleanup(func() { common.MemoryCacheEnabled = orig })
+
+	for _, table := range []string{"channel_disabled_models", "abilities", "channels", "model_group_items", "model_groups"} {
+		require.NoError(t, DB.Exec("DELETE FROM "+table).Error)
+	}
+	pri8 := int64(8)
+	pri7 := int64(7)
+	w1 := uint(1)
+	w100 := uint(100)
+	require.NoError(t, DB.Create(&Channel{Id: 9301, Type: constant.ChannelTypeOpenAI, Key: "k", Status: common.ChannelStatusEnabled, Name: "mm-8", Models: "m-a,m-b", Group: "default", Priority: &pri8, Weight: &w1}).Error)
+	require.NoError(t, DB.Create(&Channel{Id: 9302, Type: constant.ChannelTypeOpenAI, Key: "k", Status: common.ChannelStatusEnabled, Name: "mm-7", Models: "m-c", Group: "default", Priority: &pri7, Weight: &w100}).Error)
+	group := ModelGroup{Name: "test-model", Source: GroupSourceManual, Enabled: true}
+	require.NoError(t, DB.Create(&group).Error)
+	require.NoError(t, DB.Create(&ModelGroupItem{GroupId: group.Id, ChannelId: 9301, Model: "m-a", Enabled: true, Priority: &pri8, Weight: &w1}).Error)
+	require.NoError(t, DB.Create(&ModelGroupItem{GroupId: group.Id, ChannelId: 9301, Model: "m-b", Enabled: true, Priority: &pri7, Weight: &w100}).Error)
+	require.NoError(t, DB.Create(&ModelGroupItem{GroupId: group.Id, ChannelId: 9302, Model: "m-c", Enabled: true, Priority: &pri7, Weight: &w100}).Error)
+	InitChannelCache()
+	t.Cleanup(func() {
+		DB.Exec("DELETE FROM channel_disabled_models WHERE channel_id IN (9301,9302)")
+		DB.Exec("DELETE FROM model_group_items WHERE channel_id IN (9301,9302)")
+		DB.Exec("DELETE FROM model_groups WHERE name = ?", "test-model")
+		DB.Exec("DELETE FROM channels WHERE id IN (9301,9302)")
+	})
+
+	for i := range 20 {
+		ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
+		require.NoError(t, err)
+		require.NotNil(t, ch)
+		assert.Equal(t, 9301, ch.Id, "iter %d: tier-8 exclusive, single weight must not cascade to pri7", i)
+	}
+	assert.Equal(t, "m-a", ResolveModelGroupUpstreamModel("test-model", 9301))
+}
