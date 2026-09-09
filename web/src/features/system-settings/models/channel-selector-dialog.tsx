@@ -47,9 +47,31 @@ import {
   DEFAULT_ENDPOINT,
   ENDPOINT_OPTIONS,
   MODELS_DEV_PRESET_ID,
+  MODELS_DEV_PRESET_NAME,
   OFFICIAL_CHANNEL_ID,
+  OFFICIAL_CHANNEL_NAME,
 } from './constants'
-import { getUpstreamDisplayName } from './upstream-ratio-sync-helpers'
+
+// 3 call sites below share the preset-name display mapping extracted from the
+// removed upstream ratio-sync helper module.
+function getUpstreamDisplayName(
+  sourceName: string,
+  t: (key: string) => string
+): string {
+  if (
+    sourceName === OFFICIAL_CHANNEL_NAME ||
+    sourceName === `${OFFICIAL_CHANNEL_NAME}(${OFFICIAL_CHANNEL_ID})`
+  ) {
+    return t('Official pricing preset')
+  }
+  if (
+    sourceName === MODELS_DEV_PRESET_NAME ||
+    sourceName === `${MODELS_DEV_PRESET_NAME}(${MODELS_DEV_PRESET_ID})`
+  ) {
+    return t('models.dev pricing preset')
+  }
+  return sourceName
+}
 
 type ChannelSelectorDialogProps = {
   open: boolean

@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 
-import type { BillingUsageSchema } from '@/features/pricing/types'
+import type { BillingUsageSchema } from '../usage-schema'
 
 import { UsageSchemaTable } from '../components/usage-schema-table'
 

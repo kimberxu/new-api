@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import axios from 'axios'
 
 import { api, refreshAuthentication, type RefreshOutcome } from '@/lib/api'
+import { AuthOperationError } from '@/lib/secure-verification'
+import { getServerErrorMessageKey } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
 import {
@@ -26,11 +28,14 @@ import {
   encryptPassword,
 } from './lib/password-encryption'
 import { getAffiliateCode } from './lib/storage'
+import type { TelegramAuthorization } from './lib/telegram-login'
+import type { VerificationOperation } from './secure-verification/types'
 import type {
   LoginPayload,
   LoginResponse,
   Login2FAResponse,
   TwoFAPayload,
+  RegisterPayload,
   ApiResponse,
 } from './types'
 
@@ -151,6 +156,101 @@ export async function sendPasswordResetEmail(
   return res.data
 }
 
+// ----------------------------------------------------------------------------
+// OAuth
+// ----------------------------------------------------------------------------
+
+// Start GitHub OAuth flow
+export async function githubOAuthStart(clientId: string, state: string) {
+  const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&state=${state}&scope=user:email`
+  window.open(url)
+}
+
+// Get OAuth state for CSRF protection
+export async function createOAuthAuthorization(
+  provider: string,
+  intent: 'login' | 'bind' | 'verify',
+  operation?: VerificationOperation,
+  signal?: AbortSignal,
+  proofToken?: string
+): Promise<{ state: string; authorizationUrl?: string }> {
+  const aff = intent === 'login' ? getAffiliateCode() : ''
+  const res = await api.post(
+    '/api/oauth/state',
+    {
+      provider,
+      intent,
+      aff: aff || undefined,
+      scope: operation?.scope,
+      ...(operation?.context ? { context: operation.context } : {}),
+    },
+    {
+      skipAuthRefresh: intent === 'login',
+      ...(proofToken ? { headers: { 'X-Security-Proof': proofToken } } : {}),
+      singleUseAuthorization: intent === 'bind',
+      signal,
+      skipBusinessError: true,
+      skipErrorHandler: true,
+    }
+  )
+  if (res.data?.success) {
+    if (typeof res.data.data === 'string') return { state: res.data.data }
+    if (typeof res.data.data?.flow_token === 'string') {
+      return {
+        state: res.data.data.flow_token,
+        authorizationUrl: res.data.data.authorization_url,
+      }
+    }
+  }
+  throw new AuthOperationError(
+    getServerErrorMessageKey(res.data) ||
+      res.data?.message ||
+      'Failed to initialize OAuth',
+    res.data?.code
+  )
+}
+
+export async function createOAuthFlow(
+  provider: string,
+  intent: 'login' | 'bind' | 'verify',
+  operation?: VerificationOperation,
+  signal?: AbortSignal
+): Promise<string> {
+  return (await createOAuthAuthorization(provider, intent, operation, signal))
+    .state
+}
+
+// WeChat login by authorization code
+export async function wechatLoginByCode(code: string): Promise<ApiResponse> {
+  const res = await api.get('/api/oauth/wechat', { params: { code } })
+  return res.data
+}
+
+export async function telegramLogin(
+  authorization: TelegramAuthorization
+): Promise<ApiResponse> {
+  const res = await api.get('/api/oauth/telegram/login', {
+    params: authorization,
+    disableDuplicate: true,
+    skipAuthRefresh: true,
+    skipBusinessError: true,
+    skipErrorHandler: true,
+  })
+  return res.data
+}
+
+// ----------------------------------------------------------------------------
+// Registration
+// ----------------------------------------------------------------------------
+
+// User registration
+export async function register(payload: RegisterPayload): Promise<ApiResponse> {
+  const res = await api.post(`/api/user/register`, payload, {
+    params: { turnstile: payload.turnstile ?? '' },
+  })
+  return res.data
+}
+
 // Send email verification code
 export async function sendEmailVerification(
   email: string,
@@ -159,5 +259,24 @@ export async function sendEmailVerification(
   const res = await api.get('/api/verification', {
     params: { email, turnstile },
   })
+  return res.data
+}
+
+// Confirm an authenticated, server-owned email binding flow.
+export async function bindEmail(
+  flowToken: string,
+  newCode: string,
+  oldCode = '',
+  signal?: AbortSignal
+): Promise<ApiResponse> {
+  const res = await api.post(
+    '/api/oauth/email/bind',
+    {
+      flow_token: flowToken,
+      new_code: newCode,
+      old_code: oldCode,
+    },
+    { singleUseAuthorization: true, signal }
+  )
   return res.data
 }

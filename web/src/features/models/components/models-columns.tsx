@@ -30,12 +30,6 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@/components/ui/tooltip'
-import {
-  useCanEditModelPricing,
-  type ModelPricingConfig,
-} from '@/features/model-pricing/api'
-import { modelPricingDisplay } from '@/features/model-pricing/pricing'
-import { ModelPriceCell } from '@/features/pricing/components/model-price-cell'
 import { formatTimestampToDate } from '@/lib/format'
 import { getLobeIcon } from '@/lib/lobe-icon'
 
@@ -48,22 +42,12 @@ import { DescriptionCell } from './description-cell'
 import { ModelSquareStatus } from './model-square-status'
 import { useModels } from './models-provider'
 
-export function useModelsColumns(
-  vendors: Vendor[] = [],
-  pricing?: ModelPricingConfig,
-  pricingState?: 'loading' | 'error'
-): ColumnDef<Model>[] {
+export function useModelsColumns(vendors: Vendor[] = []): ColumnDef<Model>[] {
   const { t } = useTranslation()
-  const canPrice = useCanEditModelPricing()
   const { setCurrentRow, setOpen } = useModels()
   const vendorMap = useMemo(
     () => new Map(vendors.map((vendor) => [vendor.id, vendor])),
     [vendors]
-  )
-  const priceMap = useMemo(
-    () =>
-      new Map(pricing?.entries.map((entry) => [entry.model_name, entry]) ?? []),
-    [pricing]
   )
   const rules = getNameRuleConfig(t)
   return [
@@ -143,117 +127,6 @@ export function useModelsColumns(
       },
     },
     {
-      id: 'pricing',
-      header: t('Pricing'),
-      meta: { label: t('Pricing') },
-      size: 225,
-      enableSorting: false,
-      cell: ({ row }) => {
-        if (!canPrice) {
-          return (
-            <span className='text-muted-foreground text-xs'>
-              {t('Super admin')}
-            </span>
-          )
-        }
-        if (row.original.name_rule !== 0) {
-          return (
-            <span className='text-muted-foreground text-xs'>
-              {t('Per matched model')}
-            </span>
-          )
-        }
-        if (pricingState) {
-          return (
-            <span className='text-muted-foreground text-xs'>
-              {pricingState === 'error'
-                ? t('Failed to load model pricing')
-                : t('Loading...')}
-            </span>
-          )
-        }
-        const entry = priceMap.get(row.original.model_name)
-        return (
-          <Button
-            variant='ghost'
-            className='h-auto w-full max-w-full min-w-0 justify-start px-0 py-1 text-left font-normal hover:bg-transparent'
-            aria-label={t('View pricing for {{model}}', {
-              model: row.original.model_name,
-            })}
-            onClick={() => {
-              setCurrentRow(row.original)
-              setOpen('price-model')
-            }}
-          >
-            <ModelPriceCell
-              model={modelPricingDisplay(
-                entry ?? { model_name: row.original.model_name, effective: {} }
-              )}
-              options={{ tokenUnit: 'M' }}
-              showExpression={false}
-            />
-          </Button>
-        )
-      },
-    },
-    {
-      accessorKey: 'square_state',
-      header: t('Model square visibility'),
-      size: 115,
-      enableSorting: false,
-      meta: { mobileBadge: true },
-      cell: ({ row }) => <ModelSquareStatus model={row.original} />,
-    },
-    {
-      id: 'connections',
-      header: t('Channels and groups'),
-      size: 180,
-      enableSorting: false,
-      cell: ({ row }) => {
-        const state = getModelChannelState(row.original)
-        return (
-          <div className='min-w-0 text-sm'>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <span
-                    tabIndex={0}
-                    title={t(state.description)}
-                    aria-description={t(state.description)}
-                    className='block whitespace-normal sm:truncate'
-                  />
-                }
-              >
-                {t('Channels {{channels}} · Groups {{groups}}', {
-                  channels: row.original.bound_channels?.length ?? 0,
-                  groups: row.original.enable_groups?.length ?? 0,
-                })}
-              </TooltipTrigger>
-              <TooltipContent role='tooltip'>
-                {t(state.description)}
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        )
-      },
-    },
-    {
-      accessorKey: 'tags',
-      header: t('Tags'),
-      size: 180,
-      enableSorting: false,
-      meta: { mobileHidden: true },
-      cell: ({ row }) => (
-        <BadgeListCell
-          expandable
-          max={1}
-          items={parseModelTags(row.original.tags ?? '').map((tag) => (
-            <StatusBadge key={tag} label={tag} variant='neutral' size='sm' />
-          ))}
-        />
-      ),
-    },
-    {
       accessorKey: 'sync_official',
       header: () => (
         <TruncatedCell className='max-w-[120px]'>
@@ -276,7 +149,7 @@ export function useModelsColumns(
       header: t('Actions'),
       enableSorting: false,
       enableHiding: false,
-      size: canPrice ? 170 : 105,
+      size: 105,
       cell: ({ row }) => <DataTableRowActions row={row} />,
     },
     {

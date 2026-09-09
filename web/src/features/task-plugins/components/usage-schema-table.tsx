@@ -26,8 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { taskEnumLabel } from '@/features/pricing/lib/task-price-display'
-import type { BillingUsageSchema } from '@/features/pricing/types'
+import { taskEnumLabel, type BillingUsageSchema } from '../usage-schema'
 import { resolveLocalizedText } from '@/lib/localized-text'
 
 type UsageSchemaTableProps = {

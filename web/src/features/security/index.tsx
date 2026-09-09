@@ -34,9 +34,7 @@ import { useProfile } from '@/features/profile/hooks/use-profile'
 
 import { AccessTokenCard } from './components/access-token-card'
 import { AccountActionCard } from './components/account-action-card'
-import { AccountBindings } from './components/account-bindings'
 import { LoginSessionsCard } from './components/login-sessions-card'
-import { PasskeyCard } from './components/passkey-card'
 import { PrivacyCard } from './components/privacy-card'
 import { TwoFACard } from './components/two-fa-card'
 
@@ -88,17 +86,6 @@ export function Security() {
               hasPassword={profile.has_password}
               onUpdate={refreshProfile}
             />
-            <TitledCard
-              title={t('Account Bindings')}
-              icon={<Link2 className='size-4' />}
-              headerClassName='px-3 py-2.5 !pb-2.5 sm:px-4 sm:py-2.5 sm:!pb-2.5'
-              contentClassName='p-3 sm:p-3'
-              titleClassName='text-sm sm:text-sm'
-              iconClassName='size-7 sm:size-7'
-              disableHoverEffect
-            >
-              <AccountBindings profile={profile} onUpdate={refreshProfile} />
-            </TitledCard>
           </section>
           <section aria-labelledby='security-access' className='space-y-4'>
             <h3 id='security-access' className='text-sm font-semibold'>
@@ -118,13 +105,6 @@ export function Security() {
           aria-labelledby='security-verification'
           className='min-w-0 space-y-4 sm:space-y-6 xl:sticky xl:top-0'
         >
-          <div className='space-y-3'>
-            <h3 id='security-verification' className='text-sm font-semibold'>
-              {t('Security verification')}
-            </h3>
-            <PasskeyCard loading={loading} />
-            <TwoFACard loading={loading} />
-          </div>
           <section aria-labelledby='security-privacy' className='space-y-4'>
             <h3 id='security-privacy' className='text-sm font-semibold'>
               {t('Privacy')}

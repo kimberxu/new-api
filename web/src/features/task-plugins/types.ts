@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { BillingUsageSchema } from '@/features/pricing/types'
+import type { BillingUsageSchema } from './usage-schema'
 
 export type TaskPluginProtocolClaim =
   | string
