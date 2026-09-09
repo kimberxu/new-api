@@ -9,7 +9,6 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/oauth"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 	"gorm.io/gorm"
 )
@@ -106,7 +105,7 @@ func BindVerificationOperation(operation VerificationOperation) (VerificationBin
 				return VerificationBinding{}, ErrVerificationContextInvalid
 			}
 		default:
-			if len(fields) != 1 || context.Provider == "" || len(context.Provider) > 64 || oauth.GetProvider(context.Provider) == nil {
+			if len(fields) != 1 || context.Provider == "" || len(context.Provider) > 64 || true {
 				return VerificationBinding{}, ErrVerificationContextInvalid
 			}
 		}
@@ -259,36 +258,29 @@ func GetVerificationRequirements(identity AuthIdentity, scope string) (*Verifica
 		}
 		if len(requirements.OAuthProviders) == 0 {
 			methods[i].Available, methods[i].Reason = false, "No linked OAuth provider is available."
-			if user.TelegramId != "" {
-				if err := oauth.TelegramConfigurationError(); err != nil {
-					methods[i].Reason = err.Error()
-				}
-			}
 		}
 	}
 	return requirements, nil
 }
 
+type oAuthProviderInfo interface {
+	GetName() string
+	IsEnabled() bool
+	ProviderUserIDColumn() string
+}
+
+func oAuthProviders() map[string]oAuthProviderInfo {
+	return nil
+}
+
 func verificationOAuthProviders(user *model.User) ([]VerificationOAuthProvider, error) {
-	bindings := map[int]string{}
-	if len(oauth.GetEnabledCustomProviders()) > 0 {
-		stored, err := model.GetUserOAuthBindingsByUserId(user.Id)
-		if err != nil {
-			return nil, err
-		}
-		for _, binding := range stored {
-			bindings[binding.ProviderId] = binding.ProviderUserId
-		}
-	}
 	providers := []VerificationOAuthProvider{}
-	for slug, provider := range oauth.GetAllProviders() {
+	for slug, provider := range oAuthProviders() {
 		if !provider.IsEnabled() {
 			continue
 		}
 		var userID string
-		if custom, ok := provider.(*oauth.GenericOAuthProvider); ok {
-			userID = bindings[custom.GetProviderId()]
-		} else {
+		{
 			switch provider.ProviderUserIDColumn() {
 			case "github_id":
 				userID = user.GitHubId

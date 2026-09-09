@@ -6,7 +6,6 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/oauth"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 )
 
@@ -15,16 +14,6 @@ func UnbindAccountOAuth(identity AuthIdentity, providerID int) error {
 		Password: common.PasswordLoginEnabled,
 		Passkey:  system_setting.GetPasskeySettings().Enabled,
 		WeChat:   common.WeChatAuthEnabled,
-	}
-	for _, provider := range oauth.GetAllProviders() {
-		if !provider.IsEnabled() {
-			continue
-		}
-		if custom, ok := provider.(*oauth.GenericOAuthProvider); ok {
-			enabled.CustomProviderIDs = append(enabled.CustomProviderIDs, custom.GetProviderId())
-		} else {
-			enabled.OAuthColumns = append(enabled.OAuthColumns, provider.ProviderUserIDColumn())
-		}
 	}
 	return model.UnbindUserOAuthForSession(identity, providerID, enabled)
 }
