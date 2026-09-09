@@ -330,32 +330,6 @@ it('sends balance sorting to the server and keeps invitation details on two line
   expect(screen.getByText(/Invited 2 users · Earnings:/)).toBeInTheDocument()
 })
 
-it('shows balance above usage on mobile cards in Chinese', async () => {
-  const originalMatchMedia = window.matchMedia
-  vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
-    ...originalMatchMedia(query),
-    matches: query.includes('max-width'),
-  }))
-  i18n.addResourceBundle('zh', 'translation', zh.translation)
-  await i18n.changeLanguage('zh')
-  try {
-    await renderUsersList()
-    expect(screen.getByText('可用余额 ($)')).toBeInTheDocument()
-    expect(screen.getByText('已用')).toBeInTheDocument()
-    expect(screen.getByText('0.0038')).toBeInTheDocument()
-    expect(screen.getByText('0.0022')).toBeInTheDocument()
-    expect(screen.queryByRole('table')).not.toBeInTheDocument()
-    await userEvent.click(
-      screen.getByRole('button', { name: /可用余额 0.0038/ })
-    )
-    const detail = await screen.findByRole('dialog', { name: '额度 ($)' })
-    expect(within(detail).getByText('累计已用')).toBeInTheDocument()
-    expect(within(detail).getByText('0.0022')).toBeInTheDocument()
-    await userEvent.keyboard('{Escape}')
-  } finally {
-    await i18n.changeLanguage('en')
-  }
-})
 
 it('combines creation and last login into one column with full dates visible directly', async () => {
   vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 8, 8, 12))

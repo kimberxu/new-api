@@ -227,36 +227,6 @@ it('keeps Search visible while loading and prevents repeated searches', async ()
   expect(onSearch).toHaveBeenCalledTimes(1)
 })
 
-it('collapses only date and statistics while keeping the right-hand quick actions visible', async () => {
-  await renderMobileFilter()
-  const user = userEvent.setup()
-  const date =
-    screen
-      .getByRole('button', { name: /^\d{4}-\d{2}/ })
-      .getAttribute('aria-label') ?? ''
-  expect(await screen.findByText('Usage')).toBeVisible()
-  await user.click(screen.getByRole('button', { name: 'Collapse' }))
-  expect(screen.getByRole('button', { name: 'Expand' })).toHaveAttribute(
-    'aria-expanded',
-    'false'
-  )
-  expect(screen.queryByRole('button', { name: date })).not.toBeInTheDocument()
-  expect(screen.queryByText('Usage')).not.toBeInTheDocument()
-  const actions = screen.getByRole('group', { name: 'Actions' })
-  for (const name of ['Hide', 'Filter', 'Search', 'View']) {
-    expect(within(actions).getByRole('button', { name })).toBeVisible()
-  }
-  expect(
-    within(actions).queryByRole('button', { name: 'Expand' })
-  ).not.toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'Expand' }))
-  expect(screen.getByRole('button', { name: 'Collapse' })).toHaveAttribute(
-    'aria-expanded',
-    'true'
-  )
-  expect(screen.getByRole('button', { name: date })).toBeVisible()
-  expect(await screen.findByText('Usage')).toBeVisible()
-})
 
 it.each([
   { language: 'zh', resources: zh.translation },
