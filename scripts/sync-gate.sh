@@ -53,8 +53,8 @@ if [ "$MODE" = "--full" ]; then
   pass "根模块构建通过"
   (cd relaykit && GOWORK=off "$GO" build ./...) || fail "relaykit 构建红"
   pass "relaykit 构建通过"
-  (cd web && bun run build >/dev/null) || fail "前端构建红"
-  pass "前端构建通过"
+  (cd web && bunx tsc --noEmit --pretty false) || fail "前端类型检查红（悬空引用/缺 import，rsbuild 照过也拦不住）"
+  pass "前端类型检查通过"
   "${RUN[@]}" "$GO" test -count=1 ./controller/... ./service/... ./relay/... ./common/... ./pkg/billingexpr/... \
     || fail "Go 全测试包红"
   pass "Go 全测试包通过（-count=1）"
