@@ -447,64 +447,23 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 	logger.LogError(c, fmt.Sprintf("channel error (channel #%d, status code: %d): %s", channelError.ChannelId, err.StatusCode, common.LocalLogPreview(err.Error())))
 	// 不要使用context获取渠道信息，异步处理时可能会出现渠道信息不一致的情况
 	// do not use context to get channel info, there may be inconsistent channel info when processing asynchronously
-	if channelError.AutoBan && relayInfo != nil && relayInfo.OriginModelName != "" {
-		// [personal] Channel-level errors win over model-level: balance/key
-		// problems disable the whole channel even when the message mentions
-		// the model name.
-		if service.IsChannelLevelError(err) {
-			decision := service.ShouldDisableChannelWithDecision(channelError.ChannelId, err)
-			if decision.ShouldDisable && channelError.AutoBan {
-				gopool.Go(func() {
-					service.DisableChannel(channelError, decision.Reason)
-				})
-			}
-		} else if service.IsModelLevelError(err) {
-			// [personal] The ban key must be the routing-entry model: under
-			// model-group routing the requested name is the group name, while
-			// cache exclusion and the groups page key on the member's real
-			// upstream model. Resolve it so the ban actually excludes routing.
-			banModel := relayInfo.OriginModelName
-			if upstream := model.ResolveModelGroupUpstreamModel(relayInfo.OriginModelName, channelError.ChannelId); upstream != "" {
-				banModel = upstream
-			}
-			if triggered, detail := service.CheckAndRecordDisableModel(channelError.ChannelId, banModel, err.StatusCode, true); triggered {
-				reason := fmt.Sprintf("model disabled: %s (%s)", err.ErrorWithStatusCode(), detail)
-				gopool.Go(func() {
-					_ = service.DisableChannelModel(channelError.ChannelId, banModel, reason)
-				})
-			}
-		} else if service.IsConfiguredDisableError(err) || types.IsSkipRetryError(err) {
-			// Admin-configured rules keep feeding the channel-level window;
-			// skip-retry errors are never counted at any level.
-			decision := service.ShouldDisableChannelWithDecision(channelError.ChannelId, err)
-			if decision.ShouldDisable && channelError.AutoBan {
-				gopool.Go(func() {
-					service.DisableChannel(channelError, decision.Reason)
-				})
-			}
-		} else if err.StatusCode >= 100 && err.StatusCode <= 599 {
-			// [personal] Unclassified errors fall back to MODEL-level on the
-			// lenient window: repeated generic failures (e.g. a bare upstream
-			// 404 from a wrong path) disable only the affected model instead
-			// of taking down the whole channel.
-			banModel := relayInfo.OriginModelName
-			if upstream := model.ResolveModelGroupUpstreamModel(relayInfo.OriginModelName, channelError.ChannelId); upstream != "" {
-				banModel = upstream
-			}
-			if triggered, detail := service.CheckAndRecordDisableModel(channelError.ChannelId, banModel, err.StatusCode, false); triggered {
-				reason := fmt.Sprintf("model disabled: %s (%s)", err.ErrorWithStatusCode(), detail)
-				gopool.Go(func() {
-					_ = service.DisableChannelModel(channelError.ChannelId, banModel, reason)
-				})
-			}
+	// [personal] 统一模型级封禁：任何上游错误只禁失败的模型，不牵连渠道。
+	// skip-retry 错误（本地/客户端错误：body 过大、请求解析失败、网关本地错误）
+	// 不封禁——模型无责。
+	if channelError.AutoBan && relayInfo != nil && relayInfo.OriginModelName != "" &&
+		!types.IsSkipRetryError(err) {
+		// The ban key must be the routing-entry model: under model-group
+		// routing the requested name is the group name, while cache exclusion
+		// keys on the member's real upstream model. Resolve it so the ban
+		// actually excludes routing.
+		banModel := relayInfo.OriginModelName
+		if upstream := model.ResolveModelGroupUpstreamModel(relayInfo.OriginModelName, channelError.ChannelId); upstream != "" {
+			banModel = upstream
 		}
-	} else {
-		decision := service.ShouldDisableChannelWithDecision(channelError.ChannelId, err)
-		if decision.ShouldDisable && channelError.AutoBan {
-			gopool.Go(func() {
-				service.DisableChannel(channelError, decision.Reason)
-			})
-		}
+		reason := fmt.Sprintf("model disabled: %s", err.ErrorWithStatusCode())
+		gopool.Go(func() {
+			_ = service.DisableChannelModel(channelError.ChannelId, banModel, reason, err.StatusCode)
+		})
 	}
 
 	if constant.ErrorLogEnabled && types.IsRecordErrorLog(err) {

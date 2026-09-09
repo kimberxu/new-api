@@ -960,38 +960,22 @@ type channelTestSummary struct {
 	Enabled   int `json:"enabled"`
 }
 
-func testChannelForHealthCheck(ctx context.Context, channel *model.Channel, testUserID int, allowDisable bool, disableThreshold int64) channelTestSummary {
+func testChannelForHealthCheck(ctx context.Context, channel *model.Channel, testUserID int) channelTestSummary {
 	summary := channelTestSummary{}
-	isChannelEnabled := channel.Status == common.ChannelStatusEnabled
 	tik := time.Now()
 	result := testChannel(ctx, channel, testUserID, "", "", shouldUseStreamForAutomaticChannelTest(channel))
 	milliseconds := time.Since(tik).Milliseconds()
 	if ctx.Err() != nil {
 		return summary
 	}
-
 	summary.Tested++
 
-	shouldBanChannel := false
 	newAPIError := result.newAPIError
-	if newAPIError != nil {
-		if result.modelName != "" && service.IsModelLevelError(newAPIError) {
-			if triggered, detail := service.CheckAndRecordDisableModel(channel.Id, result.modelName, newAPIError.StatusCode, true); triggered {
-				summary.Disabled++
-				_ = service.DisableChannelModel(channel.Id, result.modelName,
-					fmt.Sprintf("model disabled: %s (%s)", newAPIError.ErrorWithStatusCode(), detail))
-			}
-		} else {
-			shouldBanChannel = service.ShouldDisableChannelWithDecision(channel.Id, result.newAPIError).ShouldDisable
-		}
-	}
-
-	if common.AutomaticDisableChannelEnabled && !shouldBanChannel {
-		if milliseconds > disableThreshold {
-			err := fmt.Errorf("响应时间 %.2fs 超过阈值 %.2fs", float64(milliseconds)/1000.0, float64(disableThreshold)/1000.0)
-			newAPIError = types.NewOpenAIError(err, types.ErrorCodeChannelResponseTimeExceeded, http.StatusRequestTimeout)
-			shouldBanChannel = true
-		}
+	if newAPIError != nil && result.modelName != "" {
+		// [personal] 统一模型级封禁：测试失败只禁该模型，不区分错误类型。
+		summary.Disabled++
+		_ = service.DisableChannelModel(channel.Id, result.modelName,
+			fmt.Sprintf("model disabled: %s", newAPIError.ErrorWithStatusCode()), newAPIError.StatusCode)
 	}
 
 	if newAPIError == nil {
@@ -1000,22 +984,10 @@ func testChannelForHealthCheck(ctx context.Context, channel *model.Channel, test
 		summary.Failed++
 	}
 
-	if allowDisable && isChannelEnabled && shouldBanChannel && channel.GetAutoBan() {
-		processChannelError(result.context, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError, nil)
-		summary.Disabled++
-	}
-
-	if result.localErr == nil && !isChannelEnabled && service.ShouldEnableChannel(newAPIError, channel.Status) {
-		service.EnableChannel(channel.Id, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.Name)
-		summary.Enabled++
-	}
-
-	// model-level recovery: an automatic periodic test pass only clears
-	// auto-sourced disables (manual disables need a manual test).
+	// 周期测试通过仅清 auto 来源的模型级禁用（手动禁用留待手动测试）。
 	if result.localErr == nil && result.modelName != "" {
 		_ = service.EnableChannelModel(channel.Id, result.modelName, "auto")
 	}
-
 	channel.UpdateResponseTime(milliseconds)
 	return summary
 }
@@ -1116,20 +1088,16 @@ func runChannelTestWorkers(
 // performChannelTests runs channel health checks with the configured bounded
 // concurrency and honors cancellation when a system-task runner loses its
 // lease.
-func performChannelTests(ctx context.Context, channels []*model.Channel, testUserID int, allowDisable bool, concurrency int, report func(processed, total int)) channelTestSummary {
+func performChannelTests(ctx context.Context, channels []*model.Channel, testUserID int, concurrency int, report func(processed, total int)) channelTestSummary {
 	if ctx == nil {
 		ctx = context.Background()
-	}
-	disableThreshold := int64(common.ChannelDisableThreshold * 1000)
-	if disableThreshold == 0 {
-		disableThreshold = 10000000 // an impossible value
 	}
 	return runChannelTestWorkers(
 		ctx,
 		channels,
 		concurrency,
 		func(ctx context.Context, channel *model.Channel) channelTestSummary {
-			return testChannelForHealthCheck(ctx, channel, testUserID, allowDisable, disableThreshold)
+			return testChannelForHealthCheck(ctx, channel, testUserID)
 		},
 		report,
 	)
@@ -1156,7 +1124,6 @@ func runChannelTestTask(ctx context.Context, mode string, notify bool, report fu
 		mode = operation_setting.GetMonitorSetting().ChannelTestMode
 	}
 	selected := selectChannelsForAutomaticTest(channels, mode)
-	allowDisable := mode != operation_setting.ChannelTestModePassiveRecovery
 	// [personal] Model-level recovery: probe expired auto bans with one
 	// targeted request per model before the channel sweep. Runs on every
 	// channel_test task (scheduled and manual).
@@ -1166,7 +1133,7 @@ func runChannelTestTask(ctx context.Context, mode string, notify bool, report fu
 		}
 	}
 	concurrency := operation_setting.GetMonitorSetting().ChannelTestConcurrency
-	summary := performChannelTests(ctx, selected, testUserID, allowDisable, concurrency, report)
+	summary := performChannelTests(ctx, selected, testUserID, concurrency, report)
 	if notify && (ctx == nil || ctx.Err() == nil) {
 		service.NotifyRootUser(dto.NotifyTypeChannelTest, "通道测试完成", "所有通道测试已完成")
 	}

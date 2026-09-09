@@ -2,13 +2,11 @@ package service
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
-	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
 
 func formatNotifyType(channelId int, status int) string {
@@ -40,82 +38,6 @@ func EnableChannel(channelId int, usingKey string, channelName string) {
 		content := fmt.Sprintf("通道「%s」（#%d）已被启用", channelName, channelId)
 		NotifyRootUser(formatNotifyType(channelId, common.ChannelStatusEnabled), subject, content)
 	}
-}
-
-// DisableDecision carries the result of channel disable evaluation, including
-// whether the sliding window threshold was reached and a human-readable reason.
-type DisableDecision struct {
-	ShouldDisable bool   // true if the channel should be disabled
-	Reason        string // human-readable disable reason
-}
-
-// IsConfiguredDisableError reports whether the error matches an explicitly
-// configured channel-disable rule: a channel-error type, a status code inside
-// AutomaticDisableStatusCodeRanges, or an automatic-disable keyword.
-// processChannelError uses it to route unclassified fallback errors between
-// the channel-level and model-level windows.
-func IsConfiguredDisableError(err *types.NewAPIError) bool {
-	if err == nil {
-		return false
-	}
-	if types.IsChannelError(err) {
-		return true
-	}
-	if operation_setting.ShouldDisableByStatusCode(err.StatusCode) {
-		return true
-	}
-	matched, _ := AcSearch(strings.ToLower(err.Error()), operation_setting.AutomaticDisableKeywords, true)
-	return matched
-}
-
-// ShouldDisableChannelWithDecision evaluates whether a channel should be
-// disabled based on the error, applying sliding-window counting. The
-// channelID is used as the error identity key so that different channels are
-// counted independently.
-func ShouldDisableChannelWithDecision(channelID int, err *types.NewAPIError) DisableDecision {
-	if !common.AutomaticDisableChannelEnabled {
-		return DisableDecision{}
-	}
-	if err == nil {
-		return DisableDecision{}
-	}
-	isConfigured := false
-	reason := ""
-
-	if types.IsChannelError(err) {
-		isConfigured = true
-		reason = err.ErrorWithStatusCode()
-	} else if types.IsSkipRetryError(err) {
-		return DisableDecision{}
-	} else if IsConfiguredDisableError(err) {
-		isConfigured = true
-		reason = err.ErrorWithStatusCode()
-	}
-
-	if isConfigured {
-		if triggered, detail := CheckAndRecordDisable(channelID, err.StatusCode, true); triggered {
-			return DisableDecision{ShouldDisable: true, Reason: fmt.Sprintf("%s; %s", reason, detail)}
-		}
-		return DisableDecision{}
-	}
-
-	// Unconfigured errors: only count valid HTTP status codes (1xx-5xx).
-	if err.StatusCode < 100 || err.StatusCode > 599 {
-		return DisableDecision{}
-	}
-	if triggered, detail := CheckAndRecordDisable(channelID, err.StatusCode, false); triggered {
-		return DisableDecision{
-			ShouldDisable: true,
-			Reason:        fmt.Sprintf("channel disabled: status_code=%d (%s)", err.StatusCode, detail),
-		}
-	}
-	return DisableDecision{}
-}
-
-// ShouldDisableChannel is a backwards-compatible wrapper that returns only
-// the boolean decision. New callers should use ShouldDisableChannelWithDecision.
-func ShouldDisableChannel(channelID int, err *types.NewAPIError) bool {
-	return ShouldDisableChannelWithDecision(channelID, err).ShouldDisable
 }
 
 func ShouldEnableChannel(newAPIError *types.NewAPIError, status int) bool {

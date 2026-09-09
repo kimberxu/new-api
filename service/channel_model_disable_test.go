@@ -1,139 +1,134 @@
 package service
 
 import (
-	"errors"
-	"sync"
 	"testing"
+	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/relaykit/types"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func newModelLevelTestError(status int, msg string) *types.NewAPIError {
-	return types.NewOpenAIError(errors.New(msg), types.ErrorCodeBadResponseStatusCode, status)
+// migrateChannelDisabledModels ensures the channel_disabled_models table
+// exists (idempotent; the package TestMain AutoMigrate list does not include
+// it) and registers cleanup so tests stay isolated on the shared in-memory DB.
+func migrateChannelDisabledModels(t *testing.T) {
+	t.Helper()
+	require.NoError(t, model.DB.AutoMigrate(&model.ChannelDisabledModel{}))
+	t.Cleanup(func() {
+		model.DB.Exec("DELETE FROM channel_disabled_models")
+	})
 }
 
-func TestIsModelLevelError(t *testing.T) {
+func TestInitialBanStageForStatusCode(t *testing.T) {
 	tests := []struct {
-		name string
-		err  *types.NewAPIError
-		want bool
+		name       string
+		statusCode int
+		want       int
 	}{
-		// true: 404 with "model" in message (loose band)
-		{"404 model not found", newModelLevelTestError(404, "model not found"), true},
-		{"404 Model Not Found case-insensitive", newModelLevelTestError(404, "Model Not Found: gpt-4"), true},
-		{"404 the model does not exist", newModelLevelTestError(404, "the model does not exist"), true},
-		{"404 no model", newModelLevelTestError(404, "no model 'x' available"), true},
-		// true: 400/422 keyword match
-		{"400 invalid model", newModelLevelTestError(400, "invalid model id"), true},
-		{"422 unsupported model", newModelLevelTestError(422, "unsupported model: foo"), true},
-		{"400 model not supported", newModelLevelTestError(400, "model is not supported"), true},
-		{"400 chinese model missing", newModelLevelTestError(400, "模型不存在"), true},
-		{"400 chinese unknown model", newModelLevelTestError(400, "未知模型"), true},
-		{"400 chinese unsupported model", newModelLevelTestError(400, "不支持的模型"), true},
-		// false: non-404/400/422 status codes
-		{"500 model not found", newModelLevelTestError(500, "model not found"), false},
-		{"429 rate limited", newModelLevelTestError(429, "rate limited"), false},
-		{"502 model not found", newModelLevelTestError(502, "model not found"), false},
-		{"401 model not found", newModelLevelTestError(401, "model not found"), false},
-		// false: 400/422 without keyword
-		{"400 invalid json", newModelLevelTestError(400, "invalid json"), false},
-		{"422 bad request body", newModelLevelTestError(422, "bad request body"), false},
-		// false: 404 without the word model
-		{"404 route not found", newModelLevelTestError(404, "route not found"), false},
-		{"404 api not found", newModelLevelTestError(404, "api endpoint not found"), false},
-		// nil
-		{"nil error", nil, false},
+		{"401 starts at 16h stage", 401, 5},
+		{"200 starts at base stage", 200, 0},
+		{"403 starts at base stage", 403, 0},
+		{"500 starts at base stage", 500, 0},
+		{"404 starts at base stage", 404, 0},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, IsModelLevelError(tt.err))
+			assert.Equal(t, tt.want, initialBanStageForStatusCode(tt.statusCode))
 		})
 	}
 }
 
-// resetChannelModelDisableWindowLimiter replaces the singleton
-// InMemoryRateLimiter so each test starts with a clean store.
-func resetChannelModelDisableWindowLimiter() {
-	channelModelDisableWindowMemoryLimiterOnce = sync.Once{}
-	channelModelDisableWindowMemoryLimiter = nil
-	_ = getChannelModelDisableWindowMemoryLimiter()
+func TestDisableChannelModel_FirstBan(t *testing.T) {
+	migrateChannelDisabledModels(t)
+
+	require.NoError(t, DisableChannelModel(1, "gpt-4", "upstream boom", 200))
+
+	record, err := model.GetChannelDisabledModel(1, "gpt-4")
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	assert.Equal(t, 0, record.BanStage)
+	assert.Equal(t, "auto", record.Source)
+	assert.Equal(t, "upstream boom", record.Reason)
+	assert.WithinDuration(t, time.Now().Add(30*time.Minute), time.Unix(record.BannedUntil, 0), time.Minute)
 }
 
-// recordDisableModel wraps CheckAndRecordDisableModel for boolean assertions.
-func recordDisableModel(channelID int, modelName string, statusCode int, isConfiguredError bool) bool {
-	triggered, _ := CheckAndRecordDisableModel(channelID, modelName, statusCode, isConfiguredError)
-	return triggered
+func TestDisableChannelModel_401StartAt16h(t *testing.T) {
+	migrateChannelDisabledModels(t)
+
+	require.NoError(t, DisableChannelModel(1, "gpt-4", "invalid key", 401))
+
+	record, err := model.GetChannelDisabledModel(1, "gpt-4")
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	assert.Equal(t, 5, record.BanStage)
+	assert.WithinDuration(t, time.Now().Add(16*time.Hour), time.Unix(record.BannedUntil, 0), time.Minute)
 }
 
-func TestCheckAndRecordDisableModel_ConfiguredThreshold(t *testing.T) {
-	common.RedisEnabled = false
-	common.ConfiguredDisableThreshold = 2
-	common.ConfiguredDisableWindowSeconds = 600
-	resetChannelModelDisableWindowLimiter()
+func TestExtendChannelModelBan_StageAdvance(t *testing.T) {
+	migrateChannelDisabledModels(t)
 
-	// Default: configured threshold = 2.
-	assert.False(t, recordDisableModel(1, "gpt-4", 404, true), "first error should not trigger")
-	assert.True(t, recordDisableModel(1, "gpt-4", 404, true), "second error should trigger")
+	require.NoError(t, DisableChannelModel(2, "gpt-4", "boom", 200))
+	require.NoError(t, ExtendChannelModelBan(2, "gpt-4"))
+
+	record, err := model.GetChannelDisabledModel(2, "gpt-4")
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	assert.Equal(t, 1, record.BanStage)
+	assert.WithinDuration(t, time.Now().Add(1*time.Hour), time.Unix(record.BannedUntil, 0), time.Minute)
+
+	require.NoError(t, ExtendChannelModelBan(2, "gpt-4"))
+	record, err = model.GetChannelDisabledModel(2, "gpt-4")
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	assert.Equal(t, 2, record.BanStage)
+	assert.WithinDuration(t, time.Now().Add(2*time.Hour), time.Unix(record.BannedUntil, 0), time.Minute)
 }
 
-func TestCheckAndRecordDisableModel_ModelsIndependent(t *testing.T) {
-	common.RedisEnabled = false
-	common.ConfiguredDisableThreshold = 2
-	common.ConfiguredDisableWindowSeconds = 600
-	resetChannelModelDisableWindowLimiter()
+func TestExtendChannelModelBan_401EscalatesToPermanent(t *testing.T) {
+	migrateChannelDisabledModels(t)
 
-	// gpt-4: 1 error; gpt-4o: fresh key.
-	assert.False(t, recordDisableModel(1, "gpt-4", 404, true))
-	assert.False(t, recordDisableModel(1, "gpt-4o", 404, true), "gpt-4o first error must not trigger (key includes model)")
-	// gpt-4: 2nd error triggers — proves the two models count independently.
-	assert.True(t, recordDisableModel(1, "gpt-4", 404, true))
+	require.NoError(t, DisableChannelModel(3, "gpt-4", "invalid key", 401))
+
+	// 401 starts at stage 5 (16h); two failed recovery probes reach
+	// permanent (stage 7, BannedUntil=0).
+	require.NoError(t, ExtendChannelModelBan(3, "gpt-4"))
+	record, err := model.GetChannelDisabledModel(3, "gpt-4")
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	assert.Equal(t, 6, record.BanStage)
+	assert.WithinDuration(t, time.Now().Add(32*time.Hour), time.Unix(record.BannedUntil, 0), time.Minute)
+
+	require.NoError(t, ExtendChannelModelBan(3, "gpt-4"))
+	record, err = model.GetChannelDisabledModel(3, "gpt-4")
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	assert.Equal(t, 7, record.BanStage)
+	assert.Equal(t, int64(0), record.BannedUntil, "stage 7 must be permanent (BannedUntil=0)")
 }
 
-func TestCheckAndRecordDisableModel_DifferentStatusCodesIndependent(t *testing.T) {
-	common.RedisEnabled = false
-	common.ConfiguredDisableThreshold = 2
-	common.ConfiguredDisableWindowSeconds = 600
-	resetChannelModelDisableWindowLimiter()
+func TestExtendChannelModelBan_RecordGoneNoop(t *testing.T) {
+	migrateChannelDisabledModels(t)
 
-	// Channel 1, gpt-4, status 404 — 1 configured error.
-	assert.False(t, recordDisableModel(1, "gpt-4", 404, true))
-	// Channel 1, gpt-4, status 400 — different key, fresh.
-	assert.False(t, recordDisableModel(1, "gpt-4", 400, true))
-	// Channel 1, gpt-4, status 404 — 2nd error triggers.
-	assert.True(t, recordDisableModel(1, "gpt-4", 404, true))
+	require.NoError(t, ExtendChannelModelBan(4, "never-banned-model"))
+
+	record, err := model.GetChannelDisabledModel(4, "never-banned-model")
+	require.NoError(t, err)
+	assert.Nil(t, record)
 }
 
-func TestCheckAndRecordDisableModel_DifferentChannelsIndependent(t *testing.T) {
-	common.RedisEnabled = false
-	common.ConfiguredDisableThreshold = 2
-	common.ConfiguredDisableWindowSeconds = 600
-	resetChannelModelDisableWindowLimiter()
+func TestDisableChannelModel_RepeatedDisableRefreshesStage(t *testing.T) {
+	migrateChannelDisabledModels(t)
 
-	// Channel 1, gpt-4 — 1 error.
-	assert.False(t, recordDisableModel(1, "gpt-4", 404, true))
-	// Channel 2 — fresh key.
-	assert.False(t, recordDisableModel(2, "gpt-4", 404, true))
-	// Channel 1 — 2nd error triggers.
-	assert.True(t, recordDisableModel(1, "gpt-4", 404, true))
-}
+	require.NoError(t, DisableChannelModel(5, "gpt-4", "boom", 200))
+	// A later failure with a different status code resets the ban to that
+	// status code's initial stage (no escalation from repeat failures —
+	// escalation only happens via failed recovery probes).
+	require.NoError(t, DisableChannelModel(5, "gpt-4", "invalid key", 401))
 
-func TestCheckAndRecordDisableModel_ThresholdOne(t *testing.T) {
-	common.RedisEnabled = false
-	common.ConfiguredDisableThreshold = 1
-	common.ConfiguredDisableWindowSeconds = 600
-	resetChannelModelDisableWindowLimiter()
-
-	assert.True(t, recordDisableModel(1, "gpt-4", 404, true), "threshold=1 triggers immediately")
-}
-
-func TestCheckAndRecordDisableModel_ThresholdZero(t *testing.T) {
-	common.RedisEnabled = false
-	common.ConfiguredDisableThreshold = 0
-	common.ConfiguredDisableWindowSeconds = 600
-	resetChannelModelDisableWindowLimiter()
-
-	assert.False(t, recordDisableModel(1, "gpt-4", 404, true), "threshold=0 never disables")
+	record, err := model.GetChannelDisabledModel(5, "gpt-4")
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	assert.Equal(t, 5, record.BanStage)
+	assert.WithinDuration(t, time.Now().Add(16*time.Hour), time.Unix(record.BannedUntil, 0), time.Minute)
 }
