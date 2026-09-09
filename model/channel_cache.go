@@ -154,7 +154,7 @@ func InitChannelCache() {
 	// sort by (effective) priority
 	for group, model2channels := range newGroup2model2channels {
 		for model, channels := range model2channels {
-			sort.Slice(channels, func(i, j int) bool {
+			sort.SliceStable(channels, func(i, j int) bool {
 				return effectivePriorityWith(channels[i], model, newChannelId2channel, newModelGroupItemOverrides) >
 					effectivePriorityWith(channels[j], model, newChannelId2channel, newModelGroupItemOverrides)
 			})

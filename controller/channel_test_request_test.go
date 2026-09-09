@@ -93,18 +93,28 @@ func TestChannelTestOpenAIChatCompatibility(t *testing.T) {
 			request, ok := buildTestRequest(tt.model, tt.endpoint, &model.Channel{}, tt.stream).(*dto.GeneralOpenAIRequest)
 			require.True(t, ok)
 			encoded := convertChatCompatibilityRequest(t, request, tt.channelType, map[string]string{tt.model: tt.upstream})
-			want := map[string]any{
-				"model":      tt.upstream,
-				"messages":   []dto.Message{{Role: "user", Content: "hi"}},
-				"stream":     tt.stream,
-				tt.wantLimit: 16,
-			}
+			// personal: probe text is randomized from the question pool and
+			// max_completion_tokens is randomized within [16,64]; assert the
+			// shape (model, roles, limit key/range) instead of exact values.
+			var got map[string]any
+			require.NoError(t, common.Unmarshal(encoded, &got))
+			assert.Equal(t, tt.upstream, got["model"])
+			assert.Equal(t, tt.stream, got["stream"])
+			limit, ok := got[tt.wantLimit].(float64)
+			require.True(t, ok, "expected %s in request", tt.wantLimit)
+			assert.GreaterOrEqual(t, uint(limit), testMaxTokensRange[0])
+			assert.LessOrEqual(t, uint(limit), testMaxTokensRange[1])
+			messages, ok := got["messages"].([]any)
+			require.True(t, ok)
+			require.Len(t, messages, 1)
+			assert.Equal(t, "user", messages[0].(map[string]any)["role"])
+			msg := messages[0].(map[string]any)["content"].(string)
+			assert.Contains(t, testUserMessages, msg)
+			assert.NotContains(t, testUserMessages, "hi")
 			if tt.stream {
-				want["stream_options"] = map[string]any{"include_usage": true}
+				assert.Equal(t,
+					map[string]any{"include_usage": true}, got["stream_options"])
 			}
-			wantJSON, err := common.Marshal(want)
-			require.NoError(t, err)
-			assert.JSONEq(t, string(wantJSON), string(encoded))
 		})
 	}
 }

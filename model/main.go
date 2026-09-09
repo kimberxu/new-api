@@ -19,10 +19,12 @@ import (
 	"gorm.io/gorm"
 )
 
-var commonGroupCol string
-var commonKeyCol string
-var commonTrueVal string
-var commonFalseVal string
+// 列名默认按 SQLite/MySQL 反引号形态预置，保证测试直接 gorm.Open 而未跑
+// initCol 时 SQL 仍完整；正式初始化由 initCol() 按库型覆盖。
+var commonGroupCol = "`group`"
+var commonKeyCol = "`key`"
+var commonTrueVal = "1"
+var commonFalseVal = "0"
 
 var logKeyCol string
 var logGroupCol string
