@@ -102,6 +102,12 @@ export function useSidebarData(): SidebarData {
             configUrls: ['/usage-logs/drawing', '/usage-logs/task'],
             icon: ListTodo,
           },
+          {
+            title: t('Real-Time Connections'),
+            url: '/usage-logs/inflight',
+            icon: Activity,
+            requiredRole: ROLE.ADMIN,
+          },
         ],
       },
       {
