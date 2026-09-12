@@ -149,6 +149,14 @@ export async function getChannelDisabledModels(): Promise<{
   return res.data
 }
 
+export async function getChannelDefaultBaseURLs(): Promise<
+  Partial<Record<number, string>>
+> {
+  const res = await api.get('/api/channel/default_base_urls', channelActionConfig())
+  return res.data
+}
+}
+
 /**
  * Create new channel(s)
  * Supports single, batch, and multi-key modes

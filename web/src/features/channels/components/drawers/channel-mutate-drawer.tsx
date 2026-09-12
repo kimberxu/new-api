@@ -129,6 +129,7 @@ import {
   fetchModels,
   getAllModels,
   getChannel,
+  getChannelDefaultBaseURLs,
   getGroups,
   getPrefillGroups,
   getTaskPluginOptions,
@@ -652,6 +653,14 @@ export function ChannelMutateDrawer({
     enabled: isEditing && Boolean(channelId),
   })
 
+  // Built-in base URLs double as form placeholders; a failure only drops the hint.
+  const { data: defaultBaseURLs } = useQuery({
+    queryKey: channelsQueryKeys.defaultBaseURLs(),
+    queryFn: () => getChannelDefaultBaseURLs().catch(() => null),
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  })
+
   // Fetch available groups
   const { data: groupsData, isLoading: isLoadingGroups } = useQuery({
     queryKey: ['groups'],
@@ -691,6 +700,8 @@ export function ChannelMutateDrawer({
   const keyMode = form.watch('key_mode')
   const currentGroups = form.watch('group')
   const currentType = form.watch('type')
+  const baseUrlPlaceholder =
+    defaultBaseURLs?.data?.[currentType] || t(FIELD_PLACEHOLDERS.BASE_URL)
   const currentStatus = form.watch('status')
   const currentBaseUrl = form.watch('base_url')
   const currentTaskPluginKey = form.watch('task_plugin_key')
@@ -2469,12 +2480,7 @@ export function ChannelMutateDrawer({
                                       {t('Private Deployment URL')}
                                     </FormLabel>
                                     <FormControl>
-                                      <Input
-                                        placeholder={t(
-                                          'e.g., https://fastgpt.run/api/openapi'
-                                        )}
-                                        {...field}
-                                      />
+                                      <Input placeholder={baseUrlPlaceholder} {...field} />
                                     </FormControl>
                                     <FormDescription>
                                       {t(
@@ -2809,12 +2815,7 @@ export function ChannelMutateDrawer({
                                   <FormItem>
                                     <FormLabel>{t('API Base URL *')}</FormLabel>
                                     <FormControl>
-                                      <Input
-                                        placeholder={t(
-                                          'e.g., https://ark.cn-beijing.volces.com'
-                                        )}
-                                        {...field}
-                                      />
+                                      <Input placeholder={baseUrlPlaceholder} {...field} />
                                     </FormControl>
                                     <FormDescription>
                                       {t('Enter custom API endpoint URL')}
@@ -2861,12 +2862,7 @@ export function ChannelMutateDrawer({
                                         : t('Base URL')}
                                     </FormLabel>
                                     <FormControl>
-                                      <Input
-                                        placeholder={t(
-                                          FIELD_PLACEHOLDERS.BASE_URL
-                                        )}
-                                        {...field}
-                                      />
+                                      <Input placeholder={baseUrlPlaceholder} {...field} />
                                     </FormControl>
                                     {currentType !==
                                       CHANNEL_TYPE_TASK_PLUGIN && (
