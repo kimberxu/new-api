@@ -5189,6 +5189,12 @@
     "© 2025 Your Company. All rights reserved.": "© 2025 您的公司。保留所有權利。",
     "、": "、",
     "，": "，",
-    "，and ": "，並"
+    "，and ": "，並",
+    "Balance Query route does not support pass-through": "餘額查詢路由不支援透傳",
+    "OpenAI Models route does not support pass-through": "OpenAI 模型路由不支援透傳",
+    "Pass-through": "透傳",
+    "Pass-through help": "透傳說明",
+    "Pass-through requires native forwarding": "透傳僅支援原生轉發",
+    "Send the original request body to upstream without conversion. Only available for native forwarding routes.": "將原始請求體不經轉換直接傳送到上游。僅原生轉發路由可用。"
   }
 }

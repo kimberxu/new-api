@@ -5189,6 +5189,12 @@
     "© 2025 Your Company. All rights reserved.": "© 2025 Votre entreprise. Tous droits réservés.",
     "、": ", ",
     "，": ", ",
-    "，and ": " et "
+    "，and ": " et ",
+    "Balance Query route does not support pass-through": "La route de consultation du solde ne prend pas en charge la transmission directe",
+    "OpenAI Models route does not support pass-through": "La route Modèles OpenAI ne prend pas en charge la transmission directe",
+    "Pass-through": "Transmission directe",
+    "Pass-through help": "Aide sur la transmission directe",
+    "Pass-through requires native forwarding": "La transmission directe nécessite le transfert natif",
+    "Send the original request body to upstream without conversion. Only available for native forwarding routes.": "Envoyer le corps de la requête d'origine à l'upstream sans conversion. Disponible uniquement pour les routes en transfert natif."
   }
 }

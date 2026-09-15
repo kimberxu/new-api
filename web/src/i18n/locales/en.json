@@ -5189,6 +5189,12 @@
     "© 2025 Your Company. All rights reserved.": "© 2025 Your Company. All rights reserved.",
     "、": ", ",
     "，": ", ",
-    "，and ": ", and "
+    "，and ": ", and ",
+    "Balance Query route does not support pass-through": "Balance Query route does not support pass-through",
+    "OpenAI Models route does not support pass-through": "OpenAI Models route does not support pass-through",
+    "Pass-through": "Pass-through",
+    "Pass-through help": "Pass-through help",
+    "Pass-through requires native forwarding": "Pass-through requires native forwarding",
+    "Send the original request body to upstream without conversion. Only available for native forwarding routes.": "Send the original request body to upstream without conversion. Only available for native forwarding routes."
   }
 }

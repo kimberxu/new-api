@@ -5189,6 +5189,12 @@
     "© 2025 Your Company. All rights reserved.": "© 2025 Công ty của bạn. Mọi quyền được bảo lưu.",
     "、": ", ",
     "，": ", ",
-    "，and ": " và "
+    "，and ": " và ",
+    "Balance Query route does not support pass-through": "Tuyến truy vấn số dư không hỗ trợ truyền thẳng",
+    "OpenAI Models route does not support pass-through": "Tuyến Mô hình OpenAI không hỗ trợ truyền thẳng",
+    "Pass-through": "Truyền thẳng",
+    "Pass-through help": "Trợ giúp truyền thẳng",
+    "Pass-through requires native forwarding": "Truyền thẳng yêu cầu chuyển tiếp nguyên bản",
+    "Send the original request body to upstream without conversion. Only available for native forwarding routes.": "Gửi phần thân yêu cầu gốc lên upstream mà không chuyển đổi. Chỉ dùng được cho các tuyến chuyển tiếp nguyên bản."
   }
 }

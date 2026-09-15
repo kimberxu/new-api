@@ -155,7 +155,6 @@ export async function getChannelDefaultBaseURLs(): Promise<
   const res = await api.get('/api/channel/default_base_urls', channelActionConfig())
   return res.data
 }
-}
 
 /**
  * Create new channel(s)

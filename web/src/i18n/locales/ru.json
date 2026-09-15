@@ -5189,6 +5189,12 @@
     "© 2025 Your Company. All rights reserved.": "© 2025 Ваша Компания. Все права защищены.",
     "、": ", ",
     "，": ", ",
-    "，and ": " и "
+    "，and ": " и ",
+    "Balance Query route does not support pass-through": "Маршрут запроса баланса не поддерживает сквозную передачу",
+    "OpenAI Models route does not support pass-through": "Маршрут моделей OpenAI не поддерживает сквозную передачу",
+    "Pass-through": "Сквозная передача",
+    "Pass-through help": "Справка по сквозной передаче",
+    "Pass-through requires native forwarding": "Сквозная передача требует нативной пересылки",
+    "Send the original request body to upstream without conversion. Only available for native forwarding routes.": "Отправлять исходное тело запроса вышестоящему серверу без преобразования. Доступно только для маршрутов с нативной пересылкой."
   }
 }

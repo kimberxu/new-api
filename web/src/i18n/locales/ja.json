@@ -5189,6 +5189,12 @@
     "© 2025 Your Company. All rights reserved.": "© 2025 Your Company. 全著作権所有。",
     "、": "、",
     "，": "、",
-    "，and ": "、"
+    "，and ": "、",
+    "Balance Query route does not support pass-through": "残高照会ルートはパススルーに対応していません",
+    "OpenAI Models route does not support pass-through": "OpenAI モデルルートはパススルーに対応していません",
+    "Pass-through": "パススルー",
+    "Pass-through help": "パススルーのヘルプ",
+    "Pass-through requires native forwarding": "パススルーにはネイティブ転送が必要です",
+    "Send the original request body to upstream without conversion. Only available for native forwarding routes.": "元のリクエストボディを変換せずにアップストリームへ送信します。ネイティブ転送ルートでのみ利用できます。"
   }
 }
