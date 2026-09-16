@@ -1,6 +1,6 @@
 # 定制功能清单（personal 分支）
 
-> 对应分支：`personal` 基线 `317e9ddd`（2026-09-16 刷新至 `0c5ba81c1`；历史 deploy 功能部分可用 `git diff upstream/main...317e9ddd` 核对。`deploy` 分支已于 2026-09-04 删除，留档 tag `deploy-image-*` 仅历史回滚，分支拓扑见 `docs/local-github-workflow.md`）
+> 对应分支：`personal` 基线 `317e9ddd`（2026-09-16 刷新至 `a0110cac4`；历史 deploy 功能部分可用 `git diff upstream/main...317e9ddd` 核对。`deploy` 分支已于 2026-09-04 删除，留档 tag `deploy-image-*` 仅历史回滚，分支拓扑见 `docs/local-github-workflow.md`）
 > 以下功能均为 `personal` 魔改线相对 `upstream/main` 的定制（含历史 deploy 登记）；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `317e9ddd` 的半重构。
 > 魔改提交：`f10d688f`（上游模型自动删除开关与筛选模型）→ `ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日志 t/s 计算排除 TTFT）→ `c8940a305`（模型组成员封禁悬停显示上次探测错误 + 永久封禁标识）→ `1d1034fcf`（封禁原因 tooltip 文字溢出框体）→ `0906c8354`（真实请求测活（重建模式））→ `1965f03cb`（修复真实请求测活池并发写穿）→ `604b5cdcc`（刷新三文档头部至 1965f03cb 并登记真实请求测活）→ `34f9a336c`（刷新三文档头部至 604b5cdcc 并校正构建说明）→ `c3721f95d`（RELAY_DISABLE_KEEP_ALIVE 与代理日志）→ `0fbbbf76b`（恢复 TLSInsecureSkipVerify 回归）→ `551330c09`（错误日志记录实际上游模型）→ `4638278c2`（成员封禁：last_error 持久化与永久封禁标识）→ `34f0a9a4d`（渠道测试复用 chat→responses 全局策略：测试与真实转发一致）→ `6c8f665fd`（chat→responses 出站统一：组名映射/加权/后缀全枚举）→ `0c5ba81c1`（成员级重试排除：同渠道兄弟成员接管）
 
@@ -14,6 +14,7 @@
 - 每项魔改在总览表「扩展点形态」列登记实际形态；`内联` 形态为负债项，后续同步出现冲突时优先顺手迁移（把逻辑抽到新文件、原位置留挂载点调用）。
 - **头部与序列登记规范**：三文档头部「刷新至 `<sha>`」指本次文档刷新提交的**父提交**，即恒滞后 HEAD 一位、不追 HEAD、不自指（amend 换哈希，自指不可能）；manifest 序列尾所指哈希若被 amend 重写，按先例 `e887bf93e`/`1a1278a8f` 以新 commit 改引新哈希，该修正 commit 本身不入序列。
 - **序列行完整性**：manifest 序列行是单行长链（第 5 行 / 第 677 行），严禁中途截断。提交前用 `python3 -c "print(open('docs/request-debug-customization-manifest.md').readlines()[4].count('…'))"` 裸验为 0；用 `read:5-5:raw` 或 `grep '…'` 复核非显示截断。
+- **共享库上的临时验证测试（硬约束）**：`.env` 的 `SQL_DSN` 指向共享 Supabase 测试库，本机可能直接用它跑实例。凡用该 DSN 做一次性验证的临时用例，清理**只能按夹具 id `DELETE` 行**；**禁止 `Migrator().DropTable()` 应用自身的表**（`channels`/`model_groups`/`model_group_items`/`channel_disabled_models` 等）——2026-09-16 已发生过一次：临时 PG 用例 DropTable 四张应用表致其从共享库消失，靠重跑 `AutoMigrate` 清单才还原（该库当时无渠道数据，未造成实际损失）。需要建表验证时改用**专用临时表名**并只删该表，参照 `model/token_migration_test.go`、`model/prefill_group_migration_test.go`。
 - 例外不变：`docs/` 与 `AGENTS.md` 登记类改动不受最小化约束。
 
 ## 功能总览
@@ -673,7 +674,7 @@ new-api 的路由索引是 `abilities` 表（渠道×分组×模型），但管�
 ---
 # personal 分支半重构登记（模型组路由 + 计费/Ollama/订阅/OAuth/注册移除）
 
-> 对应分支：`personal`（基于基线 `317e9ddd`，2026-09-16 刷新至 `0c5ba81c1`）
+> 对应分支：`personal`（基于基线 `317e9ddd`，2026-09-16 刷新至 `a0110cac4`）
 > 本小节登记 `personal` 相对基线 `317e9ddd` 的半重构（`git log 317e9ddd..personal` 核对）。
 > 魔改提交序列：`cfddd71b`（模型组接管路由）→ `b6925d13`（错误分级与模型级到期恢复）→ `d0f1ea52`（计费功能级移除）→ `a7e70937`（前端计费 UI 删除）→ `1ee3129d`（i18n 孤儿 key 清理）→ `6745718c`（移除 Ollama 渠道）→ `1219dfc6`（订阅后端残留清理）→ `d2c72bfe`（移除 OAuth/Passkey 登录）→ `b962fc25`（移除开放注册与 OAuth/Passkey 前端残余）→ `c99427f3`（新建模型组前端 feature）→ `c58905d9`（模型组列表工具栏）→ `5b797304`（模型组列表关键词筛选 + 排序工具栏）→ `b7419616`（GHCR 构建支持分支前缀镜像 tag）→ `9f70c191`（修复成员优先级/权重继承失效）→ `30fb8c53`（上游请求改用成员真实上游模型）→ `076db805`（移除系统设置 Billing 页残留）→ `a2473546`（模型组引用成员开放编辑）→ `66a000ae`（添加成员界面全量列表化 + 搜索）→ `8727d3ce`（勾选多选批量添加）→ `fe9cc024`（模型级禁用键解析成员上游模型 + 模型组页封禁显示与列序调整）→ `ea91c322`（成员视图透出渠道实时状态 + 页面渠道禁用徽章）→ `b1d030b6`（禁用徽章悬停显示级别/原因/时间）→ `8d34b68b`（成员测试按钮 + 测试通过即解禁）→ `711a845c`（未分类错误兜底改走模型级宽容窗口）→ `55032e6b`（模型组手动组组名开放编辑）→ `7dccc6db4`（同步上游 21 提交：冲突归位 + 免费计费测试语义适配）→ `0985c75a9`（模型组折叠三角可展开 + 组内优先级排序）→ `c555a188a`（成员优先级排序逻辑提取与单测）→ `c84e1d82c`（模型组降级徽章）→ `badf2e5ee`（可配置上游默认 User-Agent）→ `acc91ab4f`（统一模型级封禁重写：渠道级自动禁用退役）→ `c3721f95d`（RELAY_DISABLE_KEEP_ALIVE 与代理日志）→ `0fbbbf76b`（恢复 TLSInsecureSkipVerify 回归）→ `551330c09`（错误日志记录实际上游模型）→ `5e413558f`（成员封禁悬停显示上次探测错误 + 永久封禁标识）→ `1d1034fcf`（封禁原因 tooltip 文字溢出框体）→ `0906c8354`（真实请求测活（重建模式））→ `1965f03cb`（修复真实请求测活池并发写穿）→ `604b5cdcc`（刷新三文档头部至 1965f03cb 并登记真实请求测活）→ `34f9a336c`（刷新三文档头部至 604b5cdcc 并校正构建说明）→ `34f0a9a4d`（渠道测试复用 chat→responses 全局策略：测试与真实转发一致）→ `6c8f665fd`（chat→responses 出站统一：组名映射/加权/后缀全枚举）→ `0c5ba81c1`（成员级重试排除：同渠道兄弟成员接管）
 
@@ -944,6 +945,7 @@ new-api 公共默认转发链路（`relay/channel/api_request.go` 的 `SetupApiR
 - SQLite：`go test ./model ./service -count=1` 全红转绿；`go test ./controller -run 'TestModelManagement' -count=1` 通过
 - 新用例 4 组断言（内存 + DB 回退两路一致）：`exclude=[]` → 9401/`m-a`；`exclude=[{9401,"m-a"}]` → **9401/`m-b`（兄弟成员接管）**；`exclude=[{9401,"m-a"},{9401,"m-b"}]` → 9402/`m-c`；`exclude=[{9401,""}]`（整渠道）→ 9402/`m-c`。service 层同断言：首轮 2201/`m-a`，`ExcludeChannelModel(2201,"m-a")` 后仍 2201 且上下文键为 `m-b`
 - PostgreSQL 17.4（Supabase 直连 IPv6，`PreferSimpleProtocol`）：一次性 `TEST_POSTGRES_DSN` 用例（`model/zz_tmp_member_exclude_pg_test.go`，跑完即删未入提交）——`AutoMigrate` 四表 + 同一 9401/9402 夹具，DB 回退路径 4 组断言全部通过（`29.67s PASS`）
+- **事故与修复（2026-09-16）**：该临时用例的 `t.Cleanup` 用了 `db.Migrator().DropTable(&ModelGroupItem{}, &ModelGroup{}, &ChannelDisabledModel{}, &Channel{})`，且 DSN 直接取自 `.env` 的 `SQL_DSN`（共享 Supabase 库）——**把这四张应用表整体 Drop 掉了**（`CASCADE`）。事后核查：四表已重建（按 `model/main.go` 的 `AutoMigrate` 清单跑一遍，索引 `idx_channel_model`/`idx_group_channel_model`/`idx_channels_name`/`idx_channels_tag`/`idx_model_group_items_group_id`/`idx_model_groups_name` 全部还原），表内数据原本为空（该库仅有一个 2026-08-25 初始化的 root 用户与 setup 行，无渠道/模型组数据），故**无实际数据损失**。教训：**临时 PG 用例的 DSN 若指向共享库，清理必须只删夹具行（按 id DELETE），禁止 `DropTable` 应用表**；仓库既有 PG 用例（`token_migration_test.go`/`prefill_group_migration_test.go`）的做法是专用临时表名 + 只删该表，应照此办理
 - MySQL：本机 `127.0.0.1:3306` 无监听、`.env` 无 `TEST_MYSQL_DSN`，阻塞未测；本次未新增任何 SQL，仅删掉一个 `NOT IN` 子句，剩余为标准 `JOIN/NOT EXISTS`
 
 ### 边界（有意不动）

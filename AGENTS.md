@@ -32,6 +32,7 @@ This is an AI API gateway/proxy built with Go. It aggregates 40+ upstream AI pro
 - 该 Supabase 项目同时承载 GitHub Actions 保活表 `baohuo`：本项目 AutoMigrate 只建自己的表，二者互不影响；保活查询顺带防止免费档 7 天不活跃暂停。
 - 直连域名 `db.<ref>.supabase.co:5432` 仅解析 IPv6，本机有 IPv6 可直连；无 IPv6 环境（部分 CI/公司网）改用 Session Pooler：`postgresql://postgres.<ref>:<密码>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require`。不要用 6543 端口（transaction 模式池化，prepared statement 会报错）。
 - 安全注意：Supabase 默认把 `public` schema 暴露在自动生成的 Data API（`/rest/v1/<table>`）上，且 GORM 建的表没有 RLS，anon key 可直接读写 `users`、`tokens` 等表。跑实例前先到 Dashboard → Settings → API 把 Exposed schemas 里的 `public` 移除（或禁用 Data API）。
+- **共享库临时测试清理（硬约束）**：该 DSN 指向共享测试库，可能正被用来跑实例。凡用此 DSN 做一次性验证（`TEST_POSTGRES_DSN` 等）的临时测试，清理**只能按夹具 id `DELETE` 行**；**禁止 `Migrator().DropTable()` 应用自身的表**（`channels`/`model_groups`/`model_group_items`/`channel_disabled_models` 等）——2026-09-16 已发生一次：临时 PG 用例 DropTable 四张应用表，致其从共享库消失，靠重跑 `AutoMigrate` 清单还原（当时该库无渠道数据，未造成实际数据损失）。需要建表验证时改用专用临时表名并只删该表，参照 `model/token_migration_test.go`、`model/prefill_group_migration_test.go`。
 
 ## Tech Stack
 
