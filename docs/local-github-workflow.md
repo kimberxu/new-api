@@ -1,10 +1,15 @@
 # 本地 GitHub Fork 工作流
 
-> 对应分支:`personal` 基线 `317e9ddd`(2026-09-16 刷新至 `8ef4727b9`;`personal` 线同步流程见「同步上游」节)
+> 对应分支:`personal` 基线 `317e9ddd`(2026-09-16 刷新至 `fc82ee85b`;`personal` 线流程见「同步上游」与「选择性纳入上游」两节 —— 自 2026-09-16 起主力方式为后者)
 
 ## 标准触发短语
 
-向维护助手说 **「同步上游」**(参考 `docs/local-github-workflow.md`) 即按本文档执行完整同步流程:fetch upstream → **`git rebase upstream/main personal`** 重放魔改提交 → 逐提交按「保留魔改 + 采纳上游语义」解决冲突 → 合并后验证 → force-push origin personal → 更新本文档头部标记。**默认同时同步 `main`**(merge upstream/main 后推送)。
+- **「纳入上游」**（**当前主力方式**，见「选择性纳入上游」节）：fetch upstream → 分类上游新提交 → 逐提交试投放探测冲突构成 → 只取与本线目标一致的提交 cherry-pick（`-x`）→ 三构建 + 测试验证 → 快进 personal → 登记 manifest。适合上游改动多为 bugfix/独立小功能时。
+- **「同步上游」**（应急手段，见「同步上游」节）：按完整 rebase 流程处理，仅当需要上游某个强耦合大重构（如协议层重写）时才用。本流程代价已实测不可接受（130 处冲突/48 提交），非必要不触发。
+
+两条路径可在不同轮次交替使用，互不冲突（判据见「与全量 rebase 的兼容性」）。
+
+**同步上游**触发时：向维护助手说 **「同步上游」**(参考 `docs/local-github-workflow.md`) 即按本文档执行完整同步流程:fetch upstream → **`git rebase upstream/main personal`** 重放魔改提交 → 逐提交按「保留魔改 + 采纳上游语义」解决冲突 → 合并后验证 → force-push origin personal → 更新本文档头部标记。**默认同时同步 `main`**(merge upstream/main 后推送)。
 
 可选追加：`不同步 main`（仅同步 personal）、`不更新文档`（跳过头部标记更新）、`跳过验证`（不推荐）。
 
@@ -104,6 +109,84 @@ cd web && systemd-run --user --scope -p MemoryMax=1G -- bun run test
 > push 前门禁（未提交就推 = 丢修复）：`scripts/sync-gate.sh`（quick：status/gofmt/vet/locale/controller 测试）；全量三构建口径用 `scripts/sync-gate.sh --full`。红即停，不进 push/docs。
 
 > 构建只证明可编译；计费/禁用/结算路径的合并正确性由测试兜底（AGENTS.md 计费不变量有回归要求）。已知预存在失败用例需先在旧线终态复跑确认非本次回归（`git worktree add /tmp/old origin/<旧tip>` 后同命令复跑），并在同步报告中注明。
+
+## 选择性纳入上游（2026-09-16 起主力方式）
+
+> 触发短语：**「纳入上游」**。与「同步上游」（全量 rebase）互斥选用：全量已退役为应急手段，仅在需要上游某个强耦合重构时才回退使用。
+
+### 动机（实测数据，2026-09-16 窗口 `4fc9d1f1f..upstream/main`，48 提交 / 546 文件 / +51730-10356）
+
+旧的 `git rebase upstream/main personal` 在当前的删除面下已不可持续：`git merge-tree` 模拟显示 **130 处冲突**（36 处内容冲突 + 93 处「personal 已删除、上游又改」+ 1 处重命名），其中 78/93 的修改-删除冲突落在已删功能（billing/pricing/OAuth/Passkey/订阅/wallet/redemption）上；重放 228 个魔改提交 × 逐提交解冲突的成本远高于收益。选择性纳入把「一次性大对冲」换成「按需取用 + 每次只碰一个提交」。
+
+### 分类判据（决定一个上游提交是否纳入）
+
+先 `git log --oneline --no-decorate <base>..upstream/main` 逐条分类，对每个提交看两件事：
+
+1. **改动性质**：bugfix / 功能新增 / 重构 / 仅测试 / 仅文档。重构与「带来新语义的删除」高风险，bugfix 与独立小功能低风险。
+2. **冲突构成**（探测命令见下）：把冲突文件分成
+   - `gone`：personal 已删除的文件（说明该提交属于已删功能，或不巧改到了这些文件）
+   - `real`：真正的内容冲突（需要手工解决）
+
+**纳入判据**：
+
+- `gone` 命中已删功能（billing/pricing/OAuth/Passkey/订阅/wallet/redemption/ollama）→ **不纳入**，除非该提交同时携带与本线目标一致的 relay/稳定性修复。
+- `real` 为空（纯 `gone`）→ 若与本线目标一致，纳入时直接 `git rm` 冲突文件即可；否则跳过。
+- backend-touching 且与「上游稳定性 → 下游稳定」目标一致（relay 正确性、限流、渠道适配、DB 迁移加固、插件修复）→ **纳入**。
+- 前端纯 UI 打磨（pricing 编辑器、passkey 设置页、渠道 UI 大改）→ 一般不纳入；已删功能的 UI 一律不纳入。
+- 只增测试的提交：跟随其被守护的实现一并纳入，否则跳过。
+
+### 探测命令（试投放前先量化，勿凭感觉挑）
+
+```bash
+# 1) 冲突模拟：一次看清整窗冲突构成（内容 / 修改-删除 / 重命名）
+git merge-tree --write-tree --name-only personal upstream/main | tail -n +2
+
+# 2) 逐提交试投放：OK=可干净落线，CONFLICT=需手工；并区分 gone/real
+cd /tmp/cptest && git reset --hard personal
+for h in $(git log --reverse --format=%H <base>..upstream/main); do
+  if git cherry-pick -x --no-edit "$h" >/dev/null 2>&1; then echo "OK $h"
+  else echo "CONFLICT $h"; git cherry-pick --abort; fi
+done
+```
+
+实测口径（2026-09-16 窗口）：48 提交中 **19 个可干净 cherry-pick**，29 个冲突；再剔除属于已删功能的提交后，**实际纳入 18 个**（含 1 个仅需 `git rm` 4 个已删文件的冲突提交）。19 个干净提交里 2 个（`f256e40bc` 定价表达式默认值、`25ec832fa` 定价草稿转换）虽干净落线但属于已删的定价功能面，**不纳入**——「能干净落」不等于「该纳入」，判据以功能面为准。
+
+### 执行流程
+
+```bash
+git fetch upstream
+# 在一次性工作区试投放（勿直接动 personal）
+git worktree add --detach /tmp/cptest personal
+cd /tmp/cptest
+for h in <按拓扑序排列的纳入清单>; do git cherry-pick -x --no-edit "$h"; done
+# 冲突多为「修改/删除」：git rm 掉 personal 已删的文件后 git cherry-pick --continue
+```
+
+纳入清单**按上游拓扑序（最旧优先）**排列，保证上游提交之间的依赖顺序天然成立。落地：
+
+```bash
+cd /root/workspace/new-api
+git merge --ff-only <试投放 tip>          # 试投放已跑完全量验证，直接快进
+git push origin personal                  # 推代码；纯代码/文档改动才需要 tag 触发构建
+```
+
+### 与全量 rebase 的兼容性（两法可交替）
+
+cherry-pick 用 `-x` 记录来源，patch-id 与上游原提交一致；因此**日后若做全量 `git rebase upstream/main personal`，这 18 个已纳入提交会被默认丢弃（默认 `--no-reapply-cherry-picks`），不会重复**。反之，全量 rebase 已经带入过的上游提交也无需再 cherry-pick。核对命令：
+
+```bash
+git rev-list --cherry-mark --right-only --oneline personal...upstream/main | grep -c '^='   # 已等价纳入的提交数
+git merge-base --is-ancestor upstream/main personal && echo "全量已同步" || echo "选择性纳入模式（upstream/main 非 personal 祖先）"
+```
+
+### 纳入后验证（与「合并后验证」同口径）
+
+- 三构建：根模块 / relaykit 独立模块 / 前端 `bun run build`。
+- 测试：`systemd-run --user --scope -p MemoryMax=1G -- go test -count=1 ./controller/... ./service/... ./relay/... ./common/... ./pkg/billingexpr/...` + `bun run test`。
+- **DB 改动额外要求**：凡纳入 `model/` 迁移类提交（如 `043ff99a5`、`007d69942`），按 AGENTS.md 要求跑 SQLite + PostgreSQL 两库；PG 用 `.env` 的 `SQL_DSN` 作 `TEST_POSTGRES_DSN`：
+  `set -a; source .env; set +a; TEST_POSTGRES_DSN="$SQL_DSN" go test -count=1 -run "TestMigratePrefillGroupUniquenessPostgreSQL|TestMigrationSchemaStability" -v ./model/`
+  （两测试均在事务内建独立 schema/表并回滚，不触碰共享库的应用表，符合共享库清理硬约束。）
+- 每个纳入提交登记一行到 manifest 的「选择性纳入上游」章节（上游 SHA → 本地 SHA、类别、验证）。
 
 ## 部署
 

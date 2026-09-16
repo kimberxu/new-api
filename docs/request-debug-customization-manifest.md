@@ -1,6 +1,6 @@
 # 定制功能清单（personal 分支）
 
-> 对应分支：`personal` 基线 `317e9ddd`（2026-09-16 刷新至 `8ef4727b9`；历史 deploy 功能部分可用 `git diff upstream/main...317e9ddd` 核对。`deploy` 分支已于 2026-09-04 删除，留档 tag `deploy-image-*` 仅历史回滚，分支拓扑见 `docs/local-github-workflow.md`）
+> 对应分支：`personal` 基线 `317e9ddd`（2026-09-16 刷新至 `fc82ee85b`；历史 deploy 功能部分可用 `git diff upstream/main...317e9ddd` 核对。`deploy` 分支已于 2026-09-04 删除，留档 tag `deploy-image-*` 仅历史回滚，分支拓扑见 `docs/local-github-workflow.md`。上游同步方式自 2026-09-16 起改为**选择性纳入**，见文末「选择性纳入上游」小节）
 > 以下功能均为 `personal` 魔改线相对 `upstream/main` 的定制（含历史 deploy 登记）；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `317e9ddd` 的半重构。
 > 魔改提交：`f10d688f`（上游模型自动删除开关与筛选模型）→ `ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日志 t/s 计算排除 TTFT）→ `c8940a305`（模型组成员封禁悬停显示上次探测错误 + 永久封禁标识）→ `1d1034fcf`（封禁原因 tooltip 文字溢出框体）→ `0906c8354`（真实请求测活（重建模式））→ `1965f03cb`（修复真实请求测活池并发写穿）→ `604b5cdcc`（刷新三文档头部至 1965f03cb 并登记真实请求测活）→ `34f9a336c`（刷新三文档头部至 604b5cdcc 并校正构建说明）→ `c3721f95d`（RELAY_DISABLE_KEEP_ALIVE 与代理日志）→ `0fbbbf76b`（恢复 TLSInsecureSkipVerify 回归）→ `551330c09`（错误日志记录实际上游模型）→ `4638278c2`（成员封禁：last_error 持久化与永久封禁标识）→ `34f0a9a4d`（渠道测试复用 chat→responses 全局策略：测试与真实转发一致）→ `6c8f665fd`（chat→responses 出站统一：组名映射/加权/后缀全枚举）→ `0c5ba81c1`（成员级重试排除：同渠道兄弟成员接管）
 
@@ -968,3 +968,45 @@ rebase 210 魔改提交全部重放，上游 `upstream/main` 完全包含于 HEA
 - **前端测试归位（`da06b7e0a`）**：删已删功能孤儿用例（OAuth 登录 hook、task 计费文案编辑器、log-cost 费用计数器 detail-preview/mobile-card/quota-adjustment、pricing 删除 checkbox、账号绑定页、Usage 徽章折叠、Wallet 侧栏、redemption 审计、pricing 草稿）；sidebar/setup-guide 期望适配魔改步骤集（2 步无 wallet/pricing）；`format.ts` 补上游审计 action 模板（token/access_token/user/channel.* 共 22 键）；7 locale 补齐审计与日期 preset 翻译（含 `{{operation}} (ID: {{id}})` 全半角括号差异键）；vitest 86 文件 708 用例全绿、`bun run build` 通过、i18n:sync 校验通过
 - **上游 DB 启动加固（`9a8674425`+`4fc9d1f1f`，SQLite driver 升级 + options 主键重建迁移）**：SQLite 走测试套件全绿；PostgreSQL 用 Supabase DSN 跑启动迁移验证；MySQL 本机无实例未测（本轮无 schema 变更由魔改侧引入，上游迁移在 PG 验证通过）
 - **登录后全站 500（`b2268ccc5`）**：`c4d40acef` 取上游版为底恢复 `profile-dropdown.tsx` 时漏带 `useIsSidebarModuleVisible` import（同提交 `mobile-drawer.tsx` 有带），产物 `ReferenceError` 致 `AuthenticatedLayout` 下所有已登录页走 `GeneralError` 默认 500（后端日志全 200/401/304、无 500；`tsc` 未配 gate 未拦截）。修复为单行 import 补回；教训：`bun run build` 不做全量 `tsc`，同步门禁应加 `tsc --noEmit`（`--pretty false` 落文件判码，禁管道 `head` 掩盖退出码）
+
+## 选择性纳入上游（2026-09-16 起主力方式，替代全量 rebase）
+
+> 流程与判据见 `docs/local-github-workflow.md`「选择性纳入上游」节。本小节只做登记：上游 SHA → 本地 SHA、类别、与本线目标的关联、验证。
+
+上游窗口：`4fc9d1f1f..upstream/main`（48 提交 / 546 文件 / +51730-10356，2026-09-09～2026-09-15）。冲突实测：整窗 merge 模拟 130 处冲突（36 内容 / 93 修改-删除 / 1 重命名），逐提交试投放 19 干净 / 29 冲突。**未纳入的 30 个提交**以已删功能面（billing/pricing/OAuth/Passkey/订阅/wallet/redemption/ollama 渠道 UI）与纯前端大改为主，含 2 个虽干净落线但属定价功能面的提交（`f256e40bc`、`25ec832fa`）——「能干净落」不等于「该纳入」。
+
+### 纳入清单（18 提交，按上游拓扑序）
+
+| 上游 SHA | 本地 SHA | 上游主题 | 类别 | 纳入理由 |
+|----------|----------|----------|------|----------|
+| `81336fc69` | `6516d362a` | gemini: 拒绝 `:countTokens` 走 unknown route | fix | 上游误把 countTokens 当 generateContent 转发，协议正确性 |
+| `610334dbd` | `bca516488` | 跨协议转 OpenAI chat 时请求 stream usage | fix | 上游计费数据缺失，本线虽免费但日志用量统计依赖 usage |
+| `fa90b2312` | `bc778e7cf` | gemini: thinkingLevel 大小写不敏感 + 规范 effort 日志 | fix | 上游参数解析健壮性 |
+| `d3874db61` | `a8f98e13d` | 内存限流器分配与清理优化 | feat | 本线渠道限流 RPM 依赖同一限流器；空闲 key LRU 逐出降低内存 |
+| `62f8db775` | `d32bda9ba` | DeepSeek 余额获取修复 | fix | 渠道余额查询正确性，直接服务本线多上游整合场景 |
+| `76f7dafd2` | `bfac4b31d` | audio: GetAudioDuration 扩展名大小写归一 | fix | 上游媒体元数据解析边界 |
+| `2509e25fa` | `9a377b923` | 防止 dialog autofocus 触发 combobox 下拉 | fix | 前端交互缺陷 |
+| `d92612038` | `a00eb7b8e` | 统一模型厂商识别 + Wan 图标 | fix | 厂商识别与其后 `a20574136`（Wan 协议）配套 |
+| `815217ba6` | `19b213ab9` | 稳定前端测试超时/动画竞态 | test | 降低本线前端测试假红 |
+| `d1c79d728` | `0c01e8495` | dashboard 周范围对齐 | fix | 前端统计口径 |
+| `043ff99a5` | `183b534d7` | legacy DB 约束与 scoped policy 处理 | fix | PG 遗留唯一约束按 catalog 名解析 + 授权策略降级为 deny（OWASP ASVS 5.0.0 8.2.1/8.2.2/8.3.1），DB 启动加固 |
+| `2ba615761` | `9f5ee91fb` | 移动端表格筛选折叠共享 | feat | 纯前端共享组件，零冲突 |
+| `007d69942` | `876c7a544` | prefill group 唯一索引重命名迁移 | fix | DB 迁移按定义而非对象名识别遗留唯一性，DB 启动加固 |
+| `876903a8e` | `bf04f9c55` | 修正火山方舟渠道模型列表端点路径 | fix | 渠道适配正确性 |
+| `3cea2bf79` | `e1fdb95e9` | relaykit 保留 cached input token 明细 | feat | relaykit 独立模块协议正确性 |
+| `bdef11750` | `a25f60e8a` | 恢复 advanced custom 路由 split button | fix | 高级自定义渠道 UI 缺陷 |
+| `a20574136` | `55c9901b9` | alibaba: Wan 模型协议与 usage 计费修正 | fix | Wan 渠道协议/用量正确性 |
+| `c79b74b68` | `fc82ee85b` | 去重 `/api/status` 请求 | fix | 本线后续 `a0110cac4` 曾因同步丢失侧栏实时连接入口，`/api/status` 查询集中化可减少此类前端回归面 |
+
+### 冲突处理记录
+
+- **`c79b74b68`（唯一需手工的纳入提交）**：4 处「修改/删除」冲突全部落在已删功能文件——`web/src/features/users/components/dialogs/user-binding-dialog.tsx`（账号绑定，随 OAuth/Passkey 移除而删）及其测试、`web/src/routes/pricing/{index,$modelId/index}.tsx`（定价页，随计费移除而删）。处理：`git rm` 四处已删文件后 `--continue`；其余 7 文件（`use-status.ts`/`use-system-config.ts`/`nav-modules.ts`/`status-query.ts`/`main.tsx`/`rankings`）干净落线。
+- 其余 17 个提交零冲突（`git cherry-pick` 直接成功）。
+
+### 验证
+
+- 三构建：根模块 `go build ./...`、`relaykit`（`GOWORK=off`）、前端 `bun run build`，全绿。
+- 后端测试：`go test -count=1 ./common/... ./relay/... ./service/... ./model/... ./pkg/billingexpr/...` 52 包全绿。
+- 前端测试：vitest 89 文件 / 902 用例全绿（较同步前 86/708 增加，来自 `815217ba6` 测试稳定化与 `c79b74b68` 新增 `status-query.test.tsx`）。
+- DB 改动（`043ff99a5`、`007d69942`）：SQLite + PostgreSQL 两库验证。PG 用 `.env` 的 `SQL_DSN`：`TestMigrationSchemaStability`（sqlite / postgres 分支全过，mysql SKIP）+ `TestMigratePrefillGroupUniquenessPostgreSQL` 11 个用例全过（fresh / legacy_constraint / legacy_standalone_index / renamed_constraints_and_indexes / imported_index_without_soft_delete_column / global_index_uses_target_name / global_constraint_uses_target_name / non_conflicting_indexes_are_preserved / unexpected_target_definition_rolls_back / target_name_on_other_table_rolls_back / foreign_key_dependency_rolls_back）；测试在事务内建独立 schema 并回滚，未触碰共享库应用表。
+- 兼容性：18 个提交均带 `-x` 尾注，patch-id 与上游原提交一致，`git rev-list --cherry-mark` 显示日后全量 rebase 会默认丢弃这 18 个，不产生重复。
