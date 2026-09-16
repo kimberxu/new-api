@@ -265,9 +265,12 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError, relayInfo)
 
-		// Exclude this failed channel from future retry selection within the same priority tier,
-		// so the next retry picks another channel at the same priority before cascading to lower tiers.
-		retryParam.ExcludeChannel(channel.Id)
+		// Exclude the failed (channel, member) from future retry selection within
+		// the same priority tier: sibling members of the same channel stay
+		// eligible, and only when every member of the channel is excluded does
+		// selection cascade to a lower tier. An empty member (affinity pin or
+		// locked-channel selection) falls back to whole-channel exclusion.
+		retryParam.ExcludeChannelModel(channel.Id, common.GetContextKeyString(c, constant.ContextKeySelectedUpstreamModel))
 
 		if !shouldRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry()) {
 			break
@@ -775,9 +778,12 @@ func executeTaskSubmissionWith(
 				relayInfo)
 		}
 
-		// Exclude this failed channel from future retry selection within the same priority tier,
-		// so the next retry picks another channel at the same priority before cascading to lower tiers.
-		retryParam.ExcludeChannel(channel.Id)
+		// Exclude the failed (channel, member) from future retry selection within
+		// the same priority tier: sibling members of the same channel stay
+		// eligible, and only when every member of the channel is excluded does
+		// selection cascade to a lower tier. An empty member (affinity pin or
+		// locked-channel selection) falls back to whole-channel exclusion.
+		retryParam.ExcludeChannelModel(channel.Id, common.GetContextKeyString(c, constant.ContextKeySelectedUpstreamModel))
 
 		willRetry := shouldRetryTaskRelay(c, channel.Id, taskErr, common.RetryTimes-retryParam.GetRetry())
 		diagnostics.attemptFailed(retryParam.GetRetry()+1, channel, taskErr, willRetry)

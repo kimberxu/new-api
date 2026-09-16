@@ -1,5 +1,7 @@
 package model
 
+import "maps"
+
 // [personal] Row-level routing helpers.
 //
 // A model group member is a (channel, upstream model) row. The legacy
@@ -57,6 +59,55 @@ func bestMemberOverride(channelId int, routable string, chanById map[int]*Channe
 		}
 	}
 	return best
+}
+
+// filterMemberOverrides returns a copy-on-write view of the member overrides
+// for one routable model with the excluded (channel, member) rows removed. The
+// input is returned unchanged when no exclusion matches, so a retry that
+// excludes rows of another group or model allocates nothing; untouched
+// subtrees are shared, not copied.
+func filterMemberOverrides(routable string, overrides map[string]map[string]map[int]modelGroupItemOverride, excluded map[int]map[string]bool) map[string]map[string]map[int]modelGroupItemOverride {
+	if len(excluded) == 0 {
+		return overrides
+	}
+	groupMembers, ok := overrides[routable]
+	if !ok {
+		return overrides
+	}
+	matched := false
+	for member, chanMap := range groupMembers {
+		for channelId := range chanMap {
+			if excluded[channelId][member] {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			break
+		}
+	}
+	if !matched {
+		return overrides
+	}
+	copiedMembers := make(map[string]map[int]modelGroupItemOverride, len(groupMembers))
+	for member, chanMap := range groupMembers {
+		copied := chanMap
+		for channelId := range chanMap {
+			if !excluded[channelId][member] {
+				continue
+			}
+			if len(copied) == len(chanMap) {
+				copied = make(map[int]modelGroupItemOverride, len(chanMap))
+				maps.Copy(copied, chanMap)
+			}
+			delete(copied, channelId)
+		}
+		copiedMembers[member] = copied
+	}
+	out := make(map[string]map[string]map[int]modelGroupItemOverride, len(overrides))
+	maps.Copy(out, overrides)
+	out[routable] = copiedMembers
+	return out
 }
 
 func resolveBestUpstream(channelId int, routable string, chanById map[int]*Channel, overrides map[string]map[string]map[int]modelGroupItemOverride) string {

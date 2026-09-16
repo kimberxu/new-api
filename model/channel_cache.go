@@ -200,20 +200,24 @@ func SyncChannelCache(frequency int) {
 	}
 }
 
+// GetRandomSatisfiedChannel returns the drawn channel together with the member
+// row's upstream model that was actually selected (verbatim; "" when the
+// channel owns no member row for the routable model, e.g. the normalized-model
+// fallback). Callers exclude that (channel, member) pair on failure so sibling
+// members of the same channel stay eligible.
 func GetRandomSatisfiedChannel(
 	group string,
 	model string,
 	retry int,
 	filters []dto.ChannelFilter,
-	excludeChannels []int,
-) (*Channel, error) {
+	exclude []ExcludedChannelModel,
+) (*Channel, string, error) {
 	// if memory cache is disabled, get channel directly from database.
 	// [personal] The DB fallback is driven by model groups (not abilities).
-	// It drops already-tried channels, targets the highest effective
-	// priority tier, and draws weighted within the tier.
+	// It drops already-tried (channel, member) rows, targets the highest
+	// effective priority tier, and draws weighted within the tier.
 	if !common.MemoryCacheEnabled {
-		ch, _, err := GetRandomSatisfiedChannelFromGroups(group, model, excludeChannels)
-		return ch, err
+		return GetRandomSatisfiedChannelFromGroups(group, model, exclude)
 	}
 	channelSyncLock.RLock()
 	defer channelSyncLock.RUnlock()
@@ -228,55 +232,69 @@ func GetRandomSatisfiedChannel(
 	}
 
 	if len(channels) == 0 {
-		return nil, nil
+		return nil, "", nil
 	}
 
-	// Build excluded channel id set for O(1) lookup. excludeChannels holds the
-	// ids of channels already tried in the current request's retry loop. The
-	// remaining channels are filtered to the highest priority tier, so retries
-	// re-roll within the same tier until it is exhausted; only then does the
+	// Build the exclusion sets for O(1) lookup. exclude holds the (channel,
+	// member) pairs already tried in the current request's retry loop; an empty
+	// member means the whole channel (rate-limit path). The remaining channels
+	// are filtered to the highest priority tier, so retries re-roll within the
+	// same tier — a failed member is replaced by a sibling member of the same
+	// channel — until every member of the tier is exhausted; only then does the
 	// caller (auto-groups) cascade to a lower tier or lower group.
-	excludeSet := make(map[int]bool, len(excludeChannels))
-	for _, id := range excludeChannels {
-		excludeSet[id] = true
+	excludedWhole, excludedMembers := buildExcludeSets(exclude)
+	filteredOverrides := modelGroupItemOverrides
+	if len(excludedMembers) > 0 {
+		filteredOverrides = filterMemberOverrides(model, modelGroupItemOverrides, excludedMembers)
 	}
+
 	var filteredChannels []int
 	for _, id := range channels {
-		if !excludeSet[id] {
-			filteredChannels = append(filteredChannels, id)
+		if excludedWhole[id] {
+			continue
 		}
+		// Drop a channel only when every member row it owns for this routable
+		// model is excluded. The "owns a row" precondition keeps the
+		// normalized-model fallback intact: there the rows live under the
+		// normalized group name, so a key with no rows must not drop the channel.
+		if len(excludedMembers[id]) > 0 &&
+			bestMemberOverride(id, model, channelsIDM, modelGroupItemOverrides) != nil &&
+			bestMemberOverride(id, model, channelsIDM, filteredOverrides) == nil {
+			continue
+		}
+		filteredChannels = append(filteredChannels, id)
 	}
 	channels = filteredChannels
 
 	if len(channels) == 0 {
-		return nil, nil
+		return nil, "", nil
 	}
 
 	if len(channels) == 1 {
 		if channel, ok := channelsIDM[channels[0]]; ok {
-			return channel, nil
+			return channel, memberModel(channels[0], model, channelsIDM, filteredOverrides), nil
 		}
-		return nil, fmt.Errorf("数据库一致性错误,渠道# %d 不存在,请联系管理员修复", channels[0])
+		return nil, "", fmt.Errorf("数据库一致性错误,渠道# %d 不存在,请联系管理员修复", channels[0])
 	}
 
 	// Pick the highest priority among the remaining (non-excluded) channels.
 	// retry no longer indexes into a sorted priority list: the same tier keeps
-	// being re-rolled until its channels are exhausted via excludeChannels.
+	// being re-rolled until its members are exhausted via exclude.
 	// [deploy 分支定制] 慢速渠道降级：每渠道只查询一次降级优先级，两段循环复用，
 	// 避免 Redis 模式下同一选择内的重复往返。
 	demotedPriority := make(map[int]int64, len(channels))
 	for _, channelId := range channels {
 		if _, ok := channelsIDM[channelId]; !ok {
-			return nil, fmt.Errorf("数据库一致性错误,渠道# %d 不存在,请联系管理员修复", channelId)
+			return nil, "", fmt.Errorf("数据库一致性错误,渠道# %d 不存在,请联系管理员修复", channelId)
 		}
-		if demoted, p := channelslowstream.GetDemotedPriority(channelId, model, effectivePriority(channelId, model)); demoted {
+		if demoted, p := channelslowstream.GetDemotedPriority(channelId, model, effectivePriorityWith(channelId, model, channelsIDM, filteredOverrides)); demoted {
 			demotedPriority[channelId] = p
 		}
 	}
 	highestPriority := int64(0)
 	first := true
 	for _, channelId := range channels {
-		priority := effectivePriority(channelId, model)
+		priority := effectivePriorityWith(channelId, model, channelsIDM, filteredOverrides)
 		if p, ok := demotedPriority[channelId]; ok {
 			priority = p
 		}
@@ -292,22 +310,22 @@ func GetRandomSatisfiedChannel(
 	for _, channelId := range channels {
 		if channel, ok := channelsIDM[channelId]; ok {
 			// [personal] member-level override wins, else channel priority
-			priority := effectivePriority(channelId, model)
+			priority := effectivePriorityWith(channelId, model, channelsIDM, filteredOverrides)
 			// [deploy 分支定制] 慢速渠道降级：priority 拍平（复用预计算结果）
 			if p, ok := demotedPriority[channelId]; ok {
 				priority = p
 			}
 			if priority == highestPriority {
-				sumWeight += effectiveWeight(channelId, model)
+				sumWeight += effectiveWeightWith(channelId, model, channelsIDM, filteredOverrides)
 				targetChannels = append(targetChannels, channel)
 			}
 		} else {
-			return nil, fmt.Errorf("数据库一致性错误,渠道# %d 不存在,请联系管理员修复", channelId)
+			return nil, "", fmt.Errorf("数据库一致性错误,渠道# %d 不存在,请联系管理员修复", channelId)
 		}
 	}
 
 	if len(targetChannels) == 0 {
-		return nil, errors.New(fmt.Sprintf("no channel found, group: %s, model: %s, priority: %d", group, model, highestPriority))
+		return nil, "", errors.New(fmt.Sprintf("no channel found, group: %s, model: %s, priority: %d", group, model, highestPriority))
 	}
 
 	// smoothing factor and adjustment
@@ -332,13 +350,13 @@ func GetRandomSatisfiedChannel(
 
 	// Find a channel based on its weight
 	for _, channel := range targetChannels {
-		randomWeight -= effectiveWeight(channel.Id, model)*smoothingFactor + smoothingAdjustment
+		randomWeight -= effectiveWeightWith(channel.Id, model, channelsIDM, filteredOverrides)*smoothingFactor + smoothingAdjustment
 		if randomWeight < 0 {
-			return channel, nil
+			return channel, memberModel(channel.Id, model, channelsIDM, filteredOverrides), nil
 		}
 	}
 	// return null if no channel is not found
-	return nil, errors.New("channel not found")
+	return nil, "", errors.New("channel not found")
 }
 
 // [personal] effectivePriorityWith resolves the effective routing priority for
@@ -361,12 +379,6 @@ func effectivePriorityWith(channelId int, model string, chanById map[int]*Channe
 	return 0
 }
 
-// [personal] effectivePriority is the selector-time wrapper using the live
-// global caches.
-func effectivePriority(channelId int, model string) int64 {
-	return effectivePriorityWith(channelId, model, channelsIDM, modelGroupItemOverrides)
-}
-
 // [personal] effectiveWeightWith mirrors effectivePriorityWith for weights.
 func effectiveWeightWith(channelId int, model string, chanById map[int]*Channel, overrides map[string]map[string]map[int]modelGroupItemOverride) int {
 	if best := bestMemberOverride(channelId, model, chanById, overrides); best != nil {
@@ -382,10 +394,6 @@ func effectiveWeightWith(channelId int, model string, chanById map[int]*Channel,
 		return ch.GetWeight()
 	}
 	return 0
-}
-
-func effectiveWeight(channelId int, model string) int {
-	return effectiveWeightWith(channelId, model, channelsIDM, modelGroupItemOverrides)
 }
 
 // [personal] GetModelGroupParamOverride returns the parsed group-level param

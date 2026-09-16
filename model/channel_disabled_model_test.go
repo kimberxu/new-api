@@ -71,14 +71,14 @@ func TestChannelDisabledModel_CachePathExcludesModel(t *testing.T) {
 	InitChannelCache()
 
 	// The disabled (channel, model) pair must not be in the routing index.
-	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
+	ch, _, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
 	require.NoError(t, err)
 	assert.Nil(t, ch, "cache path must exclude a model-level disabled channel")
 
 	// Re-enable -> back in the index.
 	require.NoError(t, EnableChannelModelDisabled(502, "test-model", ""))
 	InitChannelCache()
-	ch, err = GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
+	ch, _, err = GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	assert.Equal(t, 502, ch.Id)

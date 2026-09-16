@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"math/rand/v2"
+	"slices"
 
 	"github.com/QuantumNous/new-api/common"
 	channelslowstream "github.com/QuantumNous/new-api/pkg/channel_slowstream"
@@ -44,11 +45,12 @@ func (r selectRow) weight() int {
 // table. Members with the highest effective priority —
 // COALESCE(member.priority, channel.priority) — are picked, and within that
 // tier a member is drawn weighted by COALESCE(member.weight, channel.weight).
-// Excluded channels (already tried in the retry loop) are dropped before the
-// tier computation. `group` is the channel group field, `model` the routable
-// model name (= model group name). Returns the selected channel and its
-// best-member upstream model ("" when no rewrite is needed).
-func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChannels []int) (*Channel, string, error) {
+// Excluded (channel, member) rows (already tried in the retry loop, or whole
+// channels when the member is empty) are dropped before the tier computation.
+// `group` is the channel group field, `model` the routable model name (= model
+// group name). Returns the selected channel and the drawn member's upstream
+// model, verbatim.
+func GetRandomSatisfiedChannelFromGroups(group string, model string, exclude []ExcludedChannelModel) (*Channel, string, error) {
 	q := DB.Table("model_group_items").
 		Select("model_group_items.channel_id as channel_id, model_group_items.model as model, "+
 			"model_group_items.priority as item_priority, model_group_items.weight as item_weight, "+
@@ -57,9 +59,6 @@ func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChan
 		Joins("JOIN channels ON model_group_items.channel_id = channels.id").
 		Where("model_groups.name = ? AND model_groups.enabled = ? AND model_group_items.enabled = ? AND channels.status = ? AND channels."+commonGroupCol+" = ?",
 			model, true, true, common.ChannelStatusEnabled, group)
-	if len(excludeChannels) > 0 {
-		q = q.Where("model_group_items.channel_id NOT IN ?", excludeChannels)
-	}
 	// Exclude (channel, model) pairs that are model-level disabled. The
 	// subquery is dialect-neutral (SQLite/MySQL/PostgreSQL).
 	q = q.Where("NOT EXISTS (SELECT 1 FROM channel_disabled_models WHERE channel_id = model_group_items.channel_id AND model = model_group_items.model)")
@@ -67,6 +66,16 @@ func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChan
 	var rows []selectRow
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, "", err
+	}
+	// Retry exclusions are applied in Go, not SQL: they carry a member model
+	// alongside the channel id, and keeping the filter out of the WHERE clause
+	// avoids a dialect-specific row-value comparison. The query already loads
+	// every row.
+	if len(exclude) > 0 {
+		excludedWhole, excludedMembers := buildExcludeSets(exclude)
+		rows = slices.DeleteFunc(rows, func(r selectRow) bool {
+			return excludedWhole[r.ChannelId] || excludedMembers[r.ChannelId][r.Model]
+		})
 	}
 	if len(rows) == 0 {
 		return nil, "", nil
@@ -154,9 +163,7 @@ func GetRandomSatisfiedChannelFromGroups(group string, model string, excludeChan
 	if err != nil {
 		return nil, "", err
 	}
-	upstream := picked.model
-	if upstream == model {
-		upstream = ""
-	}
-	return ch, upstream, nil
+	// The drawn member is returned verbatim (even when it equals the routable
+	// name) so the retry loop can exclude exactly this (channel, member) pair.
+	return ch, picked.model, nil
 }

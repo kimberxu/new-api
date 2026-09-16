@@ -80,7 +80,7 @@ func TestGetRandomSatisfiedChannelSamePriorityTierReRoll(t *testing.T) {
 	InitChannelCache()
 
 	// Exclude channel 301 -> should still get p3 (302)
-	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, []int{301})
+	ch, _, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, []ExcludedChannelModel{{ChannelId: 301}})
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	assert.Equal(t, 302, ch.Id, "should return the remaining p3 channel, not cascade to p2")
@@ -107,7 +107,7 @@ func TestGetRandomSatisfiedChannelPriorityCascadeOnTierExhausted(t *testing.T) {
 	InitChannelCache()
 
 	// Exclude all p3 channels -> should cascade to p2
-	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, []int{401, 402})
+	ch, _, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, []ExcludedChannelModel{{ChannelId: 401}, {ChannelId: 402}})
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	assert.Equal(t, int64(2), *ch.Priority, "should cascade to priority 2 when all p3 channels are excluded")
@@ -130,7 +130,7 @@ func TestGetRandomSatisfiedChannelAllExcludedReturnsNil(t *testing.T) {
 	InitChannelCache()
 
 	// Exclude all channels -> should return nil, nil
-	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, []int{501, 502})
+	ch, _, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, []ExcludedChannelModel{{ChannelId: 501}, {ChannelId: 502}})
 	require.NoError(t, err)
 	assert.Nil(t, ch, "should return nil when all channels are excluded")
 }
@@ -153,7 +153,7 @@ func TestGetRandomSatisfiedChannelCascadeAcrossThreeTiers(t *testing.T) {
 	InitChannelCache()
 
 	// Exclude p3 and p2
-	ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, []int{601, 602})
+	ch, _, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, []ExcludedChannelModel{{ChannelId: 601}, {ChannelId: 602}})
 	require.NoError(t, err)
 	require.NotNil(t, ch)
 	assert.Equal(t, 603, ch.Id, "should cascade to priority 1")
@@ -180,7 +180,7 @@ func TestGetRandomSatisfiedChannelNoExcludeReturnsHighestPriority(t *testing.T) 
 
 	// Multiple calls should all return a priority 4 channel
 	for i := range 10 {
-		ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
+		ch, _, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, ch)
 		assert.Equal(t, int64(4), *ch.Priority, "iteration %d: should always return highest priority with no exclusions", i)
@@ -220,10 +220,70 @@ func TestGetRandomSatisfiedChannelMultiMemberPerChannelAggregatesSingleWeight(t 
 	})
 
 	for i := range 20 {
-		ch, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
+		ch, member, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, ch)
 		assert.Equal(t, 9301, ch.Id, "iter %d: tier-8 exclusive, single weight must not cascade to pri7", i)
+		// The drawn member is the best row of the channel (m-a pri8/w1).
+		assert.Equal(t, "m-a", member, "iter %d: the selector must report the drawn member", i)
 	}
 	assert.Equal(t, "m-a", ResolveModelGroupUpstreamModel("test-model", 9301))
+}
+func TestGetRandomSatisfiedChannelMemberLevelExclusion(t *testing.T) {
+	// Channel 9401 hosts two members (m-a pri5, m-b pri4); channel 9402 hosts
+	// one (m-c pri1). A failure of 9401/m-a must hand the request over to the
+	// sibling member m-b instead of cascading to the lower tier channel 9402.
+	for _, tc := range []struct {
+		name   string
+		memory bool
+	}{{"memory", true}, {"db-fallback", false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			orig := common.MemoryCacheEnabled
+			common.MemoryCacheEnabled = tc.memory
+			t.Cleanup(func() { common.MemoryCacheEnabled = orig })
+
+			pri5 := int64(5)
+			pri4 := int64(4)
+			pri1 := int64(1)
+			w100 := uint(100)
+			for _, table := range []string{"channel_disabled_models", "abilities", "channels", "model_group_items", "model_groups"} {
+				require.NoError(t, DB.Exec("DELETE FROM "+table).Error)
+			}
+			require.NoError(t, DB.Create(&Channel{Id: 9401, Type: constant.ChannelTypeOpenAI, Key: "k", Status: common.ChannelStatusEnabled, Name: "mm-a-b", Models: "m-a,m-b", Group: "default", Priority: &pri5, Weight: &w100}).Error)
+			require.NoError(t, DB.Create(&Channel{Id: 9402, Type: constant.ChannelTypeOpenAI, Key: "k", Status: common.ChannelStatusEnabled, Name: "mm-c", Models: "m-c", Group: "default", Priority: &pri1, Weight: &w100}).Error)
+			group := ModelGroup{Name: "test-model", Source: GroupSourceManual, Enabled: true}
+			require.NoError(t, DB.Create(&group).Error)
+			require.NoError(t, DB.Create(&ModelGroupItem{GroupId: group.Id, ChannelId: 9401, Model: "m-a", Enabled: true, Priority: &pri5, Weight: &w100}).Error)
+			require.NoError(t, DB.Create(&ModelGroupItem{GroupId: group.Id, ChannelId: 9401, Model: "m-b", Enabled: true, Priority: &pri4, Weight: &w100}).Error)
+			require.NoError(t, DB.Create(&ModelGroupItem{GroupId: group.Id, ChannelId: 9402, Model: "m-c", Enabled: true, Priority: &pri1, Weight: &w100}).Error)
+			if tc.memory {
+				InitChannelCache()
+			}
+			t.Cleanup(func() {
+				DB.Exec("DELETE FROM channel_disabled_models WHERE channel_id IN (9401,9402)")
+				DB.Exec("DELETE FROM model_group_items WHERE channel_id IN (9401,9402)")
+				DB.Exec("DELETE FROM model_groups WHERE name = ?", "test-model")
+				DB.Exec("DELETE FROM channels WHERE id IN (9401,9402)")
+			})
+
+			cases := []struct {
+				name    string
+				exclude []ExcludedChannelModel
+				wantID  int
+				wantMem string
+			}{
+				{"fresh", nil, 9401, "m-a"},
+				{"sibling-takeover", []ExcludedChannelModel{{ChannelId: 9401, Model: "m-a"}}, 9401, "m-b"},
+				{"all-members-excluded", []ExcludedChannelModel{{ChannelId: 9401, Model: "m-a"}, {ChannelId: 9401, Model: "m-b"}}, 9402, "m-c"},
+				{"whole-channel", []ExcludedChannelModel{{ChannelId: 9401}}, 9402, "m-c"},
+			}
+			for _, c := range cases {
+				ch, member, err := GetRandomSatisfiedChannel("default", "test-model", 0, nil, c.exclude)
+				require.NoError(t, err)
+				require.NotNil(t, ch, c.name)
+				assert.Equal(t, c.wantID, ch.Id, "%s: channel", c.name)
+				assert.Equal(t, c.wantMem, member, "%s: member", c.name)
+			}
+		})
+	}
 }

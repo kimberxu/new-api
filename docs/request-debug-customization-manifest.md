@@ -23,6 +23,7 @@
 | 请求调试日志 | `ee6da30d` | 中（`controller/relay.go`、`relay/common/relay_info.go`） | `挂载点`+`独立文件`（核心在 relay/common/request_debug.go，relay.go 为挂载点） | 否 |
 | 日志自动清理 | `ee6da30d` | 低 | `挂载点`+`独立文件`（service/system_task.go 任务注册挂载） | 否 |
 | 同优先级渠道重试 | `ee6da30d` | 中（`controller/relay.go`） | `内联`（controller/relay.go 内）→ 待迁移 | 待观察（upstream `fix/tiered-retry-billing-followups` 主题相邻；上游合并后审查能否退役本地版） |
+| 成员级重试排除（同渠道兄弟成员接管） | 待补（提交 B 刷新） | 中（`controller/relay.go`、`model/channel_cache.go`、`model/model_group_select.go`、`service/channel_select.go`） | `独立文件`（model/channel_exclude.go）+ `挂载点`（channel_cache.go/model_group_select.go/channel_select.go/relay.go） | 否 |
 | 504/524 超时重试开关与自动禁用 | `bf00be83` | 中（`controller/relay.go`、`setting/operation_setting/status_code_ranges.go`、系统设置前端） | `挂载点`（relay.go 接入点 + status_code_ranges.go 独立） | 否 |
 | 流式结束原因分类与中断流语义 | `e033cc91` | 中（`relay/common/stream_status.go`、`relay/channel/openai/relay-openai.go`、`service/log_info_generate.go`） | `挂载点`（stream_status.go 新文件 + relay-openai.go 接入） | 否 |
 | 实时连接追踪 | `6ff43dbc`、`3958b068`、`e8078e55` | 中（`controller/relay.go`、`router/api-router.go`、`service/inflight_tracker.go`） | `独立文件`（service/inflight_tracker.go）+ `挂载点`（relay.go） | 否 |
@@ -183,8 +184,8 @@ Secret keys: `authorization`, `api_key`, `apikey`, `access_token`, `refresh_toke
 
 ### 文件清单
 
-- `service/channel_select.go` - `RetryParam` 新增 `ExcludeChannels` 和 `ExcludeChannel()`;auto-group 循环按排除集合驱动的层内重选与切组
-- `model/channel_cache.go` - 排除驱动选择:过滤 `ExcludeChannels` 后在剩余渠道中取最高优先级层,层内加权随机;该层耗尽才级联到低优先级
+- `service/channel_select.go` - `RetryParam` 新增 `ExcludeChannels` 和 `ExcludeChannel()`;auto-group 循环按排除集合驱动的层内重选与切组（2026-09 升级为成员级排除 `ExcludeChannelModel`，见半重构登记）
+- `model/channel_cache.go` - 排除驱动选择:过滤 `ExcludeChannels` 后在剩余渠道中取最高优先级层,层内加权随机;该层耗尽才级联到低优先级（同步骤升级为按 `(渠道, 成员)` 行过滤，同渠道兄弟成员先接管）
 - `model/ability.go` - 非内存缓存(DB)回退路径始终选择最高优先级渠道(`MAX(priority)` 子查询)
 - `controller/relay.go` - 请求失败后调用 `retryParam.ExcludeChannel(channel.Id)`;全渠道均被限流时返回 429
 
@@ -919,6 +920,37 @@ new-api 公共默认转发链路（`relay/channel/api_request.go` 的 `SetupApiR
 - SQLite：`go test ./model -run 'TestGetRandomSatisfiedChannel|TestApplyModelGroupMemberMapping|TestChannelDisabledModel' -count=1` 13/13 通过（`0.054s`）
 - PostgreSQL 17.4（Supabase `db.djfnafgoszislyumucpi`，直连 IPv6，`PreferSimpleProtocol`）：一次性 `PG_ROUTING_FIX_TEST=1` 多成员用例通过后即删（未入提交）——双次 `AutoMigrate` 幂等 ok；`pg-mm` 组（9201 双成员 m-a pri8/w1 + m-b pri7/w100，9202 m-c pri7/w100，9203 m-d pri5/w100 被模型级禁用）20 次抽样全中 9201/m-a，排除 9201 级联 9202/m-c，`Resolve(9201)==m-a` 与聚合同序，亲和性 9201 true / 9203 false（`61.58s PASS`）
 - MySQL：本机无实例（`which mysql/psql/docker` 均无），阻塞未测；本次 SQL 仅标准 `COALESCE/JOIN/NOT EXISTS`，SQLite 与 PG 已验语法兼容
+
+## 重试排除渠道级→成员级（同渠道兄弟成员接管）
+
+重试排除曾以整渠道为粒度：`(9401, "m-a")` 失败后排除整个渠道 9401，同渠道的兄弟成员 `m-b` 被一并丢弃，直接级联到低优先级渠道。本次把排除粒度对齐失败粒度——失败属于 `(渠道, 成员)` 行，排除后由同渠道兄弟成员接替，只有该层全部成员被排除才降级。
+
+### 文件清单
+
+**新增：**
+- `model/channel_exclude.go` - `ExcludedChannelModel{ChannelId, Model}`（`Model==""` 表示整渠道）+ `buildExcludeSets`（拆整渠道集合与成员集合，O(1) 查表）+ `memberModel`（取通道剩余 best 成员的上游模型，verbatim）
+
+**改动（挂载点/最小插入）：**
+- `model/model_group_row.go` - 新增 `filterMemberOverrides`：对某一 routable 模型做 copy-on-write 视图，剔除被排除的 `(渠道, 成员)` 行；无命中直接返回入参（无重试路径零分配），未触碰的子树共享不复制
+- `model/channel_cache.go` - `GetRandomSatisfiedChannel` 签名 `excludeChannels []int` → `exclude []ExcludedChannelModel`、返回 `(*Channel, string, error)`（第二返回值 = 实际抽中的成员模型，verbatim，不做 `==""` 归零，否则重试会重复排除同一成员而空转）；候选过滤：整渠道集合直接跳过，成员全被排除的渠道剔除（`bestMemberOverride` 原视图非 nil 且过滤视图为 nil 才剔除，保住 normalized-model 回退分支）；tier/weight/best 全部改走 `effectivePriorityWith`/`effectiveWeightWith` + 过滤视图；删除仅本文件使用的 `effectivePriority`/`effectiveWeight` 包装
+- `model/model_group_select.go` - `GetRandomSatisfiedChannelFromGroups` 签名同步；删除 `model_group_items.channel_id NOT IN ?` 子句，改 Go 侧 `slices.DeleteFunc` 丢弃被排除行（零新增方言依赖，查询本就取全量行）；末尾 `if upstream == model { upstream = "" }` 改为 verbatim 返回
+- `service/channel_select.go` - `RetryParam.ExcludeChannels []int` → `ExcludeChannelModels []model.ExcludedChannelModel`；保留 `ExcludeChannel(id)`（写 `Model==""`，限流用），新增 `ExcludeChannelModel(channelId, upstreamModel)`（失败用）；`ContextKeySelectedUpstreamModel` 改为**直写选择器返回的成员**（不再调 `ResolveModelGroupUpstreamModel` 重解析——重解析不感知排除，会把刚排除的成员再解析回来），无条件写（含空串）以清掉上一轮陈旧值
+- `controller/relay.go` - API 失败与 task 失败两处 `ExcludeChannel(channel.Id)` → `ExcludeChannelModel(channel.Id, common.GetContextKeyString(c, constant.ContextKeySelectedUpstreamModel))`；渠道 RPM 限流处保持整渠道排除（RPM 是渠道属性，与成员无关）
+- 测试：`model/channel_selection_test.go`（新增 `TestGetRandomSatisfiedChannelMemberLevelExclusion` 内存 + DB 双路）、`service/channel_select_auto_groups_test.go`（新增 `TestCacheGetRandomSatisfiedChannelMemberLevelExclusion`）；`channel_slow_stream_selection_test.go`/`channel_disabled_model_test.go`/`controller/model_management_test.go` 机械签名更新
+
+### 验证
+
+- `go1.26.1`；`gofmt` 干净（仅去掉了 `channel_disabled_model_test.go`/`model_group_select.go` 的缺失尾换行，非本次引入的格式债不动）；`go vet ./model ./service ./controller` 干净；`go build ./...` 干净
+- SQLite：`go test ./model ./service -count=1` 全红转绿；`go test ./controller -run 'TestModelManagement' -count=1` 通过
+- 新用例 4 组断言（内存 + DB 回退两路一致）：`exclude=[]` → 9401/`m-a`；`exclude=[{9401,"m-a"}]` → **9401/`m-b`（兄弟成员接管）**；`exclude=[{9401,"m-a"},{9401,"m-b"}]` → 9402/`m-c`；`exclude=[{9401,""}]`（整渠道）→ 9402/`m-c`。service 层同断言：首轮 2201/`m-a`，`ExcludeChannelModel(2201,"m-a")` 后仍 2201 且上下文键为 `m-b`
+- PostgreSQL 17.4（Supabase 直连 IPv6，`PreferSimpleProtocol`）：一次性 `TEST_POSTGRES_DSN` 用例（`model/zz_tmp_member_exclude_pg_test.go`，跑完即删未入提交）——`AutoMigrate` 四表 + 同一 9401/9402 夹具，DB 回退路径 4 组断言全部通过（`29.67s PASS`）
+- MySQL：本机 `127.0.0.1:3306` 无监听、`.env` 无 `TEST_MYSQL_DSN`，阻塞未测；本次未新增任何 SQL，仅删掉一个 `NOT IN` 子句，剩余为标准 `JOIN/NOT EXISTS`
+
+### 边界（有意不动）
+
+- 显式渠道级加权 mapping（1:N 加权值）不经成员排除；normalized-model 回退分支空成员 → 整渠道排除（与改动前一致）
+- `common.RetryTimes` 预算不变：兄弟成员接管只发生在重试循环仍有剩余次数时
+- 慢速降级、`processChannelError` 封禁键、auto 分组级联均未改；排除集合只是本次请求的重试内存态，不落库
 
 ## 2026-09-09 同步上游 39 提交（`eb99ab1b4` → `4fc9d1f1f`）冲突决策
 

@@ -145,3 +145,50 @@ func TestCacheGetRandomSatisfiedChannelUsesTokenAutoGroupsWhenGlobalAutoIsEmpty(
 	assert.Equal(t, "default", selectedGroup)
 	assert.Equal(t, "default", common.GetContextKeyString(ctx, constant.ContextKeyAutoGroup))
 }
+
+func TestCacheGetRandomSatisfiedChannelMemberLevelExclusion(t *testing.T) {
+	db := setupChannelSelectAutoGroupsTest(t)
+	const modelName = "member-exclusion-model"
+
+	pri5 := int64(5)
+	pri4 := int64(4)
+	w100 := uint(100)
+	require.NoError(t, db.Create(&model.Channel{
+		Id:       2201,
+		Type:     constant.ChannelTypeOpenAI,
+		Key:      "key-2201",
+		Status:   common.ChannelStatusEnabled,
+		Name:     "channel-2201",
+		Weight:   &w100,
+		Models:   "m-a,m-b",
+		Group:    "default",
+		Priority: &pri5,
+	}).Error)
+	group := model.ModelGroup{Name: modelName, Source: model.GroupSourceManual, Enabled: true}
+	require.NoError(t, db.Create(&group).Error)
+	require.NoError(t, db.Create(&model.ModelGroupItem{GroupId: group.Id, ChannelId: 2201, Model: "m-a", Enabled: true, Priority: &pri5, Weight: &w100}).Error)
+	require.NoError(t, db.Create(&model.ModelGroupItem{GroupId: group.Id, ChannelId: 2201, Model: "m-b", Enabled: true, Priority: &pri4, Weight: &w100}).Error)
+	model.InitChannelCache()
+
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	common.SetContextKey(ctx, constant.ContextKeyUserGroup, "default")
+	param := &RetryParam{Ctx: ctx, TokenGroup: "default", ModelName: modelName, RequestPath: "/v1/chat/completions", Retry: common.GetPointer(0)}
+
+	first, _, err := CacheGetRandomSatisfiedChannel(param)
+	require.NoError(t, err)
+	require.NotNil(t, first)
+	assert.Equal(t, 2201, first.Id)
+	assert.Equal(t, "m-a", common.GetContextKeyString(ctx, constant.ContextKeySelectedUpstreamModel))
+
+	// The failed member is excluded; the sibling member of the same channel
+	// must take over instead of the request cascading to a lower tier.
+	param.ExcludeChannelModel(2201, "m-a")
+	param.IncreaseRetry()
+
+	second, _, err := CacheGetRandomSatisfiedChannel(param)
+	require.NoError(t, err)
+	require.NotNil(t, second)
+	assert.Equal(t, 2201, second.Id, "同渠道兄弟成员必须接管，不得级联到低优先级渠道")
+	assert.Equal(t, "m-b", common.GetContextKeyString(ctx, constant.ContextKeySelectedUpstreamModel))
+}

@@ -36,20 +36,29 @@ func AppendTaskPluginIdentityFilter(c *gin.Context, pluginKey string) {
 }
 
 type RetryParam struct {
-	Ctx             *gin.Context
-	TokenGroup      string
-	ModelName       string
-	RequestPath     string
-	Retry           *int
-	ExcludeChannels []int
-	resetNextTry    bool
+	Ctx                  *gin.Context
+	TokenGroup           string
+	ModelName            string
+	RequestPath          string
+	Retry                *int
+	ExcludeChannelModels []model.ExcludedChannelModel
+	resetNextTry         bool
 }
 
+// ExcludeChannel excludes a whole channel from the retry selection. Used for
+// channel-scoped conditions (rate limits), where every member is affected.
 func (p *RetryParam) ExcludeChannel(id int) {
-	if p.ExcludeChannels == nil {
-		p.ExcludeChannels = []int{}
+	p.ExcludeChannelModel(id, "")
+}
+
+// ExcludeChannelModel excludes one member row (channelId, upstreamModel) so
+// sibling members of the same channel stay eligible. An empty upstreamModel
+// excludes the whole channel, matching ExcludeChannel.
+func (p *RetryParam) ExcludeChannelModel(channelId int, upstreamModel string) {
+	if p.ExcludeChannelModels == nil {
+		p.ExcludeChannelModels = []model.ExcludedChannelModel{}
 	}
-	p.ExcludeChannels = append(p.ExcludeChannels, id)
+	p.ExcludeChannelModels = append(p.ExcludeChannelModels, model.ExcludedChannelModel{ChannelId: channelId, Model: upstreamModel})
 }
 
 func (p *RetryParam) GetRetry() int {
@@ -81,15 +90,18 @@ func (p *RetryParam) ResetRetryNextTry() {
 // CacheGetRandomSatisfiedChannel tries to get a random channel that satisfies the requirements.
 // 尝试获取一个满足要求的随机渠道。
 //
-// Channel selection is exclude-driven: the caller accumulates the ids of
-// already-tried (failed or rate-limited) channels in param.ExcludeChannels, and
-// each call re-rolls only among the highest priority tier of the remaining
-// channels. Retries therefore prefer another channel at the same priority;
-// only when that tier is fully excluded does selection cascade to the next
-// lower priority tier, and (for "auto" groups) to the next group.
-// 渠道选择由排除集合驱动:调用方将已尝试(失败或限流)的渠道 id 累积在
-// param.ExcludeChannels 中,每次调用只在剩余渠道的最高优先级层内重新随机。
-// 因此重试会优先选择同一优先级的其他渠道;只有该层被全部排除后,选择才会
+// Channel selection is exclude-driven: the caller accumulates the (channel,
+// member) pairs of already-tried (failed) channels — or whole channel ids for
+// channel-scoped conditions such as rate limits — in
+// param.ExcludeChannelModels, and each call re-rolls only among the highest
+// priority tier of the remaining candidates. A failed member is handed over to
+// a sibling member of the same channel; only when every member of the tier is
+// excluded does selection cascade to the next lower priority tier, and (for
+// "auto" groups) to the next group.
+// 渠道选择由排除集合驱动:调用方将已尝试(失败)的 (渠道, 成员) 对累积在
+// param.ExcludeChannelModels 中(限流等渠道级条件则排除整渠道),
+// 每次调用只在剩余候选的最高优先级层内重新随机。
+// 成员失败后由同渠道的兄弟成员接替;只有该层全部成员被排除后,选择才会
 // 级联到下一个较低优先级层,以及(对于 "auto" 分组)下一个分组。
 //
 // For "auto" tokenGroup with cross-group Retry enabled:
@@ -125,6 +137,9 @@ func (p *RetryParam) ResetRetryNextTry() {
 //	         分组B, 剩余最高优先级层
 func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, error) {
 	var channel *model.Channel
+	// selectedMember is the member row the selector actually drew for
+	// `channel` (verbatim upstream model, "" when it had none to report).
+	var selectedMember string
 	var err error
 	selectGroup := param.TokenGroup
 	userGroup := common.GetContextKeyString(param.Ctx, constant.ContextKeyUserGroup)
@@ -162,12 +177,12 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			}
 			logger.LogDebug(param.Ctx, "Auto selecting group: %s, priorityRetry: %d", autoGroup, priorityRetry)
 
-			channel, _ = model.GetRandomSatisfiedChannel(
+			channel, selectedMember, _ = model.GetRandomSatisfiedChannel(
 				autoGroup,
 				param.ModelName,
 				priorityRetry,
 				filters,
-				param.ExcludeChannels,
+				param.ExcludeChannelModels,
 			)
 			if channel == nil {
 				// Current group has no available channel for this model, try next group
@@ -205,28 +220,28 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			break
 		}
 	} else {
-		channel, err = model.GetRandomSatisfiedChannel(
+		channel, selectedMember, err = model.GetRandomSatisfiedChannel(
 			param.TokenGroup,
 			param.ModelName,
 			param.GetRetry(),
 			filters,
-			param.ExcludeChannels,
+			param.ExcludeChannelModels,
 		)
 		if err != nil {
 			return nil, param.TokenGroup, err
 		}
 	}
-	// [personal] Row-level passthrough: record the selected member's upstream
-	// model so SetupContextForSelectedChannel and the ban path reuse it
-	// instead of re-guessing among sibling members on the same channel.
-	// ResolveModelGroupUpstreamModel is deterministic per (model, channel):
-	// cache path reads the best member override, DB path takes the single
-	// best row via ORDER BY … LIMIT 1 with the same
-	// (priority → weight → model ASC) rule as the selectors' per-channel
-	// aggregation, so no second random roll happens here.
-	// param.ModelName is the routable model in both branches (auto or not).
+	// [personal] Row-level passthrough: record the member the selector actually
+	// drew (exclusion-aware) so the retry loop excludes exactly that
+	// (channel, member) pair while sibling members stay eligible, and so
+	// SetupContextForSelectedChannel rewrites with the same member. The value
+	// is the member's upstream model verbatim — including when it equals the
+	// routable name (auto groups) — and "" only when the selector had no member
+	// row to report; the caller then falls back to whole-channel exclusion.
+	// Always written (even when empty) to clear a stale value from the previous
+	// retry round.
 	if channel != nil && param != nil && param.Ctx != nil && param.ModelName != "" {
-		common.SetContextKey(param.Ctx, constant.ContextKeySelectedUpstreamModel, model.ResolveModelGroupUpstreamModel(param.ModelName, channel.Id))
+		common.SetContextKey(param.Ctx, constant.ContextKeySelectedUpstreamModel, selectedMember)
 	}
 	return channel, selectGroup, nil
 }
