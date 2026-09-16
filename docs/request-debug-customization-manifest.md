@@ -1,6 +1,6 @@
 # 定制功能清单（personal 分支）
 
-> 对应分支：`personal` 基线 `317e9ddd`（2026-09-16 刷新至 `fc82ee85b`；历史 deploy 功能部分可用 `git diff upstream/main...317e9ddd` 核对。`deploy` 分支已于 2026-09-04 删除，留档 tag `deploy-image-*` 仅历史回滚，分支拓扑见 `docs/local-github-workflow.md`。上游同步方式自 2026-09-16 起改为**选择性纳入**，见文末「选择性纳入上游」小节）
+> 对应分支：`personal` 基线 `317e9ddd`（2026-09-16 刷新至 `aedfa6f0f`；历史 deploy 功能部分可用 `git diff upstream/main...317e9ddd` 核对。`deploy` 分支已于 2026-09-04 删除，留档 tag `deploy-image-*` 仅历史回滚，分支拓扑见 `docs/local-github-workflow.md`。上游同步方式自 2026-09-16 起改为**选择性纳入**，见文末「选择性纳入上游」小节）
 > 以下功能均为 `personal` 魔改线相对 `upstream/main` 的定制（含历史 deploy 登记）；文末「personal 分支半重构登记」小节单独登记 `personal` 相对基线 `317e9ddd` 的半重构。
 > 魔改提交：`f10d688f`（上游模型自动删除开关与筛选模型）→ `ee6da30d`（请求调试日志 + 日志清理 + 同优先级重试 + GHCR 构建）→ `a5a2304f`（渠道限流 RPM）→ `6a12bc8d`（上下文感知限流 + float RPM）→ `48f9c2e2`（RPM 输入 `step='any'`）→ `fab8e37f`（渠道测试请求文案定制）→ `d840c4fb`（加权模型映射）→ `3ecd81c9`（加权映射目标暴露修复）→ `d23122a5`（暴露目标守卫排除 source key）→ `484d024c`（额度显示模式切换修复）→ `99cc5e56`（token 大数 K/M/B 分级显示）→ `827b6092`（manifest 登记 token 大数）→ `44ac09de`（三文档头部标记刷新）→ `bf00be83`（504/524 超时重试开关 + 超时自动禁用）→ `cda0a61f`（token 显示改进：删除 Token 后缀）→ `e033cc91`（流式结束原因分类与中断流语义）→ `6ff43dbc`（实时连接追踪）→ `ad37eb30`（manifest 登记实时连接追踪）→ `b1e3ff0c`（恢复上游 stream_status_test.go + 拆分分类测试）→ `3958b068`（实时连接表格优化）→ `e8078e55`（尾部随机请求 ID + 下游/上游双模型列）→ `30286246`（三文档头部标记刷新至 c759de26）→ `c0272220`（滑动窗口渠道自动禁用）→ `db70cf02`（partial_failure length 收尾 + 异常流记错误日志）→ `678cdb6c`（实时连接侧边栏入口迁至 general 组）→ `33f8aa0f`（日志 t/s 计算排除 TTFT）→ `c8940a305`（模型组成员封禁悬停显示上次探测错误 + 永久封禁标识）→ `1d1034fcf`（封禁原因 tooltip 文字溢出框体）→ `0906c8354`（真实请求测活（重建模式））→ `1965f03cb`（修复真实请求测活池并发写穿）→ `604b5cdcc`（刷新三文档头部至 1965f03cb 并登记真实请求测活）→ `34f9a336c`（刷新三文档头部至 604b5cdcc 并校正构建说明）→ `c3721f95d`（RELAY_DISABLE_KEEP_ALIVE 与代理日志）→ `0fbbbf76b`（恢复 TLSInsecureSkipVerify 回归）→ `551330c09`（错误日志记录实际上游模型）→ `4638278c2`（成员封禁：last_error 持久化与永久封禁标识）→ `34f0a9a4d`（渠道测试复用 chat→responses 全局策略：测试与真实转发一致）→ `6c8f665fd`（chat→responses 出站统一：组名映射/加权/后缀全枚举）→ `0c5ba81c1`（成员级重试排除：同渠道兄弟成员接管）
 
@@ -1020,3 +1020,56 @@ rebase 210 魔改提交全部重放，上游 `upstream/main` 完全包含于 HEA
 - **探针 abort-and-skip 的连锁效应**：`channel-mutate-drawer.tsx` 命中 8 个提交的冲突清单，渠道 UI 提交串是耦合单元，必须整串取或整串不取。29 个冲突提交四类分解：8 纯已删文件、1 纯 i18n、3 真代码、17 混合。
 - **relaykit 硬约束**：`3cea2bf79` 改 `relaykit/dto/{billing_usage,openai_response,usage_merge}.go`，已单独跑 `cd relaykit && GOWORK=off go build ./...`（退出码 0）；根模块构建不替代该验证。
 - **一次性工作区构建前置（实测坑，与上游设计有关，非本轮引入）**：`main.go` 有 `//go:embed web/dist` + `//go:embed web/dist/index.html`，`web/dist` 被 `.gitignore` 忽略，故**新 worktree 里 `go build ./...` 直接退出码 1**（`pattern web/dist: no matching files found`）；主仓库能过是因残留上次构建产物。在 worktree 跑后端构建前先 `cd web && bun run build` 或 `cp -r web/dist <worktree>/web/`。`.gitkeep` 占位**无效**（embed 忽略点开头文件，报 `contains no embeddable files`，实测），本项目不采用占位、保持 embed 不动。
+
+### 第二轮复核（2026-09-16 晚）：上游未前进，复核上轮判「不纳入」的 30 提交
+
+上游 ref **未前进**：`git ls-remote upstream refs/heads/main` = `69a50029819a26c53e6babd276d49cfe2f8880ad`，与本地上游 ref 一致（tip 2026-09-15 14:00 +0800）；窗口仍为 `4fc9d1f1f..upstream/main` 48 提交。本轮实质工作改为**独立复核上轮判为「不纳入」的 30 个提交**。
+
+**为什么要复核**：上轮的分类口径有系统性缺陷，两处都会把「该纳入」误判为「不纳入」：
+
+1. **探针是 abort-and-skip 口径**，跳过的提交会让同文件后续提交连锁冲突，冲突数被显著高估（例如 `channel-mutate-drawer.tsx` 命中 8 个提交的冲突清单）。
+2. **把「窗口内被排除提交创建的文件」误判为「personal 主动删除」**。典型：`web/src/features/channels/lib/channel-configuration.ts` 与 `.../__tests__/channel-configuration.test.tsx` 由**排除提交** `505805a4c` 创建，在 personal 和基线 `4fc9d1f1f` 里都不存在；上轮却按 `gone` 处理，连带把整批提交判死。
+
+**本轮方法**：每个提交都从 `personal` 净态起投（不再 abort-and-skip 累积），并用 `git ls-files -u` 的 stage 构成区分冲突类型（`{1,3}`=修改/删除、`{1,2,3}`=真内容冲突）。结论能力以 `git rev-list --cherry-mark` 之外的 `-x` 尾注检索为准。
+
+**复核结果**：30 个提交中，独立探针 2 干净 / 28 冲突；按本线判据（backend 相关 + 上游稳定性/relay 正确性/渠道适配 → 纳入；已删功能面 billing/pricing/OAuth/Passkey/订阅/wallet/ollama → 不纳入；纯前端 UI 打磨 → 一般不纳入），确认 **3 个提交该纳入却被上轮漏掉**，已补入；其余 27 个维持不纳入，理由与原判据一致（功能面已删或纯前端大改，且多数依赖链落在排除提交上）。
+
+#### 补充纳入清单（3 提交，按上游拓扑序）
+
+| 上游 SHA | 本地 SHA | 上游主题 | 类别 | 纳入理由 |
+|----------|----------|----------|------|----------|
+| `d4c26bfb8` | `453d75c0a` | fix(channels): allow editing multi-key selection strategy | fix | 渠道多密钥选择策略在编辑态无法修改，且单选渠道会误提交策略字段；渠道配置正确性缺陷 |
+| `c9a110190` | `5580ec819` | fix(channels): show built-in base URLs as placeholders | fix | 新增 `GET /api/channel/default_base_urls`，让渠道表单以**内置默认地址**作占位提示（原先只有 5 个渠道硬编码、其余为空）；渠道适配体验 |
+| `69a500298` | `a8bb94bb0` | feat(channel): per-route pass-through for advanced custom channels (#7386) | feat | advanced custom 渠道**按路由**决定是否透传请求体；relay 正确性核心功能，且配套 `relay_info.go` 路由级判定与 `relaykit` 校验 |
+
+#### 冲突处理记录（本地适配，均因 personal 已删面）
+
+- **`69a500298`**：`relaykit/dto/channel_settings.go` 的 `SupportsPassThroughBody()` 上游版把 `AdvancedCustomConverterSGLangRerank` 也判为可透传，但该常量由**未纳入**的 `8529f209c`（vLLM/SGLang 渠道）引入，personal 不存在 → 去掉该分支、只保留 `""` 与 `none`（并同步删除测试里的 SGLang 正例，测试内 `Routes[2]` 索引随之改为 `[1]`）；`web/src/features/channels/lib/channel-form.ts` 只采纳 `pass_through_body_enabled` 门控，丢弃随带引入的 `responses_websocket_enabled`（personal 无该字段）；drawer 的 `pass_through_body_enabled` 开关按上游语义加 `currentType !== CHANNEL_TYPE_ADVANCED_CUSTOM &&` 包裹（保留 personal 的抽屉结构，不引入 `505805a4c` 的字段重排）。
+- **`c9a110190`**：`web/src/features/channels/api.ts` 取 personal 版为底 + 追加 `getChannelDefaultBaseURLs`（personal 的 `channelActionConfig()` 口径，非上游的 `requireServerSuccess`）；drawer 手工应用 3 处 placeholder 替换 + 新增 `defaultBaseURLs` 查询；`channel-type-config.ts` 删除 5 个渠道的硬编码 `defaultBaseUrl`（`getDefaultBaseUrl` 在 personal 无调用方，删除安全）。
+- **`d4c26bfb8`**：drawer 采用 personal 版结构 + 单行语义改动（`!isEditing && multiKeyMode === 'multi_to_single'` → 加 `isMultiKeyChannel ||`）；`use-channel-mutate-form.ts` 干净落线。
+- 三个提交共同涉及的 `channel-configuration.ts` / `channel-configuration.test.tsx` 均**由排除提交创建、personal 不存在**，按 `git rm`（保持删除）处理。
+
+#### 验证
+
+- 三构建：根模块 `go build ./...`（退出码 0）、`relaykit`（`GOWORK=off go build ./...`，0）、前端 `bun run build`（成功）。
+- 后端测试：`go test -count=1 ./relay/common/... ./relay/channel/advancedcustom/... ./controller/... ./router/...` 全绿；`./model/... ./service/... ./common/... ./pkg/...` 全绿；`relaykit` 全模块 `go test ./...` 全绿。
+- 前端测试：vitest 89 文件 / 902 用例全绿。
+- `gofmt`：本次改动的 3 个 Go 文件在**基线上已脏**（`controller/channel.go`、`relay/common/relay_info.go`、`relaykit/dto/channel_settings.go`，均为既有漂移；门禁只查改动文件，故未扩大改动面）；`go vet ./relay/... ./controller/ ./router/` 通过。
+- 兼容性：3 个提交均带 `-x` 尾注。
+
+#### 同轮发现的两项既有缺陷（非本轮引入，已单列说明，未在本轮修复）
+
+1. **`web/src/features/auth/types.ts` 被截断（personal 既有缺陷）**：该文件在 `ea2d310ec`（2026-09-09「移除开放注册与 OAuth/Passkey 前端残余」）被过度删除——`SystemStatus` 接口的 `data?: {` 打开后未闭合，文件在 `logo?: string` 处戛然而止（花括号 12 `{` / 10 `}`，其父提交为平衡的 16/16）。后果：`AuthFormProps`、`CustomOAuthProviderInfo` 等类型**已不再声明，但仍被 import 与 `index.ts` 重导出**（`user-auth-form.tsx` 依赖 `AuthFormProps`）；`tsgo` 报 `TS1005: '}' expected`。另 `features/auth/api.ts` 仍 import 已被同提交删除的 `./lib/telegram-login`。
+2. **门禁前端类型检查是**空转**：`scripts/sync-gate.sh` 用 `bunx tsc --noEmit --pretty false`，但 `web/tsconfig.json` 是 solution-style（`"files": []` + `references`），裸 `tsc` 不编译任何文件、**恒退出 0**。真正的检查器是 `tsgo -b`（`bun run typecheck`）。这正是缺陷 1 长期未被发现的原因。修复缺陷 1 后会暴露 **41 个既有错误 / 24 个文件**（全部在 personal 既有面：`models-columns.tsx` 未用导入、`rankings/entity-links.tsx` 指向已删的 `/pricing/$modelId` 路由、`system-settings/types.ts` 重复键 `channel_slow_stream_setting.ttft_threshold`、`usage-logs/types.ts` 缺失 `RequestRuleTrace` 等）——**本轮改动的 26 个文件零错误**，故本轮不动这些既有面。
+
+### 同步工具修复（同轮，`aedfa6f0f`）
+
+`scripts/i18n_3way_merge.py` 两处缺陷都会**静默**产出错误结果（不报错、无冲突标记）：
+
+1. **只按顶层按键合并**：locale 文件是 `{"translation": {键: 值}}`，顶层只有 `translation` 一个键，而它在 base/theirs 间必然不同，于是整个内层对象被 theirs 覆盖、**ours 独有的键被全部清空**。本轮实测 `69a500298` 冲突上 personal 侧 165 个独有键被抹掉（5190 → 6531 全取上游版）。已改为递归下钻。
+2. **输出走 `json.dump`**：会把 `footer.\u0061pi.projectAttributionSuffix` 这类**受项目政策保护的转义标识符**还原成明文。已改为按行拼接——只重放 theirs 中「新增/修改」的原始行，ours 的行按原字节保留，并原样保留 JSON 外壳。
+
+验证：以本轮真实冲突数据复现（base=`69a500298^`、ours=`9e2dd38e6`、theirs=`69a500298`，七语言各一份）——personal 独有键全部保留、上游新增 6 键全部落入、转义键保持转义、输出为合法 JSON；修复前同一输入产出上游全量覆盖版。
+
+> **教训**：cherry-pick 冲突里 i18n locale 是「看不出错」的重灾区——文本级冲突解完可能既无标记也无报错，却是整段丢失。凡 locale 走三方合并，必须**逐键核对**（键数 `ours → ours+新增`、抽样验证 ours 独有键仍在），不能只看「冲突已解」。
+> **另一教训**：`cherry-pick` 期间**不要依赖 rerere**（本轮曾因 rerere 重放上一版陈旧解，把已修好的 locale 与 relaykit 打回错误状态）。解冲突前先 `git config rerere.enabled false` 并清 `.git/rr-cache`，或解完逐个复核终态。
