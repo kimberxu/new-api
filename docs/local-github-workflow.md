@@ -116,7 +116,21 @@ cd web && systemd-run --user --scope -p MemoryMax=1G -- bun run test
 
 ### 动机（实测数据，2026-09-16 窗口 `4fc9d1f1f..upstream/main`，48 提交 / 546 文件 / +51730-10356）
 
-旧的 `git rebase upstream/main personal` 在当前的删除面下已不可持续：`git merge-tree` 模拟显示 **130 处冲突**（36 处内容冲突 + 93 处「personal 已删除、上游又改」+ 1 处重命名），其中 78/93 的修改-删除冲突落在已删功能（billing/pricing/OAuth/Passkey/订阅/wallet/redemption）上；重放 228 个魔改提交 × 逐提交解冲突的成本远高于收益。选择性纳入把「一次性大对冲」换成「按需取用 + 每次只碰一个提交」。
+**冲突数口径**：`git merge-tree --write-tree --name-only` 输出**第一行是 tree hash，第 2 行起是冲突路径清单**（135 行），再往后是「自动合并 X」/「冲突（内容）：…」逐文件日志（非冲突清单，别把它连同自动合并行一起计数）。真实冲突数按**描述行**取：**130 处**（36 内容 / 93 修改-删除 / 1 重命名）。实际 `git merge --no-commit` 落到工作区为 **125 个冲突文件**（92 DU + 32 UU + 1 UA），与 merge-tree 口径的 8 处差异全是「merge-tree 报冲突但三方合并能自动解」的文件。
+
+三种方案在本窗口的实测成本（均在 `/tmp` 一次性 worktree 内实跑）：
+
+| 方案 | 冲突总数 | 机械可解 | 真需人工 | merge-base | 可维护性 |
+|------|---------|---------|---------|-----------|---------|
+| **全量 merge** | 125 文件 | **92 DU**：全部为 personal 主动删除（92/92 在基线存在），`git rm` 循环即清零 | **32 UU**：其中 11 个是 i18n locale（批量三方合并）、21 个代码；但经逐文件溯源，**28 个 UU 仅由本线主动排除的提交引起**、3 个混杂、**0 个仅由已纳入提交引起** | **前进到 upstream/main** | 一次推进基座；代价是 merge 会**静默带入 94 个新增文件（含 29 个属已删功能面）**，需事后逐个 `git rm`——本轮实测 `relay/responses_websocket.go`、`pkg/wsmanager/`、`relay/request_billing.go`、`model/passkey_option.go` 等全部无冲突落入 |
+| **纯 cherry-pick** | 逐提交 19 干净 / 29 冲突 | 8 个纯已删文件（`git rm` 即解） | 真代码冲突仅 **3** 个提交；17 个为「已删文件 + 真代码」混合 | **不动**（停在 `4fc9d1f1f`） | 每次只碰一个提交、粒度可控、可精准跳过已删功能面；代价是基座不前进、上游提交以新 SHA 出现，需靠 `-x` 尾注追踪 |
+| **混合（推荐）** | — | — | 仅对**选中提交**跑 cherry-pick（本轮 18 个中 17 个零冲突、1 个仅 `git rm` 4 文件） | 不动（同 cherry-pick） | 兼顾「精准取用」与「低跟踪成本」；基座不前进的问题由 `-x` 尾注 + `--cherry-mark` 计数缓解 |
+
+**为什么本窗口选 cherry-pick 而非 merge**（关键实测）：merge 的 32 个内容冲突里 **28 个源自本线主动排除的提交**（如 `9fe0457ee` Responses WebSocket → `controller/relay.go`/`relay/responses_handler.go`；`74629e29f` 插件任务流 → `details-dialog.tsx`/`task-plugins/*`；`12be9975c` 前端错误通知 → `users/api.ts` 等 5 文件；`385d2dfd1` passkey → `login_verification.go`）。这些冲突**不是「合并需要解决的分歧」，而是「已经决定不要的上游功能」**——为它们逐文件解冲突是纯浪费；且 merge 还会无冲突带入 29 个已删功能面的新增文件，事后仍需人工 `git rm`。相比之下 cherry-pick 可以**根本不碰**这些提交。若某轮上游改动以「想全要的 bugfix」为主、排除面很小，merge 更划算（一次推进基座）。
+
+### 探针口径警告（避免高估人工成本）
+
+逐提交探针是 abort-and-skip 策略：跳过的提交会让**同文件的后续提交连锁冲突**。实测 `web/src/features/channels/components/drawers/channel-mutate-drawer.tsx` 出现在 **8 个提交**的冲突清单里（`505805a4c` 及其后继），说明渠道 UI 那串提交是**耦合单元**——要么整串取、要么整串不取，不能只取一半。汇报探针冲突时要按四类分解：**纯 i18n locale**（批量三方合并）/ **纯已删文件**（`git rm`）/ **真代码冲突**（需人工）/ **依赖链**（耦合单元整体决策）。本窗口 29 个冲突提交的分解：8 纯已删文件、1 纯 i18n、3 真代码、17 混合（含已删文件 + 真代码）。
 
 ### 分类判据（决定一个上游提交是否纳入）
 
@@ -172,10 +186,10 @@ git push origin personal                  # 推代码；纯代码/文档改动�
 
 ### 与全量 rebase 的兼容性（两法可交替）
 
-cherry-pick 用 `-x` 记录来源，patch-id 与上游原提交一致；因此**日后若做全量 `git rebase upstream/main personal`，这 18 个已纳入提交会被默认丢弃（默认 `--no-reapply-cherry-picks`），不会重复**。反之，全量 rebase 已经带入过的上游提交也无需再 cherry-pick。核对命令：
+cherry-pick 用 `-x` 记录来源，patch-id 与上游原提交一致（本轮 18 个中 **17 个等价，1 个例外**：`c79b74b68` → `fc82ee85b` 因手工解冲突（`git rm` 4 个已删文件）致 patch-id 变更，日后全量 rebase 时这 1 个会被重新拣起并可能再冲突，需手工 `git rm` 跳过）。其余 17 个在日后全量 `git rebase upstream/main personal` 时会被默认丢弃（默认 `--no-reapply-cherry-picks`），不会重复。核对命令：
 
 ```bash
-git rev-list --cherry-mark --right-only --oneline personal...upstream/main | grep -c '^='   # 已等价纳入的提交数
+git rev-list --cherry-mark --right-only --oneline personal...upstream/main | grep -c '^='   # 应输出 17
 git merge-base --is-ancestor upstream/main personal && echo "全量已同步" || echo "选择性纳入模式（upstream/main 非 personal 祖先）"
 ```
 
