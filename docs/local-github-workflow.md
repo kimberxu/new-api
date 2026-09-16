@@ -1,6 +1,6 @@
 # 本地 GitHub Fork 工作流
 
-> 对应分支:`personal` 基线 `317e9ddd`(2026-09-16 刷新至 `eed1a8b3b`;`personal` 线同步流程见「同步上游」节)
+> 对应分支:`personal` 基线 `317e9ddd`(2026-09-16 刷新至 `8ef4727b9`;`personal` 线同步流程见「同步上游」节)
 
 ## 标准触发短语
 
