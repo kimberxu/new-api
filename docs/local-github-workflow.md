@@ -213,6 +213,8 @@ git merge-base --is-ancestor upstream/main personal && echo "全量已同步" ||
 
 - 三构建：根模块 / relaykit 独立模块 / 前端 `bun run build`。
 - 测试：`systemd-run --user --scope -p MemoryMax=1G -- go test -count=1 ./controller/... ./service/... ./relay/... ./common/... ./pkg/billingexpr/...` + `bun run test`。
+- **一次性工作区构建前置（实测坑）**：`main.go` 有 `//go:embed web/dist` 与 `//go:embed web/dist/index.html` 两条指令，而 `web/dist` 被 `.gitignore` 忽略。**新建 worktree 后 `go build ./...` 会以 `main.go:44:12: pattern web/dist: no matching files found` 失败（退出码 1）**——主仓库 gate 能过是因为残留了上一次 `bun run build` 的产物。在 worktree 里跑后端构建前，须先 `cd web && bun run build`（或从主仓库 `cp -r web/dist <worktree>/web/`）。
+  - **注意 `.gitkeep` 方案无效**：Go `embed` 忽略以 `.` 开头的文件，只放 `web/dist/.gitkeep` 会报 `cannot embed directory web/dist: contains no embeddable files`（实测）；且 `index.html` 那条指令要求该文件必须存在。因此占位必须是**非点开头的真实文件**（如 `placeholder.txt` + `index.html`），但本项目**不采用**占位方案——上游设计即要求真实前端产物，保持 embed 不动、验证前先构建即可。
 - **DB 改动额外要求**：凡纳入 `model/` 迁移类提交（如 `043ff99a5`、`007d69942`），按 AGENTS.md 要求跑 SQLite + PostgreSQL 两库；PG 用 `.env` 的 `SQL_DSN` 作 `TEST_POSTGRES_DSN`：
   `set -a; source .env; set +a; TEST_POSTGRES_DSN="$SQL_DSN" go test -count=1 -run "TestMigratePrefillGroupUniquenessPostgreSQL|TestMigrationSchemaStability" -v ./model/`
   （两测试均在事务内建独立 schema/表并回滚，不触碰共享库的应用表，符合共享库清理硬约束。）
